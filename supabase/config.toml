@@ -1,0 +1,8 @@
+# Configuración de la Supabase CLI para el ERP Chepito.
+# El project_id se completa/actualiza al enlazar con:
+#   npm run db:link -- --project-ref <TU_PROJECT_REF>
+project_id = "erp-chepito"
+
+[db]
+# Versión mayor de Postgres del proyecto en la nube (Supabase usa 15).
+major_version = 15
