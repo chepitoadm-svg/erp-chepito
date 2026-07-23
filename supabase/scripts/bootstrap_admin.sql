@@ -15,7 +15,7 @@
 
 do $$
 declare
-  v_email    text := 'admin@chepito.cr';   -- <<< CAMBIAR por el email real
+  v_email    text := 'chepitoadm@gmail.com';   -- <<< CAMBIAR por el email real
   v_user_id  uuid;
   v_rol_id   uuid;
 begin

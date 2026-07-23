@@ -27,6 +27,7 @@ export interface Database {
           cedula_juridica?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["empresa"]["Insert"]>;
+        Relationships: [];
       };
       sucursales: {
         Row: {
@@ -46,6 +47,7 @@ export interface Database {
           tipo: "punto_venta" | "produccion" | "administracion";
         };
         Update: Partial<Database["public"]["Tables"]["sucursales"]["Insert"]>;
+        Relationships: [];
       };
       bodegas: {
         Row: {
@@ -67,6 +69,7 @@ export interface Database {
           tipo: "materia_prima" | "producto_terminado" | "general";
         };
         Update: Partial<Database["public"]["Tables"]["bodegas"]["Insert"]>;
+        Relationships: [];
       };
       cuentas: {
         Row: {
@@ -94,6 +97,7 @@ export interface Database {
           acepta_movimiento?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["cuentas"]["Insert"]>;
+        Relationships: [];
       };
       periodos_contables: {
         Row: {
@@ -118,6 +122,7 @@ export interface Database {
           estado?: "abierto" | "cerrado" | "bloqueado";
         };
         Update: Partial<Database["public"]["Tables"]["periodos_contables"]["Insert"]>;
+        Relationships: [];
       };
       roles: {
         Row: {
@@ -139,6 +144,7 @@ export interface Database {
           es_sistema?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["roles"]["Insert"]>;
+        Relationships: [];
       };
       permisos: {
         Row: {
@@ -155,11 +161,13 @@ export interface Database {
           descripcion?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["permisos"]["Insert"]>;
+        Relationships: [];
       };
       roles_permisos: {
         Row: { rol_id: string; permiso_id: string };
         Insert: { rol_id: string; permiso_id: string };
         Update: Partial<{ rol_id: string; permiso_id: string }>;
+        Relationships: [];
       };
       perfiles: {
         Row: {
@@ -179,11 +187,13 @@ export interface Database {
           estado?: Estado;
         };
         Update: Partial<Database["public"]["Tables"]["perfiles"]["Insert"]>;
+        Relationships: [];
       };
       usuarios_sucursales: {
         Row: { usuario_id: string; sucursal_id: string };
         Insert: { usuario_id: string; sucursal_id: string };
         Update: Partial<{ usuario_id: string; sucursal_id: string }>;
+        Relationships: [];
       };
       auditoria: {
         Row: {
@@ -198,8 +208,10 @@ export interface Database {
         };
         Insert: never;
         Update: never;
+        Relationships: [];
       };
     };
+    Views: { [_ in never]: never };
     Functions: {
       mis_sucursales: { Args: Record<string, never>; Returns: string[] };
       soy_administrador: { Args: Record<string, never>; Returns: boolean };
@@ -230,5 +242,7 @@ export interface Database {
         }[];
       };
     };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
 }

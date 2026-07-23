@@ -163,8 +163,13 @@ Aplican en TODOS los módulos, siempre:
 
 - Este CLAUDE.md es la **fuente de verdad**; manténlo actualizado con cada
   decisión de arquitectura que se tome.
-- **Fase 1 (Fundación): código escrito y commiteado**, pendiente de instalar y
-  probar en una máquina con salida de red (ver nota de entorno abajo).
+- **Fase 1 (Fundación): COMPLETADA Y VERIFICADA** (2026-07-22) contra un
+  proyecto Supabase real (`ERP Chepito`, ref `iwtbfdrchzqcrewiaiua`). Los 5
+  puntos del criterio de verificación pasaron: login del admin, alta de un
+  cajero con rol y sucursal, edición, desactivación (sin borrado físico),
+  aislamiento por rol/sucursal, y rastro en `auditoria`.
+- **Siguiente: Fase 2 (Contabilidad).** Antes de codear, proponer plan y diseño
+  de esquema y DETENERSE para aprobación (convención #1).
 
 ### Decisiones de arquitectura fijadas (Fase 1)
 
@@ -194,4 +199,20 @@ Aplican en TODOS los módulos, siempre:
   / `supabase db push` ahí. El código se escribe en esa máquina y se
   instala/prueba/pushea en otra con red. Arreglo de fondo: whitelist de red
   para `node.exe`.
+- **TLS interceptado (resuelto).** En la máquina de pruebas, un antivirus o
+  firewall re-firma el tráfico HTTPS con su propia CA raíz. Windows confía,
+  pero Node usa su propio almacén y rechazaba **todo** HTTPS
+  (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`), lo que se manifestaba como
+  `fetch failed` y mensajes engañosos ("Credenciales inválidas", botones que
+  "no hacen nada"). Por eso los scripts `dev` y `start` corren
+  `node --use-system-ca`. **Si algo falla con `fetch failed`, sospechar esto
+  primero.**
+- **Conexión a la base:** la opción "Direct connection" de Supabase **no sirve**
+  en esta red (`db.<ref>.supabase.co` solo resuelve a IPv6). Hay que usar el
+  **Session pooler** (`aws-1-us-west-2.pooler.supabase.com:5432`, usuario
+  `postgres.<ref>`).
+- **Llaves de API:** el proyecto usa el formato nuevo de Supabase
+  (`sb_publishable_` / `sb_secret_`), soportado por supabase-js 2.110+. Los
+  nombres de las variables de entorno se mantienen (`..._ANON_KEY`,
+  `..._SERVICE_ROLE_KEY`); solo cambia el valor.
 - Verificación de la Fase 1 y pasos de arranque: ver `README.md`.

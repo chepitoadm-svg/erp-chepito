@@ -22,6 +22,13 @@ export async function iniciarSesion(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    // El mensaje al usuario se mantiene genérico a propósito (no revelar si el
+    // correo existe), pero el motivo real se registra para poder diagnosticar.
+    console.error("[login] fallo signInWithPassword:", {
+      status: error.status,
+      code: error.code,
+      message: error.message,
+    });
     return { error: "Credenciales inválidas." };
   }
 

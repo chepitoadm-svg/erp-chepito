@@ -24,7 +24,15 @@ export async function tienePermiso(codigo: string): Promise<boolean> {
   const { data, error } = await supabase.rpc("tengo_permiso", {
     p_codigo: codigo,
   });
-  if (error) return false;
+  if (error) {
+    console.error("[permisos] rpc tengo_permiso falló:", {
+      codigo,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+    });
+    return false;
+  }
   return data === true;
 }
 
@@ -33,8 +41,13 @@ export async function tienePermiso(codigo: string): Promise<boolean> {
  * Server Action que modifique datos, ANTES de tocar el cliente admin.
  */
 export async function requerirPermiso(codigo: string): Promise<void> {
-  await requerirUsuario();
+  const user = await getUsuario();
+  if (!user) {
+    console.error("[permisos] requerirPermiso sin sesión:", { codigo });
+    throw new Error("No autenticado.");
+  }
   if (!(await tienePermiso(codigo))) {
+    console.error("[permisos] permiso denegado:", { codigo, userId: user.id });
     throw new Error(`Permiso denegado: se requiere "${codigo}".`);
   }
 }
