@@ -73,9 +73,24 @@ Aplican en TODOS los módulos, siempre:
 - **Centros de costo** por canal (Chepito 1, Chepito 2, Taller).
 - Manejo de préstamos, depreciación de activos fijos y saldos iniciales.
 - Produce **Estado de Resultados** y **Balance de Situación**.
-- Cuentas de patrimonio ya definidas: Capital Social (31-10), Depuración Saldos
-  Contables (31-11, cuenta puente de regularización), Utilidades no distribuidas
-  (31-50), Pérdidas y ganancias del periodo (31-90).
+- **Códigos de cuenta: 5 segmentos fijos `NN-NN-NN-NN-NN`.** El `nivel` es el
+  número de segmentos distintos de `00`. El catálogo real (371 cuentas) se
+  importa desde xlsx; el árbol está completo y `cuenta_padre_id` se deriva del
+  código.
+- Cuentas de patrimonio y **a cuál se postea de verdad** (la agrupadora no
+  acepta movimiento):
+
+  | Concepto | Agrupadora | **Cuenta posteable** |
+  |---|---|---|
+  | Capital Social | `31-10-00-00-00` (no acepta) | **`31-10-01-00-00` Acciones comunes** |
+  | Depuración Saldos Contables | — | **`31-11-00-00-00`** |
+  | Utilidades no distribuidas | — | **`31-50-00-00-00`** |
+  | Pérdidas y ganancias del periodo | — | **`31-90-00-00-00`** |
+
+- **Cuentas de orden** (`99-*`, tipo `orden`): son de memorando. Un asiento no
+  puede mezclarlas con cuentas reales, cuadran contra su propia contrapartida,
+  no llevan centro de costo y **se excluyen** del Balance y del Estado de
+  Resultados.
 
 ---
 
@@ -176,9 +191,12 @@ Aplican en TODOS los módulos, siempre:
 - **Stack:** Next.js App Router + TypeScript, `@supabase/ssr` (Auth por
   cookies), Tailwind v4, Zod, react-hook-form. Migraciones con la Supabase CLI.
 - **DB:** Supabase en la **nube**, proyecto nuevo y exclusivo (sin Docker).
-- **Esquema en español.** Sucursal = centro de costo unificado (tabla
-  `sucursales` con `tipo`). Un rol por usuario (M:N roles↔permisos para roles a
+- **Esquema en español.** Un rol por usuario (M:N roles↔permisos para roles a
   medida).
+- ~~Sucursal = centro de costo unificado~~ **SUPERADO en Fase 2:** los centros
+  de costo son su propia tabla extensible (`centros_costo`), porque "Venta
+  externa" y "General" no son sucursales físicas y el Taller es un acumulador
+  intermedio. Ver sección de Fase 2.
 - **Auditoría:** trigger genérico `fn_auditoria` → tabla `auditoria` (inmutable).
   Columnas `creado_*/actualizado_*` en cada tabla.
 - **Anular, nunca borrar:** sin políticas de DELETE; baja = `estado`.
@@ -191,6 +209,51 @@ Aplican en TODOS los módulos, siempre:
   luego desde xlsx.
 - **Patrón de referencia:** gestión de usuarios de punta a punta (migración →
   RLS → capa de datos → Server Actions → UI). Replicar en los demás módulos.
+
+### Decisiones fijadas (Fase 2 — Contabilidad)
+
+- **Marco legal (DGT-R-001-2013).** Los libros contables ya no requieren
+  legalización y pueden llevarse en el sistema que el contribuyente elija,
+  siempre que garantice **la seguridad y fiabilidad del registro**. Este ERP
+  puede ser legalmente el sistema contable de la sociedad; no hace falta
+  software certificado. **Consecuencia dura:** la inmutabilidad del asiento
+  confirmado, la bitácora de auditoría, la ausencia de DELETE y la anulación por
+  reversión **no son preferencias de diseño, son lo que sostiene esa
+  fiabilidad**. No se simplifican si estorban. Contabilidad en español y
+  conforme a NIIF.
+- **Centros de costo:** tabla propia `centros_costo`, extensible sin migración.
+  Dos tipos: **finales** (Chepito 1, Chepito 2, Venta externa) que salen en el
+  Estado de Resultados por canal, e **intermedios** (Taller, General) que
+  acumulan gasto compartido y se reparten a fin de mes. Toda línea de cuenta de
+  resultado exige centro; las de balance lo dejan en NULL. El inventario por
+  bodega es del módulo de inventario, **no** se mezcla con el centro de costo.
+- **Prorrateo:** es un asiento (`tipo='prorrateo'`), no un reporte. Se hace
+  **cuenta por cuenta** para conservar el detalle de gastos por canal. Regla de
+  redondeo obligatoria: las primeras n-1 líneas se redondean y **la última
+  absorbe el residuo**, por cuenta. Las bases suman 100 exacto, sin excepción.
+  Nace en `borrador` para revisarlo antes de confirmar.
+- **Doble partida:** `CONSTRAINT TRIGGER DEFERRABLE INITIALLY DEFERRED` sobre
+  `asientos_lineas` **y** sobre `asientos` (este segundo es imprescindible: sin
+  él se confirma un descuadre con un simple `UPDATE estado`). Valida solo cuando
+  el asiento queda `confirmado`. Estados:
+  `borrador → confirmado → anulado`, más `descartado` para borradores resueltos
+  al cerrar un periodo. El consecutivo se asigna **al confirmar**, no al crear.
+- **Fecha contable:** `asientos.fecha` es `DATE`, nunca `timestamptz` (CR es
+  UTC-6; una venta de las 7pm del 30 de junio caería en julio). Las marcas de
+  auditoría sí son `timestamptz`.
+- **Montos:** `NUMERIC(18,2)` siempre. Nunca `float`.
+- **Idempotencia:** índice único sobre `(origen_tipo, origen_id)`. El POS es
+  offline-first y puede sincronizar dos veces la misma venta.
+- **RLS de contabilidad: por permiso, no por sucursal.** Filtrar líneas por
+  sucursal mostraría medio asiento, que por definición no cuadra.
+- **Respaldos (decidido 2026-07-22):** NO se sube a Pro todavía. Se monta
+  respaldo propio con `pg_dump` diario vía GitHub Actions a repo privado, con
+  verificación de integridad, usando el **Session Pooler** (la Direct es IPv6 y
+  los runners de GitHub son IPv4; la Transaction del 6543 rompe el `COPY` de
+  `pg_dump`). Riesgo asumido: hasta 24 h de datos de construcción, todo
+  reconstruible. **Disparador de revisión: el arranque del POS en producción**
+  — ahí se sube a Pro y se valora PITR. Un día de ventas del POS no se
+  reconstruye.
 
 ### Nota de entorno
 
