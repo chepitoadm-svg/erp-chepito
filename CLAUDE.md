@@ -255,6 +255,28 @@ Aplican en TODOS los módulos, siempre:
   — ahí se sube a Pro y se valora PITR. Un día de ventas del POS no se
   reconstruye.
 
+### Libros contables obligatorios (CR)
+
+Son tres: **Diario**, **Mayor** e **Inventarios y Balances**. Los dos primeros
+salen del motor de Fase 2. El tercero **se parte en dos mitades**:
+
+- **Balances** (Balance de Situación y Estado de Resultados al cierre del
+  periodo fiscal): **entra en Fase 2**, expuesto como reporte de cierre con su
+  fecha y formato. Las vistas ya están en el alcance de la fase; diferirlo
+  obligaría a volver a tocar en Fase 3 algo ya construido.
+- **Inventarios** (detalle valuado por ítem): **se difiere a Fase 3**, porque
+  sin kardex con promedio ponderado no hay contenido que mostrar.
+
+**Condiciones de la mitad diferida:**
+
+1. **Fase 3 debe estar lista antes del cierre del periodo fiscal.** Si no
+   llega, el respaldo es el **conteo físico documentado**.
+2. El **conteo físico del 30/06/2026** que originó el asiento de apertura ya
+   cumple esa función **para esa fecha**: es respaldo válido del inventario a
+   esa fecha.
+3. **La fecha del cierre fiscal está sin confirmar.** NO darla por sentada ni
+   escribirla acá hasta que se confirme cuál le aplica a la sociedad.
+
 ### Nota de entorno
 
 - En la compu del trabajo, `node.exe` **no tiene salida de red** (firewall
