@@ -246,14 +246,36 @@ Aplican en TODOS los módulos, siempre:
   offline-first y puede sincronizar dos veces la misma venta.
 - **RLS de contabilidad: por permiso, no por sucursal.** Filtrar líneas por
   sucursal mostraría medio asiento, que por definición no cuadra.
-- **Respaldos (decidido 2026-07-22):** NO se sube a Pro todavía. Se monta
-  respaldo propio con `pg_dump` diario vía GitHub Actions a repo privado, con
-  verificación de integridad, usando el **Session Pooler** (la Direct es IPv6 y
-  los runners de GitHub son IPv4; la Transaction del 6543 rompe el `COPY` de
-  `pg_dump`). Riesgo asumido: hasta 24 h de datos de construcción, todo
+- **Respaldos (decidido 2026-07-22, IMPLEMENTADO 2026-07-24):** NO se sube a Pro
+  todavía. Riesgo asumido: hasta 24 h de datos de construcción, todo
   reconstruible. **Disparador de revisión: el arranque del POS en producción**
   — ahí se sube a Pro y se valora PITR. Un día de ventas del POS no se
   reconstruye.
+
+  **Cómo está montado:** repo privado aparte
+  **`chepitoadm-svg/erp-chepito-backups`**, con el workflow
+  `.github/workflows/respaldo.yml` que corre `pg_dump` **diario a las 08:00 UTC
+  (02:00 CR)** y commitea el `.sql.gz` en `respaldos/` del mismo repo. Se puede
+  disparar a mano con *Run workflow*. Único secreto: `SUPABASE_DB_URL`.
+
+  Detalles que costaron y no hay que volver a descubrir:
+  - Usa el **Session Pooler** (`aws-1-us-west-2.pooler.supabase.com:5432`): la
+    conexión Direct es IPv6 y los runners de GitHub son IPv4. La Transaction
+    (6543) rompe el `COPY` de `pg_dump`.
+  - **Hay que instalar `postgresql-client-17` Y poner
+    `/usr/lib/postgresql/17/bin` al frente del PATH.** Ubuntu deja la 16 como
+    predeterminada y `pg_dump` aborta con *"server version mismatch"* contra el
+    servidor 17.6.
+  - El volcado va por tubería a `gzip`, así que **`set -o pipefail` es
+    obligatorio**: sin eso un `pg_dump` fallido genera un archivo vacío y el
+    paso reporta éxito.
+  - Verifica integridad antes de guardar: `gzip -t`, tamaño mínimo y que el
+    volcado termine con *"PostgreSQL database dump complete"*.
+
+  **Limitación conocida:** respalda solo el esquema `public` (los libros, que es
+  lo irremplazable). **No incluye `auth.users`**, así que tras una restauración
+  hay que recrear los usuarios en el Dashboard; `perfiles` referencia a
+  `auth.users`, así que primero se recrean los usuarios y luego se restaura.
 
 ### Libros contables obligatorios (CR)
 
