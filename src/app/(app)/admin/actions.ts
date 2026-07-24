@@ -108,6 +108,44 @@ export async function crearCentro(
   return { ok: "Centro creado." };
 }
 
+export async function editarCentro(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("centros.gestionar");
+  const id = String(formData.get("id") ?? "");
+  const codigo = String(formData.get("codigo") ?? "").trim().toUpperCase();
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  const tipo = String(formData.get("tipo") ?? "");
+  const requiere = formData.get("requiere_prorrateo") === "on";
+
+  if (!id) return { error: "Falta el centro." };
+  if (codigo.length < 2 || codigo.length > 8) return { error: "El código debe tener 2 a 8 caracteres." };
+  if (nombre.length < 2) return { error: "El nombre es obligatorio." };
+  if (tipo !== "final" && tipo !== "intermedio") return { error: "Tipo inválido." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("centros_costo")
+    .update({
+      codigo,
+      nombre,
+      tipo,
+      // Un centro final no puede requerir prorrateo (lo exige la base igual).
+      requiere_prorrateo: tipo === "intermedio" ? requiere : false,
+    })
+    .eq("id", id);
+  if (error) {
+    return {
+      error: error.message.includes("duplicate")
+        ? "Ya existe un centro con ese código."
+        : limpiar(error.message),
+    };
+  }
+  revalidatePath("/admin/centros");
+  return { ok: "Centro actualizado." };
+}
+
 export async function alternarCentroActivo(formData: FormData): Promise<void> {
   await requerirPermiso("centros.gestionar");
   const id = String(formData.get("id") ?? "");
