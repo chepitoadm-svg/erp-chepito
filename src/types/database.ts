@@ -445,6 +445,41 @@ export interface Database {
           saldo: number;
         }[];
       };
+      app_listar_periodos: {
+        Args: { p_anio?: number | null };
+        Returns: {
+          id: string;
+          anio: number;
+          mes: number;
+          fecha_inicio: string;
+          fecha_fin: string;
+          estado: "abierto" | "cerrado" | "bloqueado";
+          n_borradores: number;
+          pools_sin_bases: string | null;
+        }[];
+      };
+      app_estado_prorrateo: {
+        Args: { p_periodo: string };
+        Returns: {
+          centro_id: string;
+          codigo: string;
+          nombre: string;
+          requiere_prorrateo: boolean;
+          pool: number;
+          suma_bases: number;
+          bases: { centro_destino_id: string; destino_codigo: string; porcentaje: number }[];
+        }[];
+      };
+      app_guardar_bases_prorrateo: {
+        Args: { p_periodo: string; p_origen: string; p_bases: unknown };
+        Returns: undefined;
+      };
+      fn_cerrar_periodo: { Args: { p_periodo_id: string }; Returns: undefined };
+      fn_reabrir_periodo: { Args: { p_periodo_id: string }; Returns: undefined };
+      fn_generar_prorrateo: {
+        Args: { p_periodo_id: string; p_centro_origen_id: string };
+        Returns: string;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

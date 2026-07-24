@@ -54,6 +54,12 @@ export default async function AppLayout({
                 Reportes
               </Link>
               <Link
+                href="/admin"
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Administración
+              </Link>
+              <Link
                 href="/usuarios"
                 className="text-neutral-600 hover:text-neutral-900"
               >
