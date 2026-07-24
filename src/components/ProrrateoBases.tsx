@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { guardarBases, type FormState } from "@/app/(app)/admin/actions";
 
 interface Final {
@@ -22,12 +22,31 @@ interface Props {
 const inicialState: FormState = {};
 
 export default function ProrrateoBases({ periodoId, origenId, finales, inicial }: Props) {
-  const [state, formAction, pending] = useActionState(guardarBases, inicialState);
-  const [bases, setBases] = useState<Base[]>(
+  const desdeInicial = (): Base[] =>
     inicial.length
-      ? inicial.map((b) => ({ centro_destino_id: b.centro_destino_id, porcentaje: String(b.porcentaje) }))
-      : [{ centro_destino_id: "", porcentaje: "" }],
-  );
+      ? inicial.map((b) => ({
+          centro_destino_id: b.centro_destino_id,
+          porcentaje: String(b.porcentaje),
+        }))
+      : [{ centro_destino_id: "", porcentaje: "" }];
+
+  const [state, formAction, pending] = useActionState(guardarBases, inicialState);
+  const [bases, setBases] = useState<Base[]>(desdeInicial);
+
+  // Re-sincroniza con lo que quedó guardado en la base cuando el server
+  // revalida (o sea, después de un guardado exitoso).
+  //
+  // Hace falta porque React 19 resetea el <form> al terminar la server action:
+  // los <select> controlados quedan en blanco en el DOM y, como el estado no
+  // cambió, React no los vuelve a sincronizar. Se re-sincroniza aquí en vez de
+  // remontar con una key para no perder el mensaje de "Bases guardadas".
+  const firmaInicial = inicial
+    .map((b) => `${b.centro_destino_id}@${b.porcentaje}`)
+    .join("|");
+  useEffect(() => {
+    setBases(desdeInicial());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaInicial]);
 
   const suma = bases.reduce((s, b) => s + (parseFloat(b.porcentaje) || 0), 0);
   const suma100 = Math.abs(suma - 100) < 0.005;
