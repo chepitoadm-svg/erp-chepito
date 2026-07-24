@@ -393,6 +393,58 @@ export interface Database {
         Args: { p_asiento_id: string; p_motivo: string };
         Returns: string;
       };
+      fn_balanza: {
+        Args: { p_hasta: string; p_incluir_prorrateo?: boolean };
+        Returns: {
+          codigo: string;
+          nombre: string;
+          nivel: number;
+          tipo: string;
+          naturaleza: "deudora" | "acreedora";
+          acepta_movimiento: boolean;
+          debitos: number;
+          creditos: number;
+          saldo: number;
+        }[];
+      };
+      fn_balance_situacion: {
+        Args: { p_fecha: string };
+        Returns: {
+          seccion: string;
+          subtipo: string;
+          codigo: string;
+          nombre: string;
+          nivel: number;
+          saldo: number;
+        }[];
+      };
+      fn_estado_resultados: {
+        Args: { p_desde: string; p_hasta: string; p_incluir_prorrateo?: boolean };
+        Returns: {
+          centro_codigo: string;
+          centro_nombre: string;
+          centro_tipo: string;
+          seccion: string;
+          subtipo: string;
+          cuenta_codigo: string;
+          cuenta_nombre: string;
+          monto: number;
+        }[];
+      };
+      app_mayor_cuenta: {
+        Args: { p_cuenta_id: string; p_desde?: string | null; p_hasta?: string | null };
+        Returns: {
+          fecha: string;
+          asiento_id: string;
+          asiento_tipo: AsientoTipo;
+          asiento_numero: number | null;
+          glosa: string;
+          centro_codigo: string | null;
+          debito: number;
+          credito: number;
+          saldo: number;
+        }[];
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
