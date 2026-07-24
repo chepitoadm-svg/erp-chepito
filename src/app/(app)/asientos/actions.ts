@@ -31,7 +31,7 @@ function parseFormData(formData: FormData) {
 
 // Deja solo los campos que la base espera, y descarta líneas vacías.
 function toLineasInput(
-  lineas: { cuenta_id: string; centro_costo_id?: string | null; debito: number; credito: number; detalle?: string }[],
+  lineas: { cuenta_id: string; centro_costo_id?: string | null; debito: number; credito: number; detalle?: string | null }[],
 ): AsientoLineaInput[] {
   return lineas.map((l) => ({
     cuenta_id: l.cuenta_id,

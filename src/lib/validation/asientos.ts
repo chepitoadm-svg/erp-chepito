@@ -14,7 +14,9 @@ export const lineaSchema = z
     centro_costo_id: z.string().uuid().nullable().optional(),
     debito: z.coerce.number().min(0, "No puede ser negativo.").default(0),
     credito: z.coerce.number().min(0, "No puede ser negativo.").default(0),
-    detalle: z.string().trim().max(300).optional(),
+    // El formulario manda null cuando el detalle va vacío; se acepta y se
+    // normaliza a undefined.
+    detalle: z.string().trim().max(300).nullable().optional(),
   })
   .refine(
     (l) => (l.debito > 0) !== (l.credito > 0),
