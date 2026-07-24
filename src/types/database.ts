@@ -5,6 +5,28 @@
 
 export type Estado = "activo" | "inactivo";
 
+export type AsientoTipo =
+  | "apertura"
+  | "diario"
+  | "ingreso"
+  | "egreso"
+  | "prorrateo"
+  | "cierre"
+  | "reversion";
+
+export type AsientoEstado = "borrador" | "confirmado" | "anulado" | "descartado";
+
+export interface AsientoLineaInput {
+  cuenta_id: string;
+  centro_costo_id?: string | null;
+  debito?: number;
+  credito?: number;
+  moneda?: string;
+  tipo_cambio?: number;
+  monto_original?: number;
+  detalle?: string | null;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -210,6 +232,92 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      centros_costo: {
+        Row: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          tipo: "final" | "intermedio";
+          parent_id: string | null;
+          sucursal_id: string | null;
+          activo: boolean;
+          requiere_prorrateo: boolean;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          codigo: string;
+          nombre: string;
+          tipo: "final" | "intermedio";
+          parent_id?: string | null;
+          sucursal_id?: string | null;
+          activo?: boolean;
+          requiere_prorrateo?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["centros_costo"]["Insert"]>;
+        Relationships: [];
+      };
+      asientos: {
+        Row: {
+          id: string;
+          tipo: AsientoTipo;
+          fecha: string;
+          anio: number;
+          numero: number | null;
+          periodo_id: string;
+          glosa: string;
+          estado: AsientoEstado;
+          origen_tipo: string | null;
+          origen_id: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          confirmado_en: string | null;
+          confirmado_por: string | null;
+          anulado_en: string | null;
+          anulado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          tipo: AsientoTipo;
+          fecha: string;
+          glosa: string;
+          periodo_id?: string;
+        };
+        Update: { estado?: AsientoEstado };
+        Relationships: [];
+      };
+      asientos_lineas: {
+        Row: {
+          id: string;
+          asiento_id: string;
+          linea: number;
+          cuenta_id: string;
+          centro_costo_id: string | null;
+          debito: number;
+          credito: number;
+          moneda: string;
+          tipo_cambio: number;
+          monto_original: number;
+          detalle: string | null;
+        };
+        Insert: {
+          asiento_id: string;
+          linea: number;
+          cuenta_id: string;
+          centro_costo_id?: string | null;
+          debito?: number;
+          credito?: number;
+          moneda?: string;
+          tipo_cambio?: number;
+          monto_original: number;
+          detalle?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["asientos_lineas"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -240,6 +348,50 @@ export interface Database {
           rol_id: string | null;
           sucursales: string[];
         }[];
+      };
+      app_listar_asientos: {
+        Args: { p_estado?: string | null; p_periodo?: string | null; p_limite?: number };
+        Returns: {
+          id: string;
+          tipo: AsientoTipo;
+          numero: number | null;
+          fecha: string;
+          glosa: string;
+          estado: AsientoEstado;
+          anio: number;
+          mes: number;
+          total: number;
+          n_lineas: number;
+        }[];
+      };
+      app_obtener_asiento: {
+        Args: { p_id: string };
+        Returns: Record<string, unknown>;
+      };
+      app_crear_asiento: {
+        Args: {
+          p_tipo: string;
+          p_fecha: string;
+          p_glosa: string;
+          p_lineas: AsientoLineaInput[];
+          p_confirmar?: boolean;
+        };
+        Returns: string;
+      };
+      app_actualizar_asiento: {
+        Args: {
+          p_id: string;
+          p_tipo: string;
+          p_fecha: string;
+          p_glosa: string;
+          p_lineas: AsientoLineaInput[];
+          p_confirmar?: boolean;
+        };
+        Returns: string;
+      };
+      fn_anular_asiento: {
+        Args: { p_asiento_id: string; p_motivo: string };
+        Returns: string;
       };
     };
     Enums: { [_ in never]: never };

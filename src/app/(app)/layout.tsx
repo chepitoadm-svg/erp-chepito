@@ -42,6 +42,12 @@ export default async function AppLayout({
             <span className="font-semibold text-neutral-900">ERP Chepito</span>
             <nav className="flex gap-4 text-sm">
               <Link
+                href="/asientos"
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Asientos
+              </Link>
+              <Link
                 href="/usuarios"
                 className="text-neutral-600 hover:text-neutral-900"
               >
