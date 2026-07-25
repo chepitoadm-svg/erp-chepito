@@ -191,8 +191,65 @@ Aplican en TODOS los módulos, siempre:
   puntos del criterio de verificación pasaron: login del admin, alta de un
   cajero con rol y sucursal, edición, desactivación (sin borrado físico),
   aislamiento por rol/sucursal, y rastro en `auditoria`.
-- **Siguiente: Fase 2 (Contabilidad).** Antes de codear, proponer plan y diseño
-  de esquema y DETENERSE para aprobación (convención #1).
+- **Fase 2 (Contabilidad): COMPLETA, verificada y en producción** en
+  `erp-chepito.netlify.app`. Motor de asientos (doble partida forzada,
+  inmutabilidad, anulación por reversión), prorrateo, cierres, y los estados
+  financieros, todo operable por pantalla.
+- **Siguiente: Fase 3 (Inventario + Compras). Diseño aprobado 2026-07-24.**
+
+### Decisiones fijadas (Fase 3 — Inventario + Compras)
+
+- **Promedio ponderado GLOBAL por artículo** (no por bodega): el inventario es
+  una sola cuenta, las transferencias no postean y quedan como puro movimiento
+  de cantidad. El promedio vive en `articulos` (`costo_promedio`,
+  `existencia_total`); `existencias` guarda solo cantidad por (artículo, bodega).
+  Reconstruible a por-bodega desde el kardex si algún día hace falta.
+- **Kardex inmutable** (`movimientos_inventario`): corregir un movimiento
+  posteado = un ajuste nuevo al costo actual, nunca recálculo hacia atrás (el
+  promedio es dependiente del camino). Editable solo en borrador. Sin DELETE.
+- **Existencia negativa: candado por TIPO de operación**, no CHECK ciego.
+  Ajustes y transferencias la rechazan. La venta del POS (Fase 5, offline) SÍ
+  podrá dejar negativo y marcar `requiere_revision` al sincronizar — el modelo
+  ya lo contempla, no se reabre en Fase 5.
+- **Transferencias en dos pasos** (envío → tránsito visible → recepción). **No
+  postean asiento** (no cambian el valor total del inventario). Recepción
+  parcial permitida.
+- **Ciclo de compra simplificado (1 paso normal) pero separable por dentro:**
+  `recepciones` y `facturas_compra` son entidades distintas; el caso normal las
+  captura en una pantalla, pero el modelo soporta recibí-sin-factura, entrega
+  parcial y factura-que-llega-después-con-diferencia-de-precio. OC opcional.
+- **Devoluciones de compra** en alcance: baja inventario, revierte IVA
+  acreditable, baja CxP.
+- **IVA en tabla `iva_tarifas`** (no enum), amarrada al artículo, con **nuestra
+  tarifa como fuente de verdad** y el `codigo_hacienda` (CodigoTarifaIVA v4.4)
+  solo para comparar contra el XML y avisar si no calzan (13% = código 08).
+- **Unidad de compra ≠ unidad de stock:** la conversión (ej. Coca-Cola 1 CJ = 12
+  BOT) vive en `proveedor_articulos` por `(proveedor, codigo_comercial)`, no en
+  el artículo — el tamaño de paquete solo viene en texto libre del XML.
+- **Carga inicial de existencias:** movimiento `saldo_inicial` que ingresa
+  cantidad+costo **sin postear asiento** (el valor ya está en la apertura del
+  30/06). Validación de conciliación: total de cargas iniciales = saldo de
+  `11-60-01` en la apertura.
+- **Posteo automático** de cada operación con impacto contable, atómico con la
+  operación, vía `origen_tipo/origen_id` (idempotente). **RLS por SUCURSAL**
+  (reusa `mis_sucursales()`), a diferencia de la contabilidad que es por permiso.
+- **Cuentas de posteo:** Inventario `11-60-01`; merma `51-30-01-02`; sobrante
+  `52-02` (Faltantes y Sobrantes, ingreso); devoluciones `51-20-02-01/02`; CxP
+  `21-10-01`. **PENDIENTES de confirmar por el usuario:** cuenta puente
+  "Mercadería recibida por facturar" (para recepción sin factura) e IVA
+  acreditable (candidata `21-10-15-01` "Crédito por Compras"). **No construir el
+  posteo de compras hasta que el usuario confirme esas dos.**
+- **empresa.cedula_juridica = 3101712291** (fuente de verdad para validar el
+  receptor del XML; era null).
+- **Ingestor de XML por SUBIDA MANUAL en Fase 3**; el correo automático
+  (IMAP/webhook) es un enganche posterior sobre la misma tabla de staging. El
+  parser (TS, server-side) clasifica por tag raíz, valida `EstadoMensaje` =
+  Aceptado y la cédula del receptor, matchea proveedor por cédula del emisor,
+  mapea líneas por `CodigoComercial` (aprende con el uso), suma solo el impuesto
+  código 07, y calcula el vencimiento con condición+plazo.
+- **RADAR (revisar en Fase 5, no ahora):** cuando el POS deje saldo negativo y
+  luego entre una compra con el saldo aún negativo, el promedio ponderado mezcla
+  cantidad negativa con positiva y puede dar un promedio raro.
 
 ### Decisiones de arquitectura fijadas (Fase 1)
 
