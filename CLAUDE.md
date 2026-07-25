@@ -35,7 +35,15 @@ integrada.
 - **Frontend:** Next.js
 - **Backend / DB:** Supabase (Postgres) con Auth y Row Level Security (RLS)
 - Multiusuario, multisucursal
-- Repo git; despliegue por definir
+- **Código:** GitHub `chepitoadm-svg/erp-chepito` (público; sin secretos, ya
+  verificado).
+- **Despliegue: Netlify, en producción desde 2026-07-24 →
+  `https://erp-chepito.netlify.app`.** Conectado al repo: cada push a `main` se
+  publica solo. Las 3 llaves de Supabase van como *environment variables* en
+  Netlify (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`). `SUPABASE_DB_URL` NO va a Netlify (solo la usan
+  migraciones y respaldos). Plan gratuito de Netlify (uso comercial permitido;
+  ~300 min de build/mes ≈ 100 despliegues, no lo consume el uso normal).
 - **Esquema versionado con migraciones SQL de Supabase.** Nunca cambios ad-hoc
   en el dashboard.
 
