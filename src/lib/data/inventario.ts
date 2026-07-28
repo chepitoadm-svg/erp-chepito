@@ -236,3 +236,192 @@ export async function libroInventarios(fecha: string): Promise<LibroInventarioFi
     valor: Number(f.valor),
   }));
 }
+
+/** Bodegas activas visibles para el usuario (RLS por sucursal). */
+export async function listarBodegas() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("bodegas")
+    .select("id, codigo, nombre, sucursal_id")
+    .eq("estado", "activo")
+    .order("codigo");
+  if (error) throw new Error(`No se pudieron cargar las bodegas: ${error.message}`);
+  return data ?? [];
+}
+
+export interface ConciliacionInicial {
+  valor_kardex_inicial: number;
+  valor_apertura_contable: number;
+  diferencia: number;
+}
+
+/** Conciliación de la carga inicial contra el asiento de apertura. */
+export async function conciliacionInicial(): Promise<ConciliacionInicial> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_conciliar_inventario_inicial");
+  if (error) throw new Error(`No se pudo conciliar el inventario inicial: ${error.message}`);
+  const fila = (data ?? [])[0];
+  return {
+    valor_kardex_inicial: Number(fila?.valor_kardex_inicial ?? 0),
+    valor_apertura_contable: Number(fila?.valor_apertura_contable ?? 0),
+    diferencia: Number(fila?.diferencia ?? 0),
+  };
+}
+
+export interface CargaInicialFila {
+  id: string;
+  fecha: string;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  bodega_codigo: string;
+  cantidad: number;
+  costo_unitario: number;
+  costo_total: number;
+}
+
+/** Movimientos de carga inicial (saldo_inicial), lo más reciente primero. */
+export async function listarCargasIniciales(): Promise<CargaInicialFila[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("v_kardex")
+    .select(
+      "id, fecha, articulo_codigo, articulo_nombre, bodega_codigo, cantidad, costo_unitario, costo_total, creado_en",
+    )
+    .eq("tipo", "saldo_inicial")
+    .order("creado_en", { ascending: false })
+    .limit(100);
+  if (error) throw new Error(`No se pudieron cargar los saldos iniciales: ${error.message}`);
+  return (data ?? []).map((m) => ({
+    id: m.id,
+    fecha: m.fecha,
+    articulo_codigo: m.articulo_codigo,
+    articulo_nombre: m.articulo_nombre,
+    bodega_codigo: m.bodega_codigo,
+    cantidad: Number(m.cantidad),
+    costo_unitario: Number(m.costo_unitario),
+    costo_total: Number(m.costo_total),
+  }));
+}
+
+export interface AjusteListado {
+  id: string;
+  fecha: string;
+  bodega_codigo: string;
+  bodega_nombre: string;
+  motivo: string;
+  estado: "borrador" | "confirmado" | "anulado";
+  n_lineas: number;
+  asiento_id: string | null;
+}
+
+interface AjusteRowEmbebido {
+  id: string;
+  fecha: string;
+  motivo: string;
+  estado: "borrador" | "confirmado" | "anulado";
+  asiento_id: string | null;
+  bodega: { codigo: string; nombre: string } | null;
+  lineas: { count: number }[];
+}
+
+export async function listarAjustes(): Promise<AjusteListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ajustes_inventario")
+    .select(
+      "id, fecha, motivo, estado, asiento_id, " +
+        "bodega:bodegas(codigo, nombre), lineas:ajustes_inventario_lineas(count)",
+    )
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar los ajustes: ${error.message}`);
+
+  return ((data ?? []) as unknown as AjusteRowEmbebido[]).map((a) => ({
+    id: a.id,
+    fecha: a.fecha,
+    bodega_codigo: a.bodega?.codigo ?? "",
+    bodega_nombre: a.bodega?.nombre ?? "",
+    motivo: a.motivo,
+    estado: a.estado,
+    n_lineas: a.lineas?.[0]?.count ?? 0,
+    asiento_id: a.asiento_id,
+  }));
+}
+
+export interface AjusteLineaDetalle {
+  linea: number;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  direccion: "pos" | "neg";
+  cantidad: number;
+  detalle: string | null;
+}
+
+export interface AjusteDetalle {
+  id: string;
+  fecha: string;
+  bodega_codigo: string;
+  bodega_nombre: string;
+  motivo: string;
+  estado: "borrador" | "confirmado" | "anulado";
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  lineas: AjusteLineaDetalle[];
+}
+
+interface AjusteDetalleEmbebido {
+  id: string;
+  fecha: string;
+  motivo: string;
+  estado: "borrador" | "confirmado" | "anulado";
+  asiento_id: string | null;
+  bodega: { codigo: string; nombre: string } | null;
+  asiento: { numero: number | null } | null;
+  lineas: {
+    linea: number;
+    direccion: "pos" | "neg";
+    cantidad: number;
+    detalle: string | null;
+    articulo: { codigo: string; nombre: string } | null;
+  }[];
+}
+
+export async function obtenerAjuste(id: string): Promise<AjusteDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ajustes_inventario")
+    .select(
+      "id, fecha, motivo, estado, asiento_id, " +
+        "bodega:bodegas(codigo, nombre), asiento:asientos(numero), " +
+        "lineas:ajustes_inventario_lineas(linea, direccion, cantidad, detalle, " +
+        "articulo:articulos(codigo, nombre))",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar el ajuste: ${error.message}`);
+  }
+
+  const a = data as unknown as AjusteDetalleEmbebido;
+  return {
+    id: a.id,
+    fecha: a.fecha,
+    bodega_codigo: a.bodega?.codigo ?? "",
+    bodega_nombre: a.bodega?.nombre ?? "",
+    motivo: a.motivo,
+    estado: a.estado,
+    asiento_id: a.asiento_id,
+    asiento_numero: a.asiento?.numero ?? null,
+    lineas: (a.lineas ?? [])
+      .sort((x, y) => x.linea - y.linea)
+      .map((l) => ({
+        linea: l.linea,
+        articulo_codigo: l.articulo?.codigo ?? "",
+        articulo_nombre: l.articulo?.nombre ?? "",
+        direccion: l.direccion,
+        cantidad: Number(l.cantidad),
+        detalle: l.detalle,
+      })),
+  };
+}

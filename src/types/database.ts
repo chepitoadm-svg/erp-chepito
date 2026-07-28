@@ -458,6 +458,53 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["proveedor_articulos"]["Insert"]>;
         Relationships: [];
       };
+      ajustes_inventario: {
+        Row: {
+          id: string;
+          fecha: string;
+          bodega_id: string;
+          motivo: string;
+          estado: "borrador" | "confirmado" | "anulado";
+          asiento_id: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          confirmado_en: string | null;
+          confirmado_por: string | null;
+          anulado_en: string | null;
+          anulado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          fecha?: string;
+          bodega_id: string;
+          motivo: string;
+          estado?: "borrador" | "confirmado" | "anulado";
+        };
+        Update: Partial<Database["public"]["Tables"]["ajustes_inventario"]["Insert"]>;
+        Relationships: [];
+      };
+      ajustes_inventario_lineas: {
+        Row: {
+          id: string;
+          ajuste_id: string;
+          linea: number;
+          articulo_id: string;
+          direccion: "pos" | "neg";
+          cantidad: number;
+          detalle: string | null;
+        };
+        Insert: {
+          ajuste_id: string;
+          linea: number;
+          articulo_id: string;
+          direccion: "pos" | "neg";
+          cantidad: number;
+          detalle?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["ajustes_inventario_lineas"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       v_existencias_valoradas: {
@@ -679,6 +726,22 @@ export interface Database {
           diferencia: number;
         }[];
       };
+      fn_cargar_saldo_inicial: {
+        Args: {
+          p_articulo: string;
+          p_bodega: string;
+          p_cantidad: number;
+          p_costo_unitario: number;
+          p_fecha?: string | null;
+        };
+        Returns: string;
+      };
+      fn_crear_ajuste: {
+        Args: { p_bodega: string; p_fecha: string; p_motivo: string; p_lineas: unknown };
+        Returns: string;
+      };
+      fn_confirmar_ajuste: { Args: { p_ajuste: string }; Returns: string };
+      fn_anular_ajuste: { Args: { p_ajuste: string; p_motivo: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

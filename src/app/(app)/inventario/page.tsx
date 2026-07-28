@@ -21,6 +21,18 @@ const SECCIONES = [
     permiso: "inventario.ver",
   },
   {
+    href: "/inventario/carga-inicial",
+    titulo: "Carga inicial",
+    desc: "Ingresar existencias de arranque y conciliar con la apertura.",
+    permiso: "inventario.ajustar",
+  },
+  {
+    href: "/inventario/ajustes",
+    titulo: "Ajustes",
+    desc: "Mermas y sobrantes, con su asiento al confirmar.",
+    permiso: "inventario.ver",
+  },
+  {
     href: "/inventario/libro",
     titulo: "Libro de Inventarios",
     desc: "Detalle valuado por ítem a una fecha (libro legal).",
