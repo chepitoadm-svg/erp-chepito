@@ -1,0 +1,38 @@
+// Esquemas Zod para proveedores y su mapeo de artículos.
+import { z } from "zod";
+
+// Cédula jurídica CR: 10 dígitos (3-101-XXXXXX). Se guarda solo dígitos.
+const cedula = z
+  .string()
+  .trim()
+  .transform((s) => s.replace(/\D/g, ""))
+  .refine((s) => s.length >= 9 && s.length <= 12, "Cédula jurídica inválida.");
+
+const base = {
+  cedula_juridica: cedula,
+  nombre: z.string().trim().min(2, "El nombre es obligatorio.").max(200),
+  condicion_venta_default: z.enum(["01", "02"]).nullable().optional(),
+  plazo_credito_default: z
+    .number()
+    .int()
+    .min(0)
+    .max(365)
+    .nullable()
+    .optional(),
+  cuenta_cxp_id: z.string().uuid().nullable().optional(),
+};
+
+export const crearProveedorSchema = z.object(base);
+export const editarProveedorSchema = z.object({ id: z.string().uuid(), ...base });
+
+export const agregarMapeoSchema = z.object({
+  proveedor_id: z.string().uuid(),
+  codigo_comercial: z.string().trim().min(1, "El código comercial es obligatorio.").max(80),
+  articulo_id: z.string().uuid("Seleccioná el artículo."),
+  unidad_compra_id: z.string().uuid("Seleccioná la unidad de compra."),
+  factor_a_stock: z.number().positive("El factor debe ser mayor que cero."),
+  descripcion_proveedor: z.string().trim().max(300).nullable().optional(),
+});
+
+export type CrearProveedorInput = z.infer<typeof crearProveedorSchema>;
+export type EditarProveedorInput = z.infer<typeof editarProveedorSchema>;

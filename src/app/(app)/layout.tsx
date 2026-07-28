@@ -48,6 +48,18 @@ export default async function AppLayout({
                 Asientos
               </Link>
               <Link
+                href="/inventario"
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Inventario
+              </Link>
+              <Link
+                href="/compras"
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Compras
+              </Link>
+              <Link
                 href="/reportes"
                 className="text-neutral-600 hover:text-neutral-900"
               >

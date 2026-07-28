@@ -16,6 +16,8 @@ export type AsientoTipo =
 
 export type AsientoEstado = "borrador" | "confirmado" | "anulado" | "descartado";
 
+export type ArticuloTipo = "materia_prima" | "producto_terminado" | "suministro";
+
 export interface AsientoLineaInput {
   cuenta_id: string;
   centro_costo_id?: string | null;
@@ -318,8 +320,185 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["asientos_lineas"]["Insert"]>;
         Relationships: [];
       };
+      // === Fase 3 — Inventario + Compras ===================================
+      unidades: {
+        Row: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          activa: boolean;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: { codigo: string; nombre: string; activa?: boolean };
+        Update: Partial<Database["public"]["Tables"]["unidades"]["Insert"]>;
+        Relationships: [];
+      };
+      iva_tarifas: {
+        Row: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          porcentaje: number;
+          codigo_hacienda: string | null;
+          activa: boolean;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          codigo: string;
+          nombre: string;
+          porcentaje: number;
+          codigo_hacienda?: string | null;
+          activa?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["iva_tarifas"]["Insert"]>;
+        Relationships: [];
+      };
+      articulos: {
+        Row: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          tipo: ArticuloTipo;
+          unidad_stock_id: string;
+          iva_tarifa_id: string;
+          cabys_codigo: string | null;
+          cuenta_inventario_id: string | null;
+          inventariable: boolean;
+          estado: Estado;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          codigo: string;
+          nombre: string;
+          tipo?: ArticuloTipo;
+          unidad_stock_id: string;
+          iva_tarifa_id: string;
+          cabys_codigo?: string | null;
+          cuenta_inventario_id?: string | null;
+          inventariable?: boolean;
+          estado?: Estado;
+        };
+        Update: Partial<Database["public"]["Tables"]["articulos"]["Insert"]>;
+        Relationships: [];
+      };
+      articulos_saldos: {
+        Row: {
+          articulo_id: string;
+          existencia_total: number;
+          valor_total: number;
+          costo_promedio: number;
+          actualizado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      existencias: {
+        Row: { articulo_id: string; bodega_id: string; cantidad: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      proveedores: {
+        Row: {
+          id: string;
+          cedula_juridica: string;
+          nombre: string;
+          condicion_venta_default: string | null;
+          plazo_credito_default: number | null;
+          cuenta_cxp_id: string | null;
+          estado: Estado;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          cedula_juridica: string;
+          nombre: string;
+          condicion_venta_default?: string | null;
+          plazo_credito_default?: number | null;
+          cuenta_cxp_id?: string | null;
+          estado?: Estado;
+        };
+        Update: Partial<Database["public"]["Tables"]["proveedores"]["Insert"]>;
+        Relationships: [];
+      };
+      proveedor_articulos: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          codigo_comercial: string;
+          articulo_id: string;
+          unidad_compra_id: string;
+          factor_a_stock: number;
+          descripcion_proveedor: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          proveedor_id: string;
+          codigo_comercial: string;
+          articulo_id: string;
+          unidad_compra_id: string;
+          factor_a_stock?: number;
+          descripcion_proveedor?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["proveedor_articulos"]["Insert"]>;
+        Relationships: [];
+      };
     };
-    Views: { [_ in never]: never };
+    Views: {
+      v_existencias_valoradas: {
+        Row: {
+          articulo_id: string;
+          articulo_codigo: string;
+          articulo_nombre: string;
+          bodega_id: string;
+          bodega_codigo: string;
+          bodega_nombre: string;
+          sucursal_id: string;
+          cantidad: number;
+          costo_promedio: number;
+          valor: number;
+        };
+        Relationships: [];
+      };
+      v_kardex: {
+        Row: {
+          id: string;
+          articulo_id: string;
+          articulo_codigo: string;
+          articulo_nombre: string;
+          bodega_id: string;
+          bodega_codigo: string;
+          sucursal_id: string;
+          fecha: string;
+          tipo: string;
+          cantidad: number;
+          costo_unitario: number;
+          costo_total: number;
+          existencia_despues: number;
+          promedio_despues: number;
+          origen_tipo: string | null;
+          origen_id: string | null;
+          detalle: string | null;
+          creado_en: string;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       mis_sucursales: { Args: Record<string, never>; Returns: string[] };
       soy_administrador: { Args: Record<string, never>; Returns: boolean };
@@ -479,6 +658,26 @@ export interface Database {
       fn_generar_prorrateo: {
         Args: { p_periodo_id: string; p_centro_origen_id: string };
         Returns: string;
+      };
+      fn_bodegas_visibles: { Args: Record<string, never>; Returns: string[] };
+      fn_libro_inventarios: {
+        Args: { p_fecha: string };
+        Returns: {
+          articulo_codigo: string;
+          articulo_nombre: string;
+          bodega_codigo: string;
+          cantidad: number;
+          costo_promedio: number;
+          valor: number;
+        }[];
+      };
+      fn_conciliar_inventario_inicial: {
+        Args: Record<string, never>;
+        Returns: {
+          valor_kardex_inicial: number;
+          valor_apertura_contable: number;
+          diferencia: number;
+        }[];
       };
     };
     Enums: { [_ in never]: never };
