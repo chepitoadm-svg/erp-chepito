@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requerirPermiso } from "@/lib/auth/permisos";
 import {
   crearProveedorSchema,
   editarProveedorSchema,
   agregarMapeoSchema,
+  crearFacturaSchema,
 } from "@/lib/validation/compras";
 
 export interface FormState {
@@ -128,4 +130,89 @@ export async function quitarMapeo(formData: FormData): Promise<void> {
   const { error } = await supabase.from("proveedor_articulos").delete().eq("id", id);
   if (error) throw new Error(limpiar(error.message));
   revalidatePath(`/compras/proveedores/${proveedorId}`);
+}
+
+// === FACTURAS DE COMPRA (D1: 1 paso) =======================================
+export async function crearFactura(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+
+  let lineasRaw: unknown = [];
+  try {
+    lineasRaw = JSON.parse(String(formData.get("lineas") ?? "[]"));
+  } catch {
+    return { error: "Líneas inválidas." };
+  }
+
+  const clave = String(formData.get("clave") ?? "").trim();
+  const cond = String(formData.get("condicion_venta") ?? "").trim();
+  const plazo = String(formData.get("plazo_credito") ?? "").trim();
+  const parsed = crearFacturaSchema.safeParse({
+    proveedor_id: String(formData.get("proveedor_id") ?? ""),
+    bodega_id: String(formData.get("bodega_id") ?? ""),
+    clave: clave || null,
+    fecha_emision: String(formData.get("fecha_emision") ?? ""),
+    condicion_venta: cond || null,
+    plazo_credito: plazo ? Number(plazo) : null,
+    lineas: lineasRaw,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_factura", {
+    p_proveedor: parsed.data.proveedor_id,
+    p_bodega: parsed.data.bodega_id,
+    p_clave: parsed.data.clave ?? null,
+    p_fecha_emision: parsed.data.fecha_emision,
+    p_condicion: parsed.data.condicion_venta ?? null,
+    p_plazo: parsed.data.plazo_credito ?? null,
+    p_lineas: parsed.data.lineas.map((l) => ({
+      articulo_id: l.articulo_id,
+      codigo_comercial: l.codigo_comercial ?? null,
+      cantidad: l.cantidad,
+      costo_unitario: l.costo_unitario,
+      iva_tarifa_id: l.iva_tarifa_id,
+      detalle: l.detalle ?? null,
+    })),
+  });
+  if (error || !id) {
+    const dup = error?.message.includes("duplicate") || error?.message.includes("clave");
+    return {
+      error: dup
+        ? "Ya se registró una factura con esa clave."
+        : limpiar(error?.message ?? "No se pudo crear la factura."),
+    };
+  }
+
+  redirect(`/compras/facturas/${id}`);
+}
+
+export async function confirmarFactura(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_confirmar_factura", { p_factura: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/compras/facturas/${id}`);
+  revalidatePath("/compras/facturas");
+  revalidatePath("/compras/cxp");
+}
+
+export async function anularFactura(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_factura", { p_factura: id, p_motivo: motivo });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/compras/facturas/${id}`);
+  revalidatePath("/compras/facturas");
+  revalidatePath("/compras/cxp");
+  return { ok: "Factura anulada." };
 }

@@ -203,12 +203,12 @@ export async function listarKardex(articuloId: string): Promise<KardexMovimiento
   }));
 }
 
-/** Artículos inventariables (para el selector del kardex). */
+/** Artículos activos (para selectores de kardex, ajustes, transferencias, facturas). */
 export async function listarArticulosParaSelector() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("articulos")
-    .select("id, codigo, nombre")
+    .select("id, codigo, nombre, iva_tarifa_id")
     .eq("estado", "activo")
     .order("codigo");
   if (error) throw new Error(`No se pudieron cargar los artículos: ${error.message}`);

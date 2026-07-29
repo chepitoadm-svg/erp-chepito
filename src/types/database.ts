@@ -553,6 +553,66 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["transferencias_lineas"]["Insert"]>;
         Relationships: [];
       };
+      facturas_compra: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          recepcion_id: string | null;
+          bodega_id: string | null;
+          clave: string | null;
+          consecutivo: string | null;
+          fecha_emision: string;
+          condicion_venta: string | null;
+          plazo_credito: number | null;
+          fecha_vencimiento: string | null;
+          moneda: string;
+          tipo_cambio: number;
+          subtotal: number;
+          iva_total: number;
+          total: number;
+          estado: "borrador" | "confirmada" | "anulada";
+          asiento_id: string | null;
+          creado_en: string;
+          creado_por: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      facturas_compra_lineas: {
+        Row: {
+          id: string;
+          factura_id: string;
+          linea: number;
+          codigo_comercial: string | null;
+          articulo_id: string;
+          cantidad: number;
+          costo_unitario: number;
+          base_imponible: number;
+          iva_tarifa_id: string | null;
+          iva_monto: number;
+          detalle: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      cuentas_por_pagar: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          factura_id: string | null;
+          fecha: string;
+          fecha_vencimiento: string | null;
+          monto_original: number;
+          saldo: number;
+          estado: string;
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       v_existencias_valoradas: {
@@ -817,6 +877,20 @@ export interface Database {
         Args: { p_transf: string; p_motivo: string };
         Returns: undefined;
       };
+      fn_crear_factura: {
+        Args: {
+          p_proveedor: string;
+          p_bodega: string;
+          p_clave: string | null;
+          p_fecha_emision: string;
+          p_condicion: string | null;
+          p_plazo: number | null;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
+      fn_confirmar_factura: { Args: { p_factura: string }; Returns: string };
+      fn_anular_factura: { Args: { p_factura: string; p_motivo: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

@@ -36,3 +36,25 @@ export const agregarMapeoSchema = z.object({
 
 export type CrearProveedorInput = z.infer<typeof crearProveedorSchema>;
 export type EditarProveedorInput = z.infer<typeof editarProveedorSchema>;
+
+// === Factura de compra (D1: 1 paso) ========================================
+export const facturaLineaSchema = z.object({
+  articulo_id: z.string().uuid(),
+  codigo_comercial: z.string().trim().max(80).nullable().optional(),
+  cantidad: z.number().positive(),
+  costo_unitario: z.number().min(0),
+  iva_tarifa_id: z.string().uuid(),
+  detalle: z.string().trim().max(300).nullable().optional(),
+});
+
+export const crearFacturaSchema = z.object({
+  proveedor_id: z.string().uuid("Seleccioná el proveedor."),
+  bodega_id: z.string().uuid("Seleccioná la bodega de ingreso."),
+  clave: z.string().trim().max(80).nullable().optional(),
+  fecha_emision: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
+  condicion_venta: z.enum(["01", "02"]).nullable().optional(),
+  plazo_credito: z.number().int().min(0).max(365).nullable().optional(),
+  lineas: z.array(facturaLineaSchema).min(1, "Agregá al menos una línea."),
+});
+
+export type CrearFacturaInput = z.infer<typeof crearFacturaSchema>;
