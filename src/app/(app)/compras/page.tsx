@@ -2,9 +2,10 @@ import Link from "next/link";
 import { tienePermiso } from "@/lib/auth/permisos";
 
 export default async function ComprasPage() {
-  const [puedeProveedores, puedeFacturar] = await Promise.all([
+  const [puedeProveedores, puedeFacturar, puedeRecibir] = await Promise.all([
     tienePermiso("proveedores.gestionar"),
     tienePermiso("compras.facturar"),
+    tienePermiso("compras.recibir"),
   ]);
 
   return (
@@ -47,6 +48,17 @@ export default async function ComprasPage() {
             </div>
           </Link>
         )}
+        {puedeRecibir && (
+          <Link
+            href="/compras/recepciones"
+            className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          >
+            <div className="font-medium text-neutral-900">Recepciones</div>
+            <div className="mt-1 text-sm text-neutral-500">
+              Recibir mercadería sin factura; la factura llega después y salda el puente.
+            </div>
+          </Link>
+        )}
         {puedeProveedores && (
           <Link
             href="/compras/proveedores"
@@ -58,10 +70,6 @@ export default async function ComprasPage() {
             </div>
           </Link>
         )}
-        <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50 p-5 text-neutral-400">
-          <div className="font-medium">Recepciones separadas</div>
-          <div className="mt-1 text-sm">Próxima rebanada de la Fase 3 (D2).</div>
-        </div>
       </div>
     </div>
   );

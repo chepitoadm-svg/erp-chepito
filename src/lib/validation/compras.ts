@@ -74,3 +74,20 @@ export const crearDevolucionSchema = z.object({
 });
 
 export type CrearDevolucionInput = z.infer<typeof crearDevolucionSchema>;
+
+// === Recepción de compra (D2) ==============================================
+export const recepcionLineaSchema = z.object({
+  articulo_id: z.string().uuid(),
+  cantidad: z.number().positive(),
+  costo_unitario: z.number().min(0),
+  detalle: z.string().trim().max(300).nullable().optional(),
+});
+
+export const crearRecepcionSchema = z.object({
+  proveedor_id: z.string().uuid("Seleccioná el proveedor."),
+  bodega_id: z.string().uuid("Seleccioná la bodega de ingreso."),
+  glosa: z.string().trim().max(200).nullable().optional(),
+  lineas: z.array(recepcionLineaSchema).min(1, "Agregá al menos una línea."),
+});
+
+export type CrearRecepcionInput = z.infer<typeof crearRecepcionSchema>;

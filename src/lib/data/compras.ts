@@ -357,6 +357,136 @@ export async function listarCxP(): Promise<CxPFila[]> {
   }));
 }
 
+// === RECEPCIONES (D2) ======================================================
+export type RecepcionEstado = "borrador" | "confirmada" | "anulada";
+
+export interface RecepcionListado {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  bodega_codigo: string;
+  estado: RecepcionEstado;
+  facturada: boolean;
+  n_lineas: number;
+}
+
+interface RecepRowEmbebido {
+  id: string;
+  fecha: string;
+  estado: RecepcionEstado;
+  facturada: boolean;
+  proveedor: { nombre: string } | null;
+  bodega: { codigo: string } | null;
+  lineas: { count: number }[];
+}
+
+export async function listarRecepciones(): Promise<RecepcionListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("recepciones")
+    .select(
+      "id, fecha, estado, facturada, proveedor:proveedores(nombre), " +
+        "bodega:bodegas(codigo), lineas:recepciones_lineas(count)",
+    )
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar las recepciones: ${error.message}`);
+  return ((data ?? []) as unknown as RecepRowEmbebido[]).map((r) => ({
+    id: r.id,
+    fecha: r.fecha,
+    proveedor_nombre: r.proveedor?.nombre ?? "",
+    bodega_codigo: r.bodega?.codigo ?? "",
+    estado: r.estado,
+    facturada: r.facturada,
+    n_lineas: r.lineas?.[0]?.count ?? 0,
+  }));
+}
+
+export interface RecepcionLineaDetalle {
+  linea: number;
+  articulo_id: string;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  iva_tarifa_id: string;
+  cantidad: number;
+  costo_unitario: number;
+  detalle: string | null;
+}
+
+export interface RecepcionDetalle {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  bodega_codigo: string;
+  glosa: string | null;
+  estado: RecepcionEstado;
+  facturada: boolean;
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  lineas: RecepcionLineaDetalle[];
+}
+
+interface RecepDetalleEmbebido {
+  id: string;
+  fecha: string;
+  glosa: string | null;
+  estado: RecepcionEstado;
+  facturada: boolean;
+  asiento_id: string | null;
+  proveedor: { nombre: string } | null;
+  bodega: { codigo: string } | null;
+  asiento: { numero: number | null } | null;
+  lineas: {
+    linea: number;
+    cantidad: number;
+    costo_unitario: number;
+    detalle: string | null;
+    articulo: { id: string; codigo: string; nombre: string; iva_tarifa_id: string } | null;
+  }[];
+}
+
+export async function obtenerRecepcion(id: string): Promise<RecepcionDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("recepciones")
+    .select(
+      "id, fecha, glosa, estado, facturada, asiento_id, " +
+        "proveedor:proveedores(nombre), bodega:bodegas(codigo), asiento:asientos(numero), " +
+        "lineas:recepciones_lineas(linea, cantidad, costo_unitario, detalle, " +
+        "articulo:articulos(id, codigo, nombre, iva_tarifa_id))",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar la recepción: ${error.message}`);
+  }
+  const r = data as unknown as RecepDetalleEmbebido;
+  return {
+    id: r.id,
+    fecha: r.fecha,
+    proveedor_nombre: r.proveedor?.nombre ?? "",
+    bodega_codigo: r.bodega?.codigo ?? "",
+    glosa: r.glosa,
+    estado: r.estado,
+    facturada: r.facturada,
+    asiento_id: r.asiento_id,
+    asiento_numero: r.asiento?.numero ?? null,
+    lineas: (r.lineas ?? [])
+      .sort((x, y) => x.linea - y.linea)
+      .map((l) => ({
+        linea: l.linea,
+        articulo_id: l.articulo?.id ?? "",
+        articulo_codigo: l.articulo?.codigo ?? "",
+        articulo_nombre: l.articulo?.nombre ?? "",
+        iva_tarifa_id: l.articulo?.iva_tarifa_id ?? "",
+        cantidad: Number(l.cantidad),
+        costo_unitario: Number(l.costo_unitario),
+        detalle: l.detalle,
+      })),
+  };
+}
+
 // === DEVOLUCIONES DE COMPRA ================================================
 export interface FacturaConfirmadaListado {
   id: string;

@@ -40,6 +40,15 @@ interface Props {
   bodegas: Bodega[];
   articulos: Articulo[];
   tarifas: Tarifa[];
+  // Modo "salda una recepción" (caso B): proveedor y bodega fijos, líneas
+  // precargadas desde la recepción (el costo se puede ajustar por diferencia).
+  recepcion?: { id: string; proveedor_nombre: string; bodega_codigo: string };
+  lineasIniciales?: {
+    articulo_id: string;
+    cantidad: number;
+    costo_unitario: number;
+    iva_tarifa_id: string;
+  }[];
 }
 
 const lineaVacia = (ivaDefault: string): Linea => ({
@@ -54,9 +63,17 @@ const money = (n: number) =>
   n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const estadoInicial: FormState = {};
 
-export default function FacturaForm({ proveedores, bodegas, articulos, tarifas }: Props) {
+export default function FacturaForm({
+  proveedores,
+  bodegas,
+  articulos,
+  tarifas,
+  recepcion,
+  lineasIniciales,
+}: Props) {
   const [state, formAction, pending] = useActionState(crearFactura, estadoInicial);
   const ivaDefault = tarifas.find((t) => t.porcentaje === 13)?.id ?? tarifas[0]?.id ?? "";
+  const modoRecepcion = !!recepcion;
 
   const [proveedor, setProveedor] = useState("");
   const [bodega, setBodega] = useState("");
@@ -64,7 +81,17 @@ export default function FacturaForm({ proveedores, bodegas, articulos, tarifas }
   const [fecha, setFecha] = useState(hoy());
   const [condicion, setCondicion] = useState("");
   const [plazo, setPlazo] = useState("");
-  const [lineas, setLineas] = useState<Linea[]>([lineaVacia(ivaDefault)]);
+  const [lineas, setLineas] = useState<Linea[]>(
+    lineasIniciales && lineasIniciales.length
+      ? lineasIniciales.map((l) => ({
+          articulo_id: l.articulo_id,
+          cantidad: String(l.cantidad),
+          costo_unitario: String(l.costo_unitario),
+          iva_tarifa_id: l.iva_tarifa_id || ivaDefault,
+          detalle: "",
+        }))
+      : [lineaVacia(ivaDefault)],
+  );
 
   const pctPorTarifa = useMemo(() => {
     const m = new Map<string, number>();
@@ -120,7 +147,8 @@ export default function FacturaForm({ proveedores, bodegas, articulos, tarifas }
         detalle: l.detalle || null,
       })),
   );
-  const listo = proveedor && bodega && JSON.parse(lineasJSON).length > 0;
+  const listo =
+    (modoRecepcion || (proveedor && bodega)) && JSON.parse(lineasJSON).length > 0;
 
   const inputCls =
     "mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -134,31 +162,42 @@ export default function FacturaForm({ proveedores, bodegas, articulos, tarifas }
       <input type="hidden" name="condicion_venta" value={condicion} />
       <input type="hidden" name="plazo_credito" value={plazo} />
       <input type="hidden" name="lineas" value={lineasJSON} />
+      {recepcion && <input type="hidden" name="recepcion_id" value={recepcion.id} />}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-neutral-700">Proveedor</label>
-          <select value={proveedor} onChange={(e) => onProveedor(e.target.value)} className={inputCls}>
-            <option value="">Seleccioná…</option>
-            {proveedores.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+      {modoRecepcion ? (
+        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm">
+          <div className="text-neutral-700">
+            Salda la recepción de <span className="font-medium">{recepcion!.proveedor_nombre}</span>{" "}
+            (bodega {recepcion!.bodega_codigo}). La mercadería ya entró; esta factura ajusta
+            cualquier diferencia de precio y crea la cuenta por pagar.
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-700">Bodega de ingreso</label>
-          <select value={bodega} onChange={(e) => setBodega(e.target.value)} className={inputCls}>
-            <option value="">Seleccioná…</option>
-            {bodegas.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.codigo} — {b.nombre}
-              </option>
-            ))}
-          </select>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700">Proveedor</label>
+            <select value={proveedor} onChange={(e) => onProveedor(e.target.value)} className={inputCls}>
+              <option value="">Seleccioná…</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700">Bodega de ingreso</label>
+            <select value={bodega} onChange={(e) => setBodega(e.target.value)} className={inputCls}>
+              <option value="">Seleccioná…</option>
+              {bodegas.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.codigo} — {b.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="sm:col-span-2">

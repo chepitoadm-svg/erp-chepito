@@ -613,6 +613,38 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      recepciones: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          bodega_id: string;
+          orden_compra_id: string | null;
+          fecha: string;
+          glosa: string | null;
+          estado: "borrador" | "confirmada" | "anulada";
+          asiento_id: string | null;
+          facturada: boolean;
+          creado_en: string;
+          creado_por: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      recepciones_lineas: {
+        Row: {
+          id: string;
+          recepcion_id: string;
+          linea: number;
+          articulo_id: string;
+          cantidad: number;
+          costo_unitario: number;
+          detalle: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       devoluciones_compra: {
         Row: {
           id: string;
@@ -926,6 +958,23 @@ export interface Database {
       };
       fn_confirmar_factura: { Args: { p_factura: string }; Returns: string };
       fn_anular_factura: { Args: { p_factura: string; p_motivo: string }; Returns: undefined };
+      fn_crear_recepcion: {
+        Args: { p_proveedor: string; p_bodega: string; p_glosa: string | null; p_lineas: unknown };
+        Returns: string;
+      };
+      fn_crear_factura_recepcion: {
+        Args: {
+          p_recepcion: string;
+          p_clave: string | null;
+          p_fecha_emision: string;
+          p_condicion: string | null;
+          p_plazo: number | null;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
+      fn_confirmar_recepcion: { Args: { p_recep: string }; Returns: string };
+      fn_anular_recepcion: { Args: { p_recep: string; p_motivo: string }; Returns: undefined };
       fn_crear_devolucion: {
         Args: { p_factura: string; p_bodega: string; p_motivo: string; p_lineas: unknown };
         Returns: string;

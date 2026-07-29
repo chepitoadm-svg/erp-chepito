@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { listarProveedoresActivos } from "@/lib/data/compras";
+import { listarProveedoresActivos, obtenerRecepcion } from "@/lib/data/compras";
 import {
   listarArticulosParaSelector,
   listarBodegas,
@@ -9,8 +9,13 @@ import {
 } from "@/lib/data/inventario";
 import FacturaForm from "@/components/FacturaForm";
 
-export default async function NuevaFacturaPage() {
+export default async function NuevaFacturaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ recepcion?: string }>;
+}) {
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras/facturas");
+  const { recepcion } = await searchParams;
 
   const [proveedores, bodegas, articulos, tarifas] = await Promise.all([
     listarProveedoresActivos(),
@@ -18,6 +23,53 @@ export default async function NuevaFacturaPage() {
     listarArticulosParaSelector(),
     listarTarifasIva(),
   ]);
+
+  // Modo caso B: la factura salda una recepción confirmada.
+  if (recepcion) {
+    const r = await obtenerRecepcion(recepcion);
+    if (!r || r.estado !== "confirmada" || r.facturada) {
+      return (
+        <div>
+          <Link href="/compras/recepciones" className="text-sm text-neutral-500 hover:text-neutral-900">
+            ← Recepciones
+          </Link>
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Esa recepción no existe, no está confirmada, o ya fue facturada.
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <Link
+          href={`/compras/recepciones/${r.id}`}
+          className="text-sm text-neutral-500 hover:text-neutral-900"
+        >
+          ← Recepción
+        </Link>
+        <h1 className="mt-1 mb-4 text-lg font-semibold text-neutral-900">
+          Facturar recepción — {r.proveedor_nombre}
+        </h1>
+        <FacturaForm
+          proveedores={proveedores}
+          bodegas={bodegas}
+          articulos={articulos}
+          tarifas={tarifas}
+          recepcion={{
+            id: r.id,
+            proveedor_nombre: r.proveedor_nombre,
+            bodega_codigo: r.bodega_codigo,
+          }}
+          lineasIniciales={r.lineas.map((l) => ({
+            articulo_id: l.articulo_id,
+            cantidad: l.cantidad,
+            costo_unitario: l.costo_unitario,
+            iva_tarifa_id: l.iva_tarifa_id,
+          }))}
+        />
+      </div>
+    );
+  }
 
   if (proveedores.length === 0 || articulos.length === 0) {
     return (
