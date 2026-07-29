@@ -58,3 +58,19 @@ export const crearFacturaSchema = z.object({
 });
 
 export type CrearFacturaInput = z.infer<typeof crearFacturaSchema>;
+
+// === Devolución de compra (D3) =============================================
+export const devolucionLineaSchema = z.object({
+  articulo_id: z.string().uuid(),
+  cantidad: z.number().positive(),
+  detalle: z.string().trim().max(300).nullable().optional(),
+});
+
+export const crearDevolucionSchema = z.object({
+  factura_id: z.string().uuid("Seleccioná la factura."),
+  bodega_id: z.string().uuid("Seleccioná la bodega."),
+  motivo: z.string().trim().min(3, "El motivo es obligatorio."),
+  lineas: z.array(devolucionLineaSchema).min(1, "Indicá al menos un artículo a devolver."),
+});
+
+export type CrearDevolucionInput = z.infer<typeof crearDevolucionSchema>;

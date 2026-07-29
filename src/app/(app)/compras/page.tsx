@@ -36,6 +36,17 @@ export default async function ComprasPage() {
             </div>
           </Link>
         )}
+        {puedeFacturar && (
+          <Link
+            href="/compras/devoluciones"
+            className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          >
+            <div className="font-medium text-neutral-900">Devoluciones de compra</div>
+            <div className="mt-1 text-sm text-neutral-500">
+              Devolver mercadería al proveedor: baja inventario, IVA y CxP.
+            </div>
+          </Link>
+        )}
         {puedeProveedores && (
           <Link
             href="/compras/proveedores"
@@ -48,8 +59,8 @@ export default async function ComprasPage() {
           </Link>
         )}
         <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50 p-5 text-neutral-400">
-          <div className="font-medium">Recepciones y devoluciones</div>
-          <div className="mt-1 text-sm">Próximas rebanadas de la Fase 3 (D2, D3).</div>
+          <div className="font-medium">Recepciones separadas</div>
+          <div className="mt-1 text-sm">Próxima rebanada de la Fase 3 (D2).</div>
         </div>
       </div>
     </div>

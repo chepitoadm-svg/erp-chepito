@@ -184,6 +184,7 @@ export async function listarFacturas(): Promise<FacturaListado[]> {
 export interface FacturaLineaDetalle {
   linea: number;
   codigo_comercial: string | null;
+  articulo_id: string;
   articulo_codigo: string;
   articulo_nombre: string;
   cantidad: number;
@@ -203,6 +204,7 @@ export interface FacturaDetalle {
   plazo_credito: number | null;
   proveedor_nombre: string;
   proveedor_cedula: string;
+  bodega_id: string | null;
   bodega_codigo: string | null;
   bodega_nombre: string | null;
   subtotal: number;
@@ -229,7 +231,7 @@ interface FacturaDetalleEmbebido {
   estado: FacturaEstado;
   asiento_id: string | null;
   proveedor: { nombre: string; cedula_juridica: string } | null;
-  bodega: { codigo: string; nombre: string } | null;
+  bodega: { id: string; codigo: string; nombre: string } | null;
   asiento: { numero: number | null } | null;
   cxp: { saldo: number; estado: string }[];
   lineas: {
@@ -240,7 +242,7 @@ interface FacturaDetalleEmbebido {
     base_imponible: number;
     iva_monto: number;
     detalle: string | null;
-    articulo: { codigo: string; nombre: string } | null;
+    articulo: { id: string; codigo: string; nombre: string } | null;
     iva: { codigo: string } | null;
   }[];
 }
@@ -253,10 +255,10 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
       "id, fecha_emision, fecha_vencimiento, clave, condicion_venta, plazo_credito, " +
         "subtotal, iva_total, total, estado, asiento_id, " +
         "proveedor:proveedores(nombre, cedula_juridica), " +
-        "bodega:bodegas(codigo, nombre), asiento:asientos(numero), " +
+        "bodega:bodegas(id, codigo, nombre), asiento:asientos(numero), " +
         "cxp:cuentas_por_pagar(saldo, estado), " +
         "lineas:facturas_compra_lineas(linea, codigo_comercial, cantidad, costo_unitario, " +
-        "base_imponible, iva_monto, detalle, articulo:articulos(codigo, nombre), " +
+        "base_imponible, iva_monto, detalle, articulo:articulos(id, codigo, nombre), " +
         "iva:iva_tarifas(codigo))",
     )
     .eq("id", id)
@@ -277,6 +279,7 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
     plazo_credito: f.plazo_credito,
     proveedor_nombre: f.proveedor?.nombre ?? "",
     proveedor_cedula: f.proveedor?.cedula_juridica ?? "",
+    bodega_id: f.bodega?.id ?? null,
     bodega_codigo: f.bodega?.codigo ?? null,
     bodega_nombre: f.bodega?.nombre ?? null,
     subtotal: Number(f.subtotal),
@@ -292,6 +295,7 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
       .map((l) => ({
         linea: l.linea,
         codigo_comercial: l.codigo_comercial,
+        articulo_id: l.articulo?.id ?? "",
         articulo_codigo: l.articulo?.codigo ?? "",
         articulo_nombre: l.articulo?.nombre ?? "",
         cantidad: Number(l.cantidad),
@@ -351,4 +355,175 @@ export async function listarCxP(): Promise<CxPFila[]> {
     saldo: Number(q.saldo),
     estado: q.estado,
   }));
+}
+
+// === DEVOLUCIONES DE COMPRA ================================================
+export interface FacturaConfirmadaListado {
+  id: string;
+  fecha_emision: string;
+  clave: string | null;
+  proveedor_nombre: string;
+  total: number;
+}
+
+interface FacturaConfEmbebido {
+  id: string;
+  fecha_emision: string;
+  clave: string | null;
+  total: number;
+  proveedor: { nombre: string } | null;
+}
+
+/** Facturas confirmadas, para elegir de cuál devolver. */
+export async function listarFacturasConfirmadas(): Promise<FacturaConfirmadaListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("facturas_compra")
+    .select("id, fecha_emision, clave, total, proveedor:proveedores(nombre)")
+    .eq("estado", "confirmada")
+    .order("fecha_emision", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar las facturas: ${error.message}`);
+  return ((data ?? []) as unknown as FacturaConfEmbebido[]).map((f) => ({
+    id: f.id,
+    fecha_emision: f.fecha_emision,
+    clave: f.clave,
+    proveedor_nombre: f.proveedor?.nombre ?? "",
+    total: Number(f.total),
+  }));
+}
+
+export type DevolucionEstado = "borrador" | "confirmada" | "anulada";
+
+export interface DevolucionListado {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  motivo: string;
+  total: number;
+  estado: DevolucionEstado;
+}
+
+interface DevRowEmbebido {
+  id: string;
+  fecha: string;
+  motivo: string;
+  total: number;
+  estado: DevolucionEstado;
+  proveedor: { nombre: string } | null;
+}
+
+export async function listarDevoluciones(): Promise<DevolucionListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("devoluciones_compra")
+    .select("id, fecha, motivo, total, estado, proveedor:proveedores(nombre)")
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar las devoluciones: ${error.message}`);
+  return ((data ?? []) as unknown as DevRowEmbebido[]).map((d) => ({
+    id: d.id,
+    fecha: d.fecha,
+    proveedor_nombre: d.proveedor?.nombre ?? "",
+    motivo: d.motivo,
+    total: Number(d.total),
+    estado: d.estado,
+  }));
+}
+
+export interface DevolucionLineaDetalle {
+  linea: number;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  cantidad: number;
+  base_imponible: number;
+  iva_monto: number;
+  detalle: string | null;
+}
+
+export interface DevolucionDetalle {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  bodega_codigo: string;
+  motivo: string;
+  subtotal: number;
+  iva_total: number;
+  total: number;
+  estado: DevolucionEstado;
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  factura_id: string | null;
+  factura_clave: string | null;
+  lineas: DevolucionLineaDetalle[];
+}
+
+interface DevDetalleEmbebido {
+  id: string;
+  fecha: string;
+  motivo: string;
+  subtotal: number;
+  iva_total: number;
+  total: number;
+  estado: DevolucionEstado;
+  asiento_id: string | null;
+  factura_id: string | null;
+  proveedor: { nombre: string } | null;
+  bodega: { codigo: string } | null;
+  asiento: { numero: number | null } | null;
+  factura: { clave: string | null } | null;
+  lineas: {
+    linea: number;
+    cantidad: number;
+    base_imponible: number;
+    iva_monto: number;
+    detalle: string | null;
+    articulo: { codigo: string; nombre: string } | null;
+  }[];
+}
+
+export async function obtenerDevolucion(id: string): Promise<DevolucionDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("devoluciones_compra")
+    .select(
+      "id, fecha, motivo, subtotal, iva_total, total, estado, asiento_id, factura_id, " +
+        "proveedor:proveedores(nombre), bodega:bodegas(codigo), asiento:asientos(numero), " +
+        "factura:facturas_compra(clave), " +
+        "lineas:devoluciones_compra_lineas(linea, cantidad, base_imponible, iva_monto, detalle, " +
+        "articulo:articulos(codigo, nombre))",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar la devolución: ${error.message}`);
+  }
+
+  const d = data as unknown as DevDetalleEmbebido;
+  return {
+    id: d.id,
+    fecha: d.fecha,
+    proveedor_nombre: d.proveedor?.nombre ?? "",
+    bodega_codigo: d.bodega?.codigo ?? "",
+    motivo: d.motivo,
+    subtotal: Number(d.subtotal),
+    iva_total: Number(d.iva_total),
+    total: Number(d.total),
+    estado: d.estado,
+    asiento_id: d.asiento_id,
+    asiento_numero: d.asiento?.numero ?? null,
+    factura_id: d.factura_id,
+    factura_clave: d.factura?.clave ?? null,
+    lineas: (d.lineas ?? [])
+      .sort((x, y) => x.linea - y.linea)
+      .map((l) => ({
+        linea: l.linea,
+        articulo_codigo: l.articulo?.codigo ?? "",
+        articulo_nombre: l.articulo?.nombre ?? "",
+        cantidad: Number(l.cantidad),
+        base_imponible: Number(l.base_imponible),
+        iva_monto: Number(l.iva_monto),
+        detalle: l.detalle,
+      })),
+  };
 }

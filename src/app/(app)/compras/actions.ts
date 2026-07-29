@@ -9,6 +9,7 @@ import {
   editarProveedorSchema,
   agregarMapeoSchema,
   crearFacturaSchema,
+  crearDevolucionSchema,
 } from "@/lib/validation/compras";
 
 export interface FormState {
@@ -215,4 +216,71 @@ export async function anularFactura(
   revalidatePath("/compras/facturas");
   revalidatePath("/compras/cxp");
   return { ok: "Factura anulada." };
+}
+
+// === DEVOLUCIONES DE COMPRA (D3) ===========================================
+export async function crearDevolucion(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+
+  let lineasRaw: unknown = [];
+  try {
+    lineasRaw = JSON.parse(String(formData.get("lineas") ?? "[]"));
+  } catch {
+    return { error: "Líneas inválidas." };
+  }
+
+  const parsed = crearDevolucionSchema.safeParse({
+    factura_id: String(formData.get("factura_id") ?? ""),
+    bodega_id: String(formData.get("bodega_id") ?? ""),
+    motivo: String(formData.get("motivo") ?? "").trim(),
+    lineas: lineasRaw,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_devolucion", {
+    p_factura: parsed.data.factura_id,
+    p_bodega: parsed.data.bodega_id,
+    p_motivo: parsed.data.motivo,
+    p_lineas: parsed.data.lineas.map((l) => ({
+      articulo_id: l.articulo_id,
+      cantidad: l.cantidad,
+      detalle: l.detalle ?? null,
+    })),
+  });
+  if (error || !id)
+    return { error: limpiar(error?.message ?? "No se pudo crear la devolución.") };
+
+  redirect(`/compras/devoluciones/${id}`);
+}
+
+export async function confirmarDevolucion(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_confirmar_devolucion", { p_dev: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/compras/devoluciones/${id}`);
+  revalidatePath("/compras/devoluciones");
+  revalidatePath("/compras/cxp");
+}
+
+export async function anularDevolucion(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_devolucion", { p_dev: id, p_motivo: motivo });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/compras/devoluciones/${id}`);
+  revalidatePath("/compras/devoluciones");
+  revalidatePath("/compras/cxp");
+  return { ok: "Devolución anulada." };
 }
