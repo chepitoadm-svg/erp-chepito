@@ -505,6 +505,54 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["ajustes_inventario_lineas"]["Insert"]>;
         Relationships: [];
       };
+      transferencias: {
+        Row: {
+          id: string;
+          fecha: string;
+          bodega_origen_id: string;
+          bodega_destino_id: string;
+          glosa: string | null;
+          estado: "borrador" | "en_transito" | "recibida" | "anulada";
+          enviada_en: string | null;
+          enviada_por: string | null;
+          recibida_en: string | null;
+          recibida_por: string | null;
+          anulada_en: string | null;
+          anulada_por: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          fecha?: string;
+          bodega_origen_id: string;
+          bodega_destino_id: string;
+          glosa?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["transferencias"]["Insert"]>;
+        Relationships: [];
+      };
+      transferencias_lineas: {
+        Row: {
+          id: string;
+          transferencia_id: string;
+          linea: number;
+          articulo_id: string;
+          cantidad_enviada: number;
+          cantidad_recibida: number;
+          detalle: string | null;
+        };
+        Insert: {
+          transferencia_id: string;
+          linea: number;
+          articulo_id: string;
+          cantidad_enviada: number;
+          detalle?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["transferencias_lineas"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       v_existencias_valoradas: {
@@ -542,6 +590,20 @@ export interface Database {
           origen_id: string | null;
           detalle: string | null;
           creado_en: string;
+        };
+        Relationships: [];
+      };
+      v_inventario_transito: {
+        Row: {
+          transferencia_id: string;
+          fecha: string;
+          origen: string;
+          destino: string;
+          articulo_codigo: string;
+          articulo_nombre: string;
+          cantidad_enviada: number;
+          cantidad_recibida: number;
+          en_transito: number;
         };
         Relationships: [];
       };
@@ -742,6 +804,19 @@ export interface Database {
       };
       fn_confirmar_ajuste: { Args: { p_ajuste: string }; Returns: string };
       fn_anular_ajuste: { Args: { p_ajuste: string; p_motivo: string }; Returns: undefined };
+      fn_crear_transferencia: {
+        Args: { p_origen: string; p_destino: string; p_glosa: string | null; p_lineas: unknown };
+        Returns: string;
+      };
+      fn_enviar_transferencia: { Args: { p_transf: string }; Returns: undefined };
+      fn_recibir_transferencia: {
+        Args: { p_transf: string; p_recibidas?: unknown };
+        Returns: undefined;
+      };
+      fn_anular_transferencia: {
+        Args: { p_transf: string; p_motivo: string };
+        Returns: undefined;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

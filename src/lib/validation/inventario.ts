@@ -45,3 +45,24 @@ export const crearAjusteSchema = z.object({
 
 export type CargaInicialInput = z.infer<typeof cargaInicialSchema>;
 export type CrearAjusteInput = z.infer<typeof crearAjusteSchema>;
+
+// === Transferencias ========================================================
+export const transferenciaLineaSchema = z.object({
+  articulo_id: z.string().uuid(),
+  cantidad: z.number().positive(),
+  detalle: z.string().trim().max(300).nullable().optional(),
+});
+
+export const crearTransferenciaSchema = z
+  .object({
+    bodega_origen_id: z.string().uuid("Seleccioná la bodega de origen."),
+    bodega_destino_id: z.string().uuid("Seleccioná la bodega de destino."),
+    glosa: z.string().trim().max(200).nullable().optional(),
+    lineas: z.array(transferenciaLineaSchema).min(1, "Agregá al menos una línea."),
+  })
+  .refine((d) => d.bodega_origen_id !== d.bodega_destino_id, {
+    message: "El origen y el destino deben ser distintos.",
+    path: ["bodega_destino_id"],
+  });
+
+export type CrearTransferenciaInput = z.infer<typeof crearTransferenciaSchema>;

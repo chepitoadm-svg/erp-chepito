@@ -33,6 +33,12 @@ const SECCIONES = [
     permiso: "inventario.ver",
   },
   {
+    href: "/inventario/transferencias",
+    titulo: "Transferencias",
+    desc: "Mover mercadería entre bodegas, en dos pasos con tránsito.",
+    permiso: "inventario.ver",
+  },
+  {
     href: "/inventario/libro",
     titulo: "Libro de Inventarios",
     desc: "Detalle valuado por ítem a una fecha (libro legal).",

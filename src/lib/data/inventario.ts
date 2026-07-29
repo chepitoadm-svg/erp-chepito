@@ -425,3 +425,151 @@ export async function obtenerAjuste(id: string): Promise<AjusteDetalle | null> {
       })),
   };
 }
+
+// === TRANSFERENCIAS ========================================================
+export type TransferenciaEstado = "borrador" | "en_transito" | "recibida" | "anulada";
+
+export interface TransferenciaListado {
+  id: string;
+  fecha: string;
+  origen_codigo: string;
+  destino_codigo: string;
+  glosa: string | null;
+  estado: TransferenciaEstado;
+  n_lineas: number;
+}
+
+interface TransfRowEmbebido {
+  id: string;
+  fecha: string;
+  glosa: string | null;
+  estado: TransferenciaEstado;
+  origen: { codigo: string } | null;
+  destino: { codigo: string } | null;
+  lineas: { count: number }[];
+}
+
+export async function listarTransferencias(): Promise<TransferenciaListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("transferencias")
+    .select(
+      "id, fecha, glosa, estado, " +
+        "origen:bodegas!transferencias_bodega_origen_id_fkey(codigo), " +
+        "destino:bodegas!transferencias_bodega_destino_id_fkey(codigo), " +
+        "lineas:transferencias_lineas(count)",
+    )
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar las transferencias: ${error.message}`);
+
+  return ((data ?? []) as unknown as TransfRowEmbebido[]).map((t) => ({
+    id: t.id,
+    fecha: t.fecha,
+    origen_codigo: t.origen?.codigo ?? "",
+    destino_codigo: t.destino?.codigo ?? "",
+    glosa: t.glosa,
+    estado: t.estado,
+    n_lineas: t.lineas?.[0]?.count ?? 0,
+  }));
+}
+
+export interface TransferenciaLineaDetalle {
+  linea: number;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  cantidad_enviada: number;
+  cantidad_recibida: number;
+  pendiente: number;
+  detalle: string | null;
+}
+
+export interface TransferenciaDetalle {
+  id: string;
+  fecha: string;
+  origen_codigo: string;
+  origen_nombre: string;
+  destino_codigo: string;
+  destino_nombre: string;
+  glosa: string | null;
+  estado: TransferenciaEstado;
+  lineas: TransferenciaLineaDetalle[];
+}
+
+interface TransfDetalleEmbebido {
+  id: string;
+  fecha: string;
+  glosa: string | null;
+  estado: TransferenciaEstado;
+  origen: { codigo: string; nombre: string } | null;
+  destino: { codigo: string; nombre: string } | null;
+  lineas: {
+    linea: number;
+    cantidad_enviada: number;
+    cantidad_recibida: number;
+    detalle: string | null;
+    articulo: { codigo: string; nombre: string } | null;
+  }[];
+}
+
+export async function obtenerTransferencia(id: string): Promise<TransferenciaDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("transferencias")
+    .select(
+      "id, fecha, glosa, estado, " +
+        "origen:bodegas!transferencias_bodega_origen_id_fkey(codigo, nombre), " +
+        "destino:bodegas!transferencias_bodega_destino_id_fkey(codigo, nombre), " +
+        "lineas:transferencias_lineas(linea, cantidad_enviada, cantidad_recibida, detalle, " +
+        "articulo:articulos(codigo, nombre))",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar la transferencia: ${error.message}`);
+  }
+
+  const t = data as unknown as TransfDetalleEmbebido;
+  return {
+    id: t.id,
+    fecha: t.fecha,
+    origen_codigo: t.origen?.codigo ?? "",
+    origen_nombre: t.origen?.nombre ?? "",
+    destino_codigo: t.destino?.codigo ?? "",
+    destino_nombre: t.destino?.nombre ?? "",
+    glosa: t.glosa,
+    estado: t.estado,
+    lineas: (t.lineas ?? [])
+      .sort((x, y) => x.linea - y.linea)
+      .map((l) => ({
+        linea: l.linea,
+        articulo_codigo: l.articulo?.codigo ?? "",
+        articulo_nombre: l.articulo?.nombre ?? "",
+        cantidad_enviada: Number(l.cantidad_enviada),
+        cantidad_recibida: Number(l.cantidad_recibida),
+        pendiente: Number(l.cantidad_enviada) - Number(l.cantidad_recibida),
+        detalle: l.detalle,
+      })),
+  };
+}
+
+export interface TransitoFila {
+  transferencia_id: string;
+  fecha: string;
+  origen: string;
+  destino: string;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  en_transito: number;
+}
+
+export async function inventarioTransito(): Promise<TransitoFila[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("v_inventario_transito")
+    .select("transferencia_id, fecha, origen, destino, articulo_codigo, articulo_nombre, en_transito")
+    .order("fecha", { ascending: false });
+  if (error) throw new Error(`No se pudo cargar el inventario en tránsito: ${error.message}`);
+  return (data ?? []).map((f) => ({ ...f, en_transito: Number(f.en_transito) }));
+}

@@ -9,6 +9,7 @@ import {
   editarArticuloSchema,
   cargaInicialSchema,
   crearAjusteSchema,
+  crearTransferenciaSchema,
 } from "@/lib/validation/inventario";
 
 export interface FormState {
@@ -191,4 +192,105 @@ export async function anularAjuste(
   revalidatePath(`/inventario/ajustes/${id}`);
   revalidatePath("/inventario/ajustes");
   return { ok: "Ajuste anulado." };
+}
+
+// === TRANSFERENCIAS ========================================================
+export async function crearTransferencia(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("inventario.transferir");
+
+  let lineasRaw: unknown = [];
+  try {
+    lineasRaw = JSON.parse(String(formData.get("lineas") ?? "[]"));
+  } catch {
+    return { error: "Líneas inválidas." };
+  }
+
+  const glosa = String(formData.get("glosa") ?? "").trim();
+  const parsed = crearTransferenciaSchema.safeParse({
+    bodega_origen_id: String(formData.get("bodega_origen_id") ?? ""),
+    bodega_destino_id: String(formData.get("bodega_destino_id") ?? ""),
+    glosa: glosa || null,
+    lineas: lineasRaw,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_transferencia", {
+    p_origen: parsed.data.bodega_origen_id,
+    p_destino: parsed.data.bodega_destino_id,
+    p_glosa: parsed.data.glosa ?? null,
+    p_lineas: parsed.data.lineas.map((l) => ({
+      articulo_id: l.articulo_id,
+      cantidad: l.cantidad,
+      detalle: l.detalle ?? null,
+    })),
+  });
+  if (error || !id) return { error: limpiar(error?.message ?? "No se pudo crear la transferencia.") };
+
+  redirect(`/inventario/transferencias/${id}`);
+}
+
+export async function enviarTransferencia(formData: FormData): Promise<void> {
+  await requerirPermiso("inventario.transferir");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_enviar_transferencia", { p_transf: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/inventario/transferencias/${id}`);
+  revalidatePath("/inventario/transferencias");
+}
+
+export async function recibirTransferencia(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("inventario.transferir");
+  const id = String(formData.get("id") ?? "");
+  const modo = String(formData.get("modo") ?? "todo");
+
+  let recibidas: { linea: number; cantidad: number }[] | null = null;
+  if (modo === "parcial") {
+    try {
+      const raw = JSON.parse(String(formData.get("recibidas") ?? "[]")) as {
+        linea: number;
+        cantidad: number;
+      }[];
+      recibidas = raw.filter((r) => Number(r.cantidad) > 0);
+    } catch {
+      return { error: "Cantidades inválidas." };
+    }
+    if (recibidas.length === 0) return { error: "Indicá al menos una cantidad a recibir." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_recibir_transferencia", {
+    p_transf: id,
+    p_recibidas: recibidas ?? undefined,
+  });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/inventario/transferencias/${id}`);
+  revalidatePath("/inventario/transferencias");
+  return { ok: "Recepción registrada." };
+}
+
+export async function anularTransferencia(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("inventario.transferir");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_transferencia", {
+    p_transf: id,
+    p_motivo: motivo,
+  });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/inventario/transferencias/${id}`);
+  revalidatePath("/inventario/transferencias");
+  return { ok: "Transferencia anulada." };
 }
