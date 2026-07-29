@@ -680,6 +680,65 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      comprobantes_ingesta: {
+        Row: {
+          id: string;
+          clave: string | null;
+          tipo_documento: string | null;
+          estado: "recibido" | "validado" | "requiere_mapeo" | "procesado" | "error" | "descartado";
+          emisor_cedula: string | null;
+          emisor_nombre: string | null;
+          receptor_cedula: string | null;
+          consecutivo: string | null;
+          fecha_emision: string | null;
+          condicion_venta: string | null;
+          plazo_credito: number | null;
+          fecha_vencimiento: string | null;
+          moneda: string | null;
+          tipo_cambio: number | null;
+          subtotal: number | null;
+          iva_total: number | null;
+          total: number | null;
+          estado_hacienda: string | null;
+          proveedor_id: string | null;
+          factura_id: string | null;
+          error_detalle: string | null;
+          lineas: unknown;
+          xml_comprobante: string;
+          xml_respuesta: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          clave?: string | null;
+          tipo_documento?: string | null;
+          estado?: string;
+          emisor_cedula?: string | null;
+          emisor_nombre?: string | null;
+          receptor_cedula?: string | null;
+          consecutivo?: string | null;
+          fecha_emision?: string | null;
+          condicion_venta?: string | null;
+          plazo_credito?: number | null;
+          fecha_vencimiento?: string | null;
+          moneda?: string | null;
+          tipo_cambio?: number | null;
+          subtotal?: number | null;
+          iva_total?: number | null;
+          total?: number | null;
+          estado_hacienda?: string | null;
+          proveedor_id?: string | null;
+          factura_id?: string | null;
+          error_detalle?: string | null;
+          lineas?: unknown;
+          xml_comprobante: string;
+          xml_respuesta?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["comprobantes_ingesta"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       v_existencias_valoradas: {

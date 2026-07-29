@@ -39,6 +39,17 @@ export default async function ComprasPage() {
         )}
         {puedeFacturar && (
           <Link
+            href="/compras/ingestor"
+            className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          >
+            <div className="font-medium text-neutral-900">Ingestor de XML</div>
+            <div className="mt-1 text-sm text-neutral-500">
+              Subir el XML de Hacienda y leer la factura automáticamente.
+            </div>
+          </Link>
+        )}
+        {puedeFacturar && (
+          <Link
             href="/compras/devoluciones"
             className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
           >

@@ -357,6 +357,154 @@ export async function listarCxP(): Promise<CxPFila[]> {
   }));
 }
 
+// === INGESTOR DE XML =======================================================
+export type IngestaEstado =
+  | "recibido"
+  | "validado"
+  | "requiere_mapeo"
+  | "procesado"
+  | "error"
+  | "descartado";
+
+export interface IngestaLineaParseada {
+  numero: number;
+  codigo_comercial: string | null;
+  detalle: string;
+  cantidad: number;
+  unidad_comercial: string | null;
+  base_imponible: number;
+  iva_monto: number;
+  articulo_id: string | null; // resuelto vía proveedor_articulos (null = sin mapear)
+  articulo_codigo: string | null;
+  mapeado: boolean;
+}
+
+export interface IngestaListado {
+  id: string;
+  clave: string | null;
+  fecha_emision: string | null;
+  emisor_nombre: string | null;
+  proveedor_nombre: string | null;
+  total: number | null;
+  estado: IngestaEstado;
+  estado_hacienda: string | null;
+}
+
+interface IngestaRowEmbebido {
+  id: string;
+  clave: string | null;
+  fecha_emision: string | null;
+  emisor_nombre: string | null;
+  total: number | null;
+  estado: IngestaEstado;
+  estado_hacienda: string | null;
+  proveedor: { nombre: string } | null;
+}
+
+export async function listarIngesta(): Promise<IngestaListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("comprobantes_ingesta")
+    .select(
+      "id, clave, fecha_emision, emisor_nombre, total, estado, estado_hacienda, " +
+        "proveedor:proveedores(nombre)",
+    )
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudo cargar la bandeja del ingestor: ${error.message}`);
+  return ((data ?? []) as unknown as IngestaRowEmbebido[]).map((c) => ({
+    id: c.id,
+    clave: c.clave,
+    fecha_emision: c.fecha_emision,
+    emisor_nombre: c.emisor_nombre,
+    proveedor_nombre: c.proveedor?.nombre ?? null,
+    total: c.total != null ? Number(c.total) : null,
+    estado: c.estado,
+    estado_hacienda: c.estado_hacienda,
+  }));
+}
+
+export interface IngestaDetalle {
+  id: string;
+  clave: string | null;
+  tipo_documento: string | null;
+  estado: IngestaEstado;
+  estado_hacienda: string | null;
+  emisor_cedula: string | null;
+  emisor_nombre: string | null;
+  receptor_cedula: string | null;
+  fecha_emision: string | null;
+  fecha_vencimiento: string | null;
+  condicion_venta: string | null;
+  plazo_credito: number | null;
+  subtotal: number | null;
+  iva_total: number | null;
+  total: number | null;
+  proveedor_id: string | null;
+  proveedor_nombre: string | null;
+  factura_id: string | null;
+  error_detalle: string | null;
+  lineas: IngestaLineaParseada[];
+}
+
+interface IngestaDetalleEmbebido {
+  id: string;
+  clave: string | null;
+  tipo_documento: string | null;
+  estado: IngestaEstado;
+  estado_hacienda: string | null;
+  emisor_cedula: string | null;
+  emisor_nombre: string | null;
+  receptor_cedula: string | null;
+  fecha_emision: string | null;
+  fecha_vencimiento: string | null;
+  condicion_venta: string | null;
+  plazo_credito: number | null;
+  subtotal: number | null;
+  iva_total: number | null;
+  total: number | null;
+  proveedor_id: string | null;
+  factura_id: string | null;
+  error_detalle: string | null;
+  lineas: IngestaLineaParseada[] | null;
+  proveedor: { nombre: string } | null;
+}
+
+export async function obtenerIngesta(id: string): Promise<IngestaDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("comprobantes_ingesta")
+    .select("*, proveedor:proveedores(nombre)")
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar el comprobante: ${error.message}`);
+  }
+  const c = data as unknown as IngestaDetalleEmbebido;
+  return {
+    id: c.id,
+    clave: c.clave,
+    tipo_documento: c.tipo_documento,
+    estado: c.estado,
+    estado_hacienda: c.estado_hacienda,
+    emisor_cedula: c.emisor_cedula,
+    emisor_nombre: c.emisor_nombre,
+    receptor_cedula: c.receptor_cedula,
+    fecha_emision: c.fecha_emision,
+    fecha_vencimiento: c.fecha_vencimiento,
+    condicion_venta: c.condicion_venta,
+    plazo_credito: c.plazo_credito,
+    subtotal: c.subtotal != null ? Number(c.subtotal) : null,
+    iva_total: c.iva_total != null ? Number(c.iva_total) : null,
+    total: c.total != null ? Number(c.total) : null,
+    proveedor_id: c.proveedor_id,
+    proveedor_nombre: c.proveedor?.nombre ?? null,
+    factura_id: c.factura_id,
+    error_detalle: c.error_detalle,
+    lineas: (c.lineas ?? []) as IngestaLineaParseada[],
+  };
+}
+
 // === RECEPCIONES (D2) ======================================================
 export type RecepcionEstado = "borrador" | "confirmada" | "anulada";
 

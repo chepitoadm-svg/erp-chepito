@@ -233,6 +233,171 @@ export async function anularFactura(
   return { ok: "Factura anulada." };
 }
 
+// === INGESTOR DE XML =======================================================
+export async function subirComprobante(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+
+  const fComp = formData.get("comprobante");
+  const fResp = formData.get("respuesta");
+  if (!(fComp instanceof File) || fComp.size === 0) {
+    return { error: "Subí el XML del comprobante." };
+  }
+  const xmlComp = await fComp.text();
+  const xmlResp = fResp instanceof File && fResp.size > 0 ? await fResp.text() : null;
+
+  const { parseComprobante, parseRespuesta } = await import("@/lib/xml/comprobante");
+  let comp;
+  try {
+    comp = parseComprobante(xmlComp);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo leer el XML del comprobante." };
+  }
+  let resp = null;
+  if (xmlResp) {
+    try {
+      resp = parseRespuesta(xmlResp);
+    } catch {
+      return { error: "El segundo archivo no es un MensajeHacienda válido." };
+    }
+    if (resp.clave && comp.clave && resp.clave !== comp.clave) {
+      return { error: "La respuesta no corresponde a ese comprobante (claves distintas)." };
+    }
+  }
+
+  const supabase = await createClient();
+
+  // Idempotencia: no reingresar la misma clave.
+  if (comp.clave) {
+    const { data: ya } = await supabase
+      .from("comprobantes_ingesta")
+      .select("id")
+      .eq("clave", comp.clave)
+      .maybeSingle();
+    if (ya) redirect(`/compras/ingestor/${ya.id}`);
+  }
+
+  // Receptor debe ser nuestra empresa.
+  const { data: empresa } = await supabase.from("empresa").select("cedula_juridica").limit(1).single();
+  const nuestraCedula = empresa?.cedula_juridica ?? null;
+
+  // Proveedor por cédula del emisor.
+  const { data: prov } = await supabase
+    .from("proveedores")
+    .select("id, estado")
+    .eq("cedula_juridica", comp.emisor_cedula)
+    .maybeSingle();
+  const proveedorId = prov?.id ?? null;
+
+  // Mapeo de líneas por CodigoComercial (aprende con el uso).
+  let mapa = new Map<string, { articulo_id: string; codigo: string }>();
+  if (proveedorId) {
+    const { data: maps } = await supabase
+      .from("proveedor_articulos")
+      .select("codigo_comercial, articulo_id, articulo:articulos(codigo)")
+      .eq("proveedor_id", proveedorId);
+    mapa = new Map(
+      (maps ?? []).map((m) => {
+        const art = m.articulo as unknown as { codigo: string } | null;
+        return [m.codigo_comercial, { articulo_id: m.articulo_id, codigo: art?.codigo ?? "" }];
+      }),
+    );
+  }
+  const lineas = comp.lineas.map((l) => {
+    const hit = l.codigo_comercial ? mapa.get(l.codigo_comercial) : undefined;
+    return {
+      numero: l.numero,
+      codigo_comercial: l.codigo_comercial,
+      detalle: l.detalle,
+      cantidad: l.cantidad,
+      unidad_comercial: l.unidad_comercial,
+      base_imponible: l.base_imponible,
+      iva_monto: l.iva_monto,
+      articulo_id: hit?.articulo_id ?? null,
+      articulo_codigo: hit?.codigo ?? null,
+      mapeado: !!hit,
+    };
+  });
+
+  // Estado y diagnóstico.
+  let estado = "validado";
+  let errorDetalle: string | null = null;
+  if (resp && resp.estado && resp.estado !== "Aceptado") {
+    estado = "error";
+    errorDetalle = `Hacienda no lo aceptó (EstadoMensaje = ${resp.estado}).`;
+  } else if (nuestraCedula && comp.receptor_cedula && comp.receptor_cedula !== nuestraCedula) {
+    estado = "error";
+    errorDetalle = `El receptor del comprobante (${comp.receptor_cedula}) no es la empresa (${nuestraCedula}).`;
+  } else if (!proveedorId) {
+    estado = "error";
+    errorDetalle = `No hay proveedor registrado con la cédula ${comp.emisor_cedula} (${comp.emisor_nombre}).`;
+  } else if (lineas.some((l) => !l.mapeado)) {
+    estado = "requiere_mapeo";
+    errorDetalle = "Faltan artículos por mapear antes de crear la factura.";
+  }
+
+  const venc =
+    comp.fecha_emision && comp.plazo_credito != null
+      ? new Date(new Date(comp.fecha_emision + "T00:00:00").getTime() + comp.plazo_credito * 86400000)
+          .toISOString()
+          .slice(0, 10)
+      : comp.fecha_emision;
+
+  const { data: ins, error } = await supabase
+    .from("comprobantes_ingesta")
+    .insert({
+      clave: comp.clave || null,
+      tipo_documento: comp.tipo,
+      estado,
+      emisor_cedula: comp.emisor_cedula,
+      emisor_nombre: comp.emisor_nombre,
+      receptor_cedula: comp.receptor_cedula,
+      consecutivo: comp.consecutivo,
+      fecha_emision: comp.fecha_emision || null,
+      condicion_venta: comp.condicion_venta,
+      plazo_credito: comp.plazo_credito,
+      fecha_vencimiento: venc || null,
+      moneda: comp.moneda,
+      tipo_cambio: comp.tipo_cambio,
+      subtotal: comp.subtotal,
+      iva_total: comp.iva_total,
+      total: comp.total,
+      estado_hacienda: resp?.estado ?? null,
+      proveedor_id: proveedorId,
+      error_detalle: errorDetalle,
+      lineas,
+      xml_comprobante: xmlComp,
+      xml_respuesta: xmlResp,
+    })
+    .select("id")
+    .single();
+  if (error || !ins) {
+    return {
+      error: error?.message.includes("duplicate")
+        ? "Ese comprobante ya fue ingresado."
+        : limpiar(error?.message ?? "No se pudo guardar el comprobante."),
+    };
+  }
+
+  revalidatePath("/compras/ingestor");
+  redirect(`/compras/ingestor/${ins.id}`);
+}
+
+export async function descartarIngesta(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("comprobantes_ingesta")
+    .update({ estado: "descartado" })
+    .eq("id", id);
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath("/compras/ingestor");
+  revalidatePath(`/compras/ingestor/${id}`);
+}
+
 // === RECEPCIONES (D2) ======================================================
 export async function crearRecepcion(
   _prev: FormState,
