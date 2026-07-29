@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerIngesta } from "@/lib/data/compras";
-import { descartarIngesta } from "../../actions";
+import { descartarIngesta, crearProveedorDesdeIngesta } from "../../actions";
 
 const fmt = (n: number | null) =>
   n == null ? "—" : Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -73,13 +73,18 @@ export default async function IngestaDetallePage({
         >
           {c.error_detalle}
           {c.estado === "error" && !c.proveedor_id && c.emisor_cedula && (
-            <>
-              {" "}
-              <Link href="/compras/proveedores" className="underline">
-                Registrar proveedor
-              </Link>{" "}
-              (céd. {c.emisor_cedula}) y volver a subirlo.
-            </>
+            <form action={crearProveedorDesdeIngesta} className="mt-3 flex flex-wrap items-center gap-3">
+              <input type="hidden" name="id" value={c.id} />
+              <button
+                type="submit"
+                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
+              >
+                Crear proveedor con los datos del XML
+              </button>
+              <span className="text-xs text-red-700/80">
+                {c.emisor_nombre} · céd. {c.emisor_cedula}
+              </span>
+            </form>
           )}
         </div>
       )}

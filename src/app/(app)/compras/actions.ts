@@ -398,6 +398,107 @@ export async function descartarIngesta(formData: FormData): Promise<void> {
   revalidatePath(`/compras/ingestor/${id}`);
 }
 
+// Recalcula proveedor, mapeo de líneas y estado de un comprobante en staging
+// a partir de sus datos ya parseados (sin volver a leer el XML). Se usa tras
+// registrar el proveedor o mapear artículos.
+async function reprocesarIngesta(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+): Promise<void> {
+  const { data: row } = await supabase
+    .from("comprobantes_ingesta")
+    .select("emisor_cedula, receptor_cedula, estado_hacienda, lineas, estado")
+    .eq("id", id)
+    .single();
+  if (!row || row.estado === "procesado" || row.estado === "descartado") return;
+
+  const { data: empresa } = await supabase.from("empresa").select("cedula_juridica").limit(1).single();
+  const nuestraCedula = empresa?.cedula_juridica ?? null;
+
+  const { data: prov } = await supabase
+    .from("proveedores")
+    .select("id")
+    .eq("cedula_juridica", row.emisor_cedula ?? "")
+    .maybeSingle();
+  const proveedorId = prov?.id ?? null;
+
+  const lineasRaw = (row.lineas ?? []) as {
+    codigo_comercial: string | null;
+    mapeado?: boolean;
+    [k: string]: unknown;
+  }[];
+
+  let mapa = new Map<string, { articulo_id: string; codigo: string }>();
+  if (proveedorId) {
+    const { data: maps } = await supabase
+      .from("proveedor_articulos")
+      .select("codigo_comercial, articulo_id, articulo:articulos(codigo)")
+      .eq("proveedor_id", proveedorId);
+    mapa = new Map(
+      (maps ?? []).map((m) => {
+        const art = m.articulo as unknown as { codigo: string } | null;
+        return [m.codigo_comercial, { articulo_id: m.articulo_id, codigo: art?.codigo ?? "" }];
+      }),
+    );
+  }
+  const lineas = lineasRaw.map((l) => {
+    const hit = l.codigo_comercial ? mapa.get(l.codigo_comercial) : undefined;
+    return { ...l, articulo_id: hit?.articulo_id ?? null, articulo_codigo: hit?.codigo ?? null, mapeado: !!hit };
+  });
+
+  let estado = "validado";
+  let errorDetalle: string | null = null;
+  if (row.estado_hacienda && row.estado_hacienda !== "Aceptado") {
+    estado = "error";
+    errorDetalle = `Hacienda no lo aceptó (EstadoMensaje = ${row.estado_hacienda}).`;
+  } else if (nuestraCedula && row.receptor_cedula && row.receptor_cedula !== nuestraCedula) {
+    estado = "error";
+    errorDetalle = `El receptor del comprobante (${row.receptor_cedula}) no es la empresa (${nuestraCedula}).`;
+  } else if (!proveedorId) {
+    estado = "error";
+    errorDetalle = `No hay proveedor registrado con la cédula ${row.emisor_cedula}.`;
+  } else if (lineas.some((l) => !l.mapeado)) {
+    estado = "requiere_mapeo";
+    errorDetalle = "Faltan artículos por mapear antes de crear la factura.";
+  }
+
+  await supabase
+    .from("comprobantes_ingesta")
+    .update({ proveedor_id: proveedorId, lineas, estado, error_detalle: errorDetalle })
+    .eq("id", id);
+}
+
+// Crea el proveedor con la cédula y el nombre que vienen en el XML, y reprocesa.
+export async function crearProveedorDesdeIngesta(formData: FormData): Promise<void> {
+  await requerirPermiso("proveedores.gestionar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+
+  const { data: row } = await supabase
+    .from("comprobantes_ingesta")
+    .select("emisor_cedula, emisor_nombre")
+    .eq("id", id)
+    .single();
+  if (!row?.emisor_cedula) throw new Error("El comprobante no trae la cédula del emisor.");
+
+  const { data: existe } = await supabase
+    .from("proveedores")
+    .select("id")
+    .eq("cedula_juridica", row.emisor_cedula)
+    .maybeSingle();
+  if (!existe) {
+    const { error } = await supabase.from("proveedores").insert({
+      cedula_juridica: row.emisor_cedula,
+      nombre: row.emisor_nombre ?? row.emisor_cedula,
+    });
+    if (error) throw new Error(limpiar(error.message));
+  }
+
+  await reprocesarIngesta(supabase, id);
+  revalidatePath(`/compras/ingestor/${id}`);
+  revalidatePath("/compras/ingestor");
+}
+
 // === RECEPCIONES (D2) ======================================================
 export async function crearRecepcion(
   _prev: FormState,
