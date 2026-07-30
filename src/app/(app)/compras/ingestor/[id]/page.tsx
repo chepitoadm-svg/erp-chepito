@@ -2,7 +2,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerIngesta } from "@/lib/data/compras";
+import {
+  listarArticulosParaSelector,
+  listarUnidades,
+  listarTarifasIva,
+  listarBodegas,
+} from "@/lib/data/inventario";
 import { descartarIngesta, crearProveedorDesdeIngesta } from "../../actions";
+import MapearLinea from "@/components/MapearLinea";
+import CrearFacturaIngesta from "@/components/CrearFacturaIngesta";
 
 const fmt = (n: number | null) =>
   n == null ? "—" : Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -35,7 +43,18 @@ export default async function IngestaDetallePage({
   const c = await obtenerIngesta(id);
   if (!c) notFound();
 
-  const sinMapear = c.lineas.filter((l) => !l.mapeado).length;
+  const sinMapear = c.lineas.filter((l) => !l.mapeado);
+
+  // Selectores para mapear / crear la factura (solo si aplica).
+  const necesitaSelectores = c.estado === "requiere_mapeo" || c.estado === "validado";
+  const [articulos, unidades, tarifas, bodegas] = necesitaSelectores
+    ? await Promise.all([
+        listarArticulosParaSelector(),
+        listarUnidades(),
+        listarTarifasIva(),
+        listarBodegas(),
+      ])
+    : [[], [], [], []];
 
   return (
     <div>
@@ -152,15 +171,42 @@ export default async function IngestaDetallePage({
       </div>
 
       {c.estado === "requiere_mapeo" && (
-        <p className="mt-4 rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-700">
-          Faltan {sinMapear} de {c.lineas.length} líneas por ligar a un artículo. El mapeo y la
-          creación automática de la factura llegan en la próxima entrega; por ahora podés crear la
-          factura a mano desde{" "}
-          <Link href="/compras/facturas/nueva" className="underline">
-            Nueva factura
-          </Link>
-          .
-        </p>
+        <div className="mt-6">
+          <h2 className="mb-1 text-sm font-medium text-neutral-800">
+            Mapear artículos ({sinMapear.length} de {c.lineas.length} pendientes)
+          </h2>
+          <p className="mb-3 text-sm text-neutral-500">
+            Ligá cada código del proveedor a tu artículo. Si no existe, crealo con el nombre del XML.
+          </p>
+          <div className="space-y-3">
+            {sinMapear.map((l) => (
+              <MapearLinea
+                key={l.numero}
+                ingestaId={c.id}
+                codigoComercial={l.codigo_comercial ?? ""}
+                detalle={l.detalle}
+                cantidad={l.cantidad}
+                unidadComercial={l.unidad_comercial}
+                articulos={articulos}
+                unidades={unidades}
+                tarifas={tarifas}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {c.estado === "validado" && (
+        <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4">
+          <h2 className="mb-1 text-sm font-medium text-green-800">
+            Todo mapeado — listo para crear la factura
+          </h2>
+          <p className="mb-3 text-sm text-green-700">
+            Se crea en borrador aplicando la conversión de unidad (cantidad × factor). Después la
+            revisás y confirmás para que ingrese al inventario y cree la CxP.
+          </p>
+          <CrearFacturaIngesta id={c.id} bodegas={bodegas} />
+        </div>
       )}
 
       {c.estado !== "descartado" && c.estado !== "procesado" && (

@@ -499,6 +499,159 @@ export async function crearProveedorDesdeIngesta(formData: FormData): Promise<vo
   revalidatePath("/compras/ingestor");
 }
 
+// Mapea un CodigoComercial del comprobante a un artículo (existente o nuevo),
+// lo guarda en proveedor_articulos (aprende) y reprocesa.
+export async function mapearLinea(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const ingestaId = String(formData.get("ingesta_id") ?? "");
+  const codigoComercial = String(formData.get("codigo_comercial") ?? "").trim();
+  const modo = String(formData.get("modo") ?? "existente");
+  const unidadCompra = String(formData.get("unidad_compra_id") ?? "");
+  const factor = Number(String(formData.get("factor_a_stock") ?? "").trim());
+  const descripcion = String(formData.get("descripcion") ?? "").trim() || null;
+
+  if (!codigoComercial) return { error: "Falta el código comercial." };
+  if (!unidadCompra) return { error: "Seleccioná la unidad de compra." };
+  if (!(factor > 0)) return { error: "El factor a stock debe ser mayor que cero." };
+
+  const supabase = await createClient();
+  const { data: ing } = await supabase
+    .from("comprobantes_ingesta")
+    .select("proveedor_id")
+    .eq("id", ingestaId)
+    .single();
+  if (!ing?.proveedor_id) return { error: "Primero registrá el proveedor." };
+
+  let articuloId = String(formData.get("articulo_id") ?? "");
+  if (modo === "nuevo") {
+    const codigo = String(formData.get("nuevo_codigo") ?? "").trim().toUpperCase();
+    const nombre = String(formData.get("nuevo_nombre") ?? "").trim();
+    const unidadStock = String(formData.get("nuevo_unidad_stock_id") ?? "");
+    const ivaTarifa = String(formData.get("nuevo_iva_tarifa_id") ?? "");
+    const cabys = String(formData.get("nuevo_cabys") ?? "").trim() || null;
+    if (!codigo || nombre.length < 2 || !unidadStock || !ivaTarifa) {
+      return { error: "Completá código, nombre, unidad de stock e IVA del artículo nuevo." };
+    }
+    const { data: art, error } = await supabase
+      .from("articulos")
+      .insert({
+        codigo,
+        nombre,
+        tipo: "materia_prima",
+        unidad_stock_id: unidadStock,
+        iva_tarifa_id: ivaTarifa,
+        cabys_codigo: cabys,
+      })
+      .select("id")
+      .single();
+    if (error || !art) {
+      return {
+        error: error?.message.includes("duplicate")
+          ? "Ya existe un artículo con ese código."
+          : limpiar(error?.message ?? "No se pudo crear el artículo."),
+      };
+    }
+    articuloId = art.id;
+  }
+  if (!articuloId) return { error: "Seleccioná o creá un artículo." };
+
+  const { error: eMap } = await supabase.from("proveedor_articulos").insert({
+    proveedor_id: ing.proveedor_id,
+    codigo_comercial: codigoComercial,
+    articulo_id: articuloId,
+    unidad_compra_id: unidadCompra,
+    factor_a_stock: factor,
+    descripcion_proveedor: descripcion,
+  });
+  if (eMap) {
+    return {
+      error: eMap.message.includes("duplicate")
+        ? "Ese código comercial ya está mapeado para este proveedor."
+        : limpiar(eMap.message),
+    };
+  }
+
+  await reprocesarIngesta(supabase, ingestaId);
+  revalidatePath(`/compras/ingestor/${ingestaId}`);
+  return { ok: "Artículo mapeado." };
+}
+
+// Crea la factura de compra (borrador) desde un comprobante ya validado,
+// aplicando la conversión de unidad de compra a stock (factor_a_stock).
+export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const bodega = String(formData.get("bodega_id") ?? "");
+  if (!bodega) throw new Error("Seleccioná la bodega de ingreso.");
+
+  const supabase = await createClient();
+  const { data: ing } = await supabase
+    .from("comprobantes_ingesta")
+    .select("estado, proveedor_id, clave, fecha_emision, condicion_venta, plazo_credito, lineas")
+    .eq("id", id)
+    .single();
+  if (!ing) throw new Error("Comprobante inexistente.");
+  if (ing.estado !== "validado") {
+    throw new Error("El comprobante no está listo (faltan mapeos o tiene error).");
+  }
+
+  const { data: maps } = await supabase
+    .from("proveedor_articulos")
+    .select("codigo_comercial, articulo_id, factor_a_stock, articulo:articulos(iva_tarifa_id)")
+    .eq("proveedor_id", ing.proveedor_id ?? "");
+  const porCodigo = new Map((maps ?? []).map((m) => [m.codigo_comercial, m]));
+
+  const lineasIng = (ing.lineas ?? []) as {
+    codigo_comercial: string | null;
+    cantidad: number;
+    base_imponible: number;
+    detalle: string;
+  }[];
+  const lineas = lineasIng.map((l) => {
+    const m = l.codigo_comercial ? porCodigo.get(l.codigo_comercial) : undefined;
+    const factor = Number(m?.factor_a_stock ?? 1);
+    const cantidadStock = Number(l.cantidad) * factor;
+    const costo = cantidadStock > 0 ? Number(l.base_imponible) / cantidadStock : 0;
+    const art = m?.articulo as unknown as { iva_tarifa_id: string } | null;
+    return {
+      articulo_id: m?.articulo_id ?? null,
+      codigo_comercial: l.codigo_comercial,
+      cantidad: cantidadStock,
+      costo_unitario: costo,
+      iva_tarifa_id: art?.iva_tarifa_id ?? null,
+      detalle: l.detalle,
+    };
+  });
+  if (lineas.some((l) => !l.articulo_id || !l.iva_tarifa_id)) {
+    throw new Error("Hay líneas sin mapear; no se puede crear la factura.");
+  }
+
+  const { data: facturaId, error } = await supabase.rpc("fn_crear_factura", {
+    p_proveedor: ing.proveedor_id as string,
+    p_bodega: bodega,
+    p_clave: ing.clave,
+    p_fecha_emision: ing.fecha_emision as string,
+    p_condicion: ing.condicion_venta,
+    p_plazo: ing.plazo_credito,
+    p_lineas: lineas,
+  });
+  if (error || !facturaId) {
+    throw new Error(
+      error?.message.includes("duplicate") || error?.message.includes("clave")
+        ? "Ya existe una factura con esa clave."
+        : limpiar(error?.message ?? "No se pudo crear la factura."),
+    );
+  }
+
+  await supabase
+    .from("comprobantes_ingesta")
+    .update({ estado: "procesado", factura_id: facturaId as string })
+    .eq("id", id);
+  revalidatePath(`/compras/ingestor/${id}`);
+  revalidatePath("/compras/ingestor");
+  redirect(`/compras/facturas/${facturaId}`);
+}
+
 // === RECEPCIONES (D2) ======================================================
 export async function crearRecepcion(
   _prev: FormState,
