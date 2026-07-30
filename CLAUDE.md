@@ -195,7 +195,16 @@ Aplican en TODOS los módulos, siempre:
   `erp-chepito.netlify.app`. Motor de asientos (doble partida forzada,
   inmutabilidad, anulación por reversión), prorrateo, cierres, y los estados
   financieros, todo operable por pantalla.
-- **Siguiente: Fase 3 (Inventario + Compras). Diseño aprobado 2026-07-24.**
+- **Fase 3 (Inventario + Compras): COMPLETA y en producción** (2026-07-29).
+  Backend con 93 pruebas + UI completa (catálogos, existencias, kardex, libro de
+  Inventarios, carga inicial, ajustes, transferencias en 2 pasos, facturas +
+  CxP, recepciones separadas, devoluciones) + **ingestor de XML de Hacienda
+  v4.4** (sube comprobante + respuesta, valida Aceptado/receptor/proveedor,
+  mapea líneas por CodigoComercial que aprende en `proveedor_articulos`, y crea
+  la factura en borrador aplicando la conversión de unidad de compra a stock).
+  Migraciones hasta `20260724100015`. Todo con posteo contable automático.
+- **Siguiente: Fase 4 (Producción):** BOM, explosión de materiales, costeo.
+  Sin empezar; requiere proponer diseño + aprobación (convención #1).
 
 ### Decisiones fijadas (Fase 3 — Inventario + Compras)
 
