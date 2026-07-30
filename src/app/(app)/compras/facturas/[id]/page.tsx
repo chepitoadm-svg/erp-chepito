@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { obtenerFactura } from "@/lib/data/compras";
+import { obtenerFactura, listarPagosDeFactura, medioLabel } from "@/lib/data/compras";
 import { confirmarFactura } from "../../actions";
 import AnularFactura from "@/components/AnularFactura";
+
+const PAGO_ESTADO_CLS: Record<string, string> = {
+  borrador: "bg-neutral-100 text-neutral-600",
+  confirmado: "bg-green-50 text-green-700",
+  anulado: "bg-red-50 text-red-700",
+};
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -24,6 +30,11 @@ export default async function FacturaDetallePage({
   const { id } = await params;
   const f = await obtenerFactura(id);
   if (!f) notFound();
+
+  const pagos = f.estado === "confirmada" ? await listarPagosDeFactura(f.id) : [];
+  const abonado = pagos
+    .filter((p) => p.estado !== "anulado")
+    .reduce((s, p) => s + p.monto, 0);
 
   return (
     <div>
@@ -150,14 +161,83 @@ export default async function FacturaDetallePage({
       )}
 
       {f.estado === "confirmada" && (
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Link
-            href={`/compras/devoluciones/nueva?factura=${f.id}`}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
-          >
-            Devolver mercadería
-          </Link>
-          <AnularFactura id={f.id} />
+        <div className="mt-8">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-sm font-medium text-neutral-800">Pagos aplicados</h2>
+            {f.cxp_saldo != null && (
+              <span className="text-sm text-neutral-500">
+                Abonado {fmt(abonado)} · saldo {fmt(f.cxp_saldo)}{" "}
+                <span
+                  className={
+                    f.cxp_estado === "pagada" ? "text-green-700" : "text-amber-700"
+                  }
+                >
+                  ({f.cxp_estado})
+                </span>
+              </span>
+            )}
+          </div>
+          {pagos.length === 0 ? (
+            <p className="rounded-lg border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+              Esta factura todavía no tiene pagos.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Fecha</th>
+                    <th className="px-4 py-3 font-medium">Medio</th>
+                    <th className="px-4 py-3 font-medium">Cuenta</th>
+                    <th className="px-4 py-3 font-medium">Referencia</th>
+                    <th className="px-4 py-3 text-right font-medium">Abonado</th>
+                    <th className="px-4 py-3 font-medium">Estado</th>
+                    <th className="px-4 py-3 text-right" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {pagos.map((p, i) => (
+                    <tr key={`${p.pago_id}-${i}`} className={p.estado === "anulado" ? "opacity-50" : ""}>
+                      <td className="px-4 py-3 text-neutral-700">{p.fecha}</td>
+                      <td className="px-4 py-3 text-neutral-600">{medioLabel(p.medio_pago)}</td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        <span className="font-mono text-xs">{p.cuenta_codigo}</span> {p.cuenta_nombre}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">{p.referencia ?? "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-neutral-900">
+                        {fmt(p.monto)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${PAGO_ESTADO_CLS[p.estado]}`}
+                        >
+                          {p.estado}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/compras/pagos/${p.pago_id}`}
+                          className="text-neutral-600 hover:text-neutral-900"
+                        >
+                          Ver pago
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link
+              href={`/compras/devoluciones/nueva?factura=${f.id}`}
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Devolver mercadería
+            </Link>
+            <AnularFactura id={f.id} />
+          </div>
         </div>
       )}
     </div>

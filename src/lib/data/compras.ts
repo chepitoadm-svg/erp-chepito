@@ -576,6 +576,60 @@ export async function obtenerPago(id: string): Promise<PagoDetalle | null> {
   };
 }
 
+export interface PagoAplicado {
+  pago_id: string;
+  fecha: string;
+  medio_pago: string;
+  cuenta_codigo: string;
+  cuenta_nombre: string;
+  referencia: string | null;
+  monto: number;
+  estado: PagoEstado;
+}
+
+/** Pagos (abonos) aplicados a la factura, para ver cuándo y cómo se pagó. */
+export async function listarPagosDeFactura(facturaId: string): Promise<PagoAplicado[]> {
+  const supabase = await createClient();
+  const { data: cxpRow } = await supabase
+    .from("cuentas_por_pagar")
+    .select("id")
+    .eq("factura_id", facturaId)
+    .maybeSingle();
+  if (!cxpRow) return [];
+
+  const { data, error } = await supabase
+    .from("pagos_proveedor_lineas")
+    .select(
+      "monto, pago:pagos_proveedor(id, fecha, medio_pago, referencia, estado, cuenta:cuentas(codigo, nombre))",
+    )
+    .eq("cxp_id", cxpRow.id);
+  if (error) throw new Error(`No se pudieron cargar los pagos de la factura: ${error.message}`);
+
+  return ((data ?? []) as unknown as {
+    monto: number;
+    pago: {
+      id: string;
+      fecha: string;
+      medio_pago: string;
+      referencia: string | null;
+      estado: PagoEstado;
+      cuenta: { codigo: string; nombre: string } | null;
+    } | null;
+  }[])
+    .filter((r) => r.pago)
+    .map((r) => ({
+      pago_id: r.pago!.id,
+      fecha: r.pago!.fecha,
+      medio_pago: r.pago!.medio_pago,
+      cuenta_codigo: r.pago!.cuenta?.codigo ?? "",
+      cuenta_nombre: r.pago!.cuenta?.nombre ?? "",
+      referencia: r.pago!.referencia,
+      monto: Number(r.monto),
+      estado: r.pago!.estado,
+    }))
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+}
+
 // === INGESTOR DE XML =======================================================
 export type IngestaEstado =
   | "recibido"
