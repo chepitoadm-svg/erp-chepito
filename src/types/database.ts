@@ -680,6 +680,31 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      pagos_proveedor: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          fecha: string;
+          medio_pago: "efectivo" | "transferencia" | "cheque" | "otro";
+          cuenta_pago_id: string;
+          referencia: string | null;
+          glosa: string | null;
+          monto_total: number;
+          estado: "borrador" | "confirmado" | "anulado";
+          asiento_id: string | null;
+          creado_en: string;
+          creado_por: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      pagos_proveedor_lineas: {
+        Row: { id: string; pago_id: string; linea: number; cxp_id: string; monto: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       comprobantes_ingesta: {
         Row: {
           id: string;
@@ -1040,6 +1065,20 @@ export interface Database {
       };
       fn_confirmar_devolucion: { Args: { p_dev: string }; Returns: string };
       fn_anular_devolucion: { Args: { p_dev: string; p_motivo: string }; Returns: undefined };
+      fn_crear_pago: {
+        Args: {
+          p_proveedor: string;
+          p_fecha: string;
+          p_medio: string;
+          p_cuenta_pago: string;
+          p_referencia: string | null;
+          p_glosa: string | null;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
+      fn_confirmar_pago: { Args: { p_pago: string }; Returns: string };
+      fn_anular_pago: { Args: { p_pago: string; p_motivo: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

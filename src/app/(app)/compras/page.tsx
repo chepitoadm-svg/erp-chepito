@@ -2,10 +2,11 @@ import Link from "next/link";
 import { tienePermiso } from "@/lib/auth/permisos";
 
 export default async function ComprasPage() {
-  const [puedeProveedores, puedeFacturar, puedeRecibir] = await Promise.all([
+  const [puedeProveedores, puedeFacturar, puedeRecibir, puedePagar] = await Promise.all([
     tienePermiso("proveedores.gestionar"),
     tienePermiso("compras.facturar"),
     tienePermiso("compras.recibir"),
+    tienePermiso("compras.pagar"),
   ]);
 
   return (
@@ -34,6 +35,17 @@ export default async function ComprasPage() {
             <div className="font-medium text-neutral-900">Cuentas por pagar</div>
             <div className="mt-1 text-sm text-neutral-500">
               Saldos con proveedores por vencimiento.
+            </div>
+          </Link>
+        )}
+        {puedePagar && (
+          <Link
+            href="/compras/pagos"
+            className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          >
+            <div className="font-medium text-neutral-900">Pagos a proveedores</div>
+            <div className="mt-1 text-sm text-neutral-500">
+              Pagar facturas por efectivo, transferencia o cheque; deja rastro para conciliar.
             </div>
           </Link>
         )}

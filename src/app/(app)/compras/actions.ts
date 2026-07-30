@@ -11,6 +11,7 @@ import {
   crearFacturaSchema,
   crearDevolucionSchema,
   crearRecepcionSchema,
+  crearPagoSchema,
 } from "@/lib/validation/compras";
 
 export interface FormState {
@@ -231,6 +232,70 @@ export async function anularFactura(
   revalidatePath("/compras/facturas");
   revalidatePath("/compras/cxp");
   return { ok: "Factura anulada." };
+}
+
+// === PAGOS A PROVEEDORES ===================================================
+export async function crearPago(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.pagar");
+
+  let lineasRaw: unknown = [];
+  try {
+    lineasRaw = JSON.parse(String(formData.get("lineas") ?? "[]"));
+  } catch {
+    return { error: "Facturas inválidas." };
+  }
+
+  const ref = String(formData.get("referencia") ?? "").trim();
+  const glosa = String(formData.get("glosa") ?? "").trim();
+  const parsed = crearPagoSchema.safeParse({
+    proveedor_id: String(formData.get("proveedor_id") ?? ""),
+    fecha: String(formData.get("fecha") ?? ""),
+    medio_pago: String(formData.get("medio_pago") ?? ""),
+    cuenta_pago_id: String(formData.get("cuenta_pago_id") ?? ""),
+    referencia: ref || null,
+    glosa: glosa || null,
+    lineas: lineasRaw,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_pago", {
+    p_proveedor: parsed.data.proveedor_id,
+    p_fecha: parsed.data.fecha,
+    p_medio: parsed.data.medio_pago,
+    p_cuenta_pago: parsed.data.cuenta_pago_id,
+    p_referencia: parsed.data.referencia ?? null,
+    p_glosa: parsed.data.glosa ?? null,
+    p_lineas: parsed.data.lineas.map((l) => ({ cxp_id: l.cxp_id, monto: l.monto })),
+  });
+  if (error || !id) return { error: limpiar(error?.message ?? "No se pudo crear el pago.") };
+
+  redirect(`/compras/pagos/${id}`);
+}
+
+export async function confirmarPago(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.pagar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_confirmar_pago", { p_pago: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/compras/pagos/${id}`);
+  revalidatePath("/compras/pagos");
+  revalidatePath("/compras/cxp");
+}
+
+export async function anularPago(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.pagar");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_pago", { p_pago: id, p_motivo: motivo });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/compras/pagos/${id}`);
+  revalidatePath("/compras/pagos");
+  revalidatePath("/compras/cxp");
+  return { ok: "Pago anulado." };
 }
 
 // === INGESTOR DE XML =======================================================

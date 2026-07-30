@@ -91,3 +91,21 @@ export const crearRecepcionSchema = z.object({
 });
 
 export type CrearRecepcionInput = z.infer<typeof crearRecepcionSchema>;
+
+// === Pago a proveedor ======================================================
+export const pagoLineaSchema = z.object({
+  cxp_id: z.string().uuid(),
+  monto: z.number().positive(),
+});
+
+export const crearPagoSchema = z.object({
+  proveedor_id: z.string().uuid("Seleccioná el proveedor."),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
+  medio_pago: z.enum(["efectivo", "transferencia", "cheque", "otro"]),
+  cuenta_pago_id: z.string().uuid("Seleccioná la cuenta de origen."),
+  referencia: z.string().trim().max(80).nullable().optional(),
+  glosa: z.string().trim().max(200).nullable().optional(),
+  lineas: z.array(pagoLineaSchema).min(1, "Marcá al menos una factura a pagar."),
+});
+
+export type CrearPagoInput = z.infer<typeof crearPagoSchema>;

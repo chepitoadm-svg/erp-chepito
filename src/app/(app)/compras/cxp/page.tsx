@@ -18,6 +18,7 @@ function hoyCR(): string {
 
 export default async function CxPPage() {
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras");
+  const puedePagar = await tienePermiso("compras.pagar");
   const cxp = await listarCxP();
   const hoy = hoyCR();
   const totalPendiente = cxp
@@ -29,10 +30,20 @@ export default async function CxPPage() {
       <Link href="/compras" className="text-sm text-neutral-500 hover:text-neutral-900">
         ← Compras
       </Link>
-      <h1 className="mt-1 text-lg font-semibold text-neutral-900">Cuentas por pagar</h1>
-      <p className="mb-4 text-sm text-neutral-500">
-        Saldos con proveedores, por vencimiento. El pago (tesorería) llega en una fase posterior.
-      </p>
+      <div className="mt-1 mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-neutral-900">Cuentas por pagar</h1>
+          <p className="text-sm text-neutral-500">Saldos con proveedores, por vencimiento.</p>
+        </div>
+        {puedePagar && (
+          <Link
+            href="/compras/pagos/nuevo"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            Registrar pago
+          </Link>
+        )}
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[720px] text-sm">

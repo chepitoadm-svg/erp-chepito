@@ -357,6 +357,225 @@ export async function listarCxP(): Promise<CxPFila[]> {
   }));
 }
 
+// === PAGOS A PROVEEDORES ===================================================
+/** Cuentas de caja (11-10-10) y bancos (11-10-15) para el origen del pago. */
+export async function listarCuentasPago() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cuentas")
+    .select("id, codigo, nombre")
+    .or("codigo.like.11-10-10-%,codigo.like.11-10-15-%")
+    .eq("acepta_movimiento", true)
+    .eq("estado", "activo")
+    .order("codigo");
+  if (error) throw new Error(`No se pudieron cargar las cuentas de pago: ${error.message}`);
+  return data ?? [];
+}
+
+export interface ProveedorConCxP {
+  proveedor_id: string;
+  proveedor_nombre: string;
+  n_facturas: number;
+  total_pendiente: number;
+}
+
+/** Proveedores con facturas pendientes de pago (para elegir a quién pagar). */
+export async function listarProveedoresConCxP(): Promise<ProveedorConCxP[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cuentas_por_pagar")
+    .select("proveedor_id, saldo, proveedor:proveedores(nombre)")
+    .eq("estado", "pendiente")
+    .gt("saldo", 0);
+  if (error) throw new Error(`No se pudieron cargar las cuentas por pagar: ${error.message}`);
+
+  const acc = new Map<string, ProveedorConCxP>();
+  for (const q of (data ?? []) as unknown as {
+    proveedor_id: string;
+    saldo: number;
+    proveedor: { nombre: string } | null;
+  }[]) {
+    const cur = acc.get(q.proveedor_id) ?? {
+      proveedor_id: q.proveedor_id,
+      proveedor_nombre: q.proveedor?.nombre ?? "",
+      n_facturas: 0,
+      total_pendiente: 0,
+    };
+    cur.n_facturas += 1;
+    cur.total_pendiente += Number(q.saldo);
+    acc.set(q.proveedor_id, cur);
+  }
+  return [...acc.values()].sort((a, b) => a.proveedor_nombre.localeCompare(b.proveedor_nombre));
+}
+
+export interface CxPPendiente {
+  id: string;
+  fecha: string;
+  fecha_vencimiento: string | null;
+  factura_clave: string | null;
+  monto_original: number;
+  saldo: number;
+}
+
+/** CxP pendientes de un proveedor, para armar el pago. */
+export async function listarCxPPendientes(proveedorId: string): Promise<CxPPendiente[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cuentas_por_pagar")
+    .select("id, fecha, fecha_vencimiento, monto_original, saldo, factura:facturas_compra(clave)")
+    .eq("proveedor_id", proveedorId)
+    .eq("estado", "pendiente")
+    .gt("saldo", 0)
+    .order("fecha_vencimiento", { ascending: true });
+  if (error) throw new Error(`No se pudieron cargar las facturas pendientes: ${error.message}`);
+  return ((data ?? []) as unknown as {
+    id: string;
+    fecha: string;
+    fecha_vencimiento: string | null;
+    monto_original: number;
+    saldo: number;
+    factura: { clave: string | null } | null;
+  }[]).map((q) => ({
+    id: q.id,
+    fecha: q.fecha,
+    fecha_vencimiento: q.fecha_vencimiento,
+    factura_clave: q.factura?.clave ?? null,
+    monto_original: Number(q.monto_original),
+    saldo: Number(q.saldo),
+  }));
+}
+
+export type PagoEstado = "borrador" | "confirmado" | "anulado";
+const MEDIO_LBL: Record<string, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  cheque: "Cheque",
+  otro: "Otro",
+};
+export function medioLabel(m: string): string {
+  return MEDIO_LBL[m] ?? m;
+}
+
+export interface PagoListado {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  medio_pago: string;
+  cuenta_codigo: string;
+  monto_total: number;
+  estado: PagoEstado;
+}
+
+export async function listarPagos(): Promise<PagoListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pagos_proveedor")
+    .select(
+      "id, fecha, medio_pago, monto_total, estado, " +
+        "proveedor:proveedores(nombre), cuenta:cuentas(codigo)",
+    )
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar los pagos: ${error.message}`);
+  return ((data ?? []) as unknown as {
+    id: string;
+    fecha: string;
+    medio_pago: string;
+    monto_total: number;
+    estado: PagoEstado;
+    proveedor: { nombre: string } | null;
+    cuenta: { codigo: string } | null;
+  }[]).map((p) => ({
+    id: p.id,
+    fecha: p.fecha,
+    proveedor_nombre: p.proveedor?.nombre ?? "",
+    medio_pago: p.medio_pago,
+    cuenta_codigo: p.cuenta?.codigo ?? "",
+    monto_total: Number(p.monto_total),
+    estado: p.estado,
+  }));
+}
+
+export interface PagoLineaDetalle {
+  linea: number;
+  factura_clave: string | null;
+  factura_id: string | null;
+  monto: number;
+}
+
+export interface PagoDetalle {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  medio_pago: string;
+  cuenta_codigo: string;
+  cuenta_nombre: string;
+  referencia: string | null;
+  glosa: string | null;
+  monto_total: number;
+  estado: PagoEstado;
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  lineas: PagoLineaDetalle[];
+}
+
+export async function obtenerPago(id: string): Promise<PagoDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pagos_proveedor")
+    .select(
+      "id, fecha, medio_pago, referencia, glosa, monto_total, estado, asiento_id, " +
+        "proveedor:proveedores(nombre), cuenta:cuentas(codigo, nombre), asiento:asientos(numero), " +
+        "lineas:pagos_proveedor_lineas(linea, monto, cxp:cuentas_por_pagar(factura_id, factura:facturas_compra(clave)))",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar el pago: ${error.message}`);
+  }
+  const p = data as unknown as {
+    id: string;
+    fecha: string;
+    medio_pago: string;
+    referencia: string | null;
+    glosa: string | null;
+    monto_total: number;
+    estado: PagoEstado;
+    asiento_id: string | null;
+    proveedor: { nombre: string } | null;
+    cuenta: { codigo: string; nombre: string } | null;
+    asiento: { numero: number | null } | null;
+    lineas: {
+      linea: number;
+      monto: number;
+      cxp: { factura_id: string | null; factura: { clave: string | null } | null } | null;
+    }[];
+  };
+  return {
+    id: p.id,
+    fecha: p.fecha,
+    proveedor_nombre: p.proveedor?.nombre ?? "",
+    medio_pago: p.medio_pago,
+    cuenta_codigo: p.cuenta?.codigo ?? "",
+    cuenta_nombre: p.cuenta?.nombre ?? "",
+    referencia: p.referencia,
+    glosa: p.glosa,
+    monto_total: Number(p.monto_total),
+    estado: p.estado,
+    asiento_id: p.asiento_id,
+    asiento_numero: p.asiento?.numero ?? null,
+    lineas: (p.lineas ?? [])
+      .sort((a, b) => a.linea - b.linea)
+      .map((l) => ({
+        linea: l.linea,
+        factura_clave: l.cxp?.factura?.clave ?? null,
+        factura_id: l.cxp?.factura_id ?? null,
+        monto: Number(l.monto),
+      })),
+  };
+}
+
 // === INGESTOR DE XML =======================================================
 export type IngestaEstado =
   | "recibido"
