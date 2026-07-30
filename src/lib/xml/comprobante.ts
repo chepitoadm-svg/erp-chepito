@@ -37,11 +37,15 @@ export interface ComprobanteLinea {
   cantidad: number;
   unidad_comercial: string | null;
   precio_unitario: number;
+  // Costo que va a INVENTARIO: mercadería (base − descuento) + impuestos
+  // específicos que efectivamente se cobran (IEBL/ISC, vía Otros Cargos).
   base_imponible: number;
-  iva_codigo_tarifa: string | null; // CodigoTarifaIVA (ej. 08)
+  base_mercaderia: number; // solo la mercadería (base − descuento), para referencia
+  especifico: number; // impuesto específico cargado al costo en esta línea
+  iva_codigo_tarifa: string | null; // CodigoTarifaIVA (ej. 08 = 13%)
   iva_tarifa: number; // ej. 13
-  iva_monto: number; // Monto del impuesto código 07 (IVA acreditable)
-  otros_impuestos: string[]; // otros códigos de impuesto en la línea (ej. ['05'])
+  iva_monto: number; // IVA acreditable de la línea (códigos 01/07/08)
+  otros_impuestos: string[]; // códigos de impuesto no-IVA presentes (ej. ['05'])
 }
 
 export interface Comprobante {
@@ -79,6 +83,11 @@ const RAICES: TipoComprobante[] = [
   "NotaDebitoElectronica",
 ];
 
+// Códigos de impuesto que son IVA acreditable (recuperable). El resto
+// (selectivo de consumo, específicos IEBL, combustibles, etc.) NO es
+// recuperable y forma parte del COSTO de la mercadería.
+const CODIGOS_IVA = new Set(["01", "07", "08"]);
+
 /** Parsea el XML del comprobante (la factura). Lanza si no reconoce la raíz. */
 export function parseComprobante(xml: string): Comprobante {
   const root = parser.parse(xml);
@@ -95,9 +104,53 @@ export function parseComprobante(xml: string): Comprobante {
   const rf = d.ResumenFactura ?? {};
   const moneda = rf.CodigoTipoMoneda ?? {};
 
-  const lineas: ComprobanteLinea[] = asArray(d.DetalleServicio?.LineaDetalle).map((l) => {
+  // Otros Cargos del documento (ej. Impuesto IEBL de bebidas): el emisor los
+  // muestra como "asumidos" por línea y los recobra acá. Se reparten al costo.
+  const otrosCargos = num(rf.TotalOtrosCargos);
+
+  // Paso 1: por línea, separar IVA (acreditable) de la mercadería.
+  const brutas = asArray(d.DetalleServicio?.LineaDetalle).map((l) => {
     const impuestos = asArray<Record<string, unknown>>(l.Impuesto);
-    const iva07 = impuestos.find((x) => txt(x.Codigo) === "07");
+    const iva = impuestos.filter((x) => CODIGOS_IVA.has(txt(x.Codigo)));
+    const iva_monto = round2(iva.reduce((s, x) => s + num(x.Monto), 0));
+    const primerIva = iva[0];
+    // Peso del específico de la línea (para repartir Otros Cargos): los
+    // impuestos NO-IVA que el emisor asumió y recobra vía Otros Cargos.
+    const especifico_bruto = impuestos
+      .filter((x) => !CODIGOS_IVA.has(txt(x.Codigo)))
+      .reduce((s, x) => s + num(x.Monto), 0);
+    // Mercadería (base − descuento) = MontoTotalLinea − IVA de la línea.
+    const mercaderia = round2(num(l.MontoTotalLinea) - iva_monto);
+    return {
+      l,
+      impuestos,
+      iva_monto,
+      primerIva,
+      especifico_bruto,
+      mercaderia,
+    };
+  });
+
+  // Paso 2: repartir Otros Cargos entre las líneas (por peso del específico;
+  // si no hay específicos, por peso de la mercadería). La última absorbe el
+  // residuo para que la suma cuadre al céntimo.
+  const pesoEspecifico = round2(brutas.reduce((s, b) => s + b.especifico_bruto, 0));
+  const usarEspecifico = pesoEspecifico > 0;
+  const pesoTotal = usarEspecifico
+    ? pesoEspecifico
+    : brutas.reduce((s, b) => s + b.mercaderia, 0);
+  let repartido = 0;
+
+  const lineas: ComprobanteLinea[] = brutas.map((b, i) => {
+    let extra = 0;
+    if (otrosCargos !== 0 && pesoTotal > 0) {
+      if (i === brutas.length - 1) extra = round2(otrosCargos - repartido);
+      else {
+        extra = round2((otrosCargos * (usarEspecifico ? b.especifico_bruto : b.mercaderia)) / pesoTotal);
+        repartido = round2(repartido + extra);
+      }
+    }
+    const l = b.l;
     return {
       numero: num(l.NumeroLinea),
       codigo_comercial: l.CodigoComercial?.Codigo ? txt(l.CodigoComercial.Codigo) : null,
@@ -106,11 +159,13 @@ export function parseComprobante(xml: string): Comprobante {
       cantidad: num(l.Cantidad),
       unidad_comercial: l.UnidadMedidaComercial ? txt(l.UnidadMedidaComercial) : null,
       precio_unitario: num(l.PrecioUnitario),
-      base_imponible: num(l.BaseImponible),
-      iva_codigo_tarifa: iva07?.CodigoTarifaIVA ? txt(iva07.CodigoTarifaIVA) : null,
-      iva_tarifa: iva07 ? num(iva07.Tarifa) : 0,
-      iva_monto: iva07 ? num(iva07.Monto) : 0,
-      otros_impuestos: impuestos.map((x) => txt(x.Codigo)).filter((c) => c && c !== "07"),
+      base_mercaderia: b.mercaderia,
+      especifico: extra,
+      base_imponible: round2(b.mercaderia + extra), // costo a inventario
+      iva_codigo_tarifa: b.primerIva?.CodigoTarifaIVA ? txt(b.primerIva.CodigoTarifaIVA) : null,
+      iva_tarifa: b.primerIva ? num(b.primerIva.Tarifa) : 0,
+      iva_monto: b.iva_monto,
+      otros_impuestos: b.impuestos.map((x) => txt(x.Codigo)).filter((c) => c && !CODIGOS_IVA.has(c)),
     };
   });
 

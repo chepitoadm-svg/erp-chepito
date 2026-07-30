@@ -1042,6 +1042,18 @@ export interface Database {
       };
       fn_confirmar_factura: { Args: { p_factura: string }; Returns: string };
       fn_anular_factura: { Args: { p_factura: string; p_motivo: string }; Returns: undefined };
+      fn_crear_factura_xml: {
+        Args: {
+          p_proveedor: string;
+          p_bodega: string;
+          p_clave: string | null;
+          p_fecha_emision: string;
+          p_condicion: string | null;
+          p_plazo: number | null;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
       fn_crear_recepcion: {
         Args: { p_proveedor: string; p_bodega: string; p_glosa: string | null; p_lineas: unknown };
         Returns: string;

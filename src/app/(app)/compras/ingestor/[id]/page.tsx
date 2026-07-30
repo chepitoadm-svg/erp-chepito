@@ -8,7 +8,7 @@ import {
   listarTarifasIva,
   listarBodegas,
 } from "@/lib/data/inventario";
-import { descartarIngesta, crearProveedorDesdeIngesta } from "../../actions";
+import { descartarIngesta, crearProveedorDesdeIngesta, reparsearIngesta } from "../../actions";
 import MapearLinea from "@/components/MapearLinea";
 import CrearFacturaIngesta from "@/components/CrearFacturaIngesta";
 
@@ -131,7 +131,7 @@ export default async function IngestaDetallePage({
               <th className="px-4 py-3 font-medium">Cód. comercial</th>
               <th className="px-4 py-3 font-medium">Detalle</th>
               <th className="px-4 py-3 text-right font-medium">Cantidad</th>
-              <th className="px-4 py-3 text-right font-medium">Base</th>
+              <th className="px-4 py-3 text-right font-medium">Costo</th>
               <th className="px-4 py-3 text-right font-medium">IVA</th>
               <th className="px-4 py-3 font-medium">Artículo</th>
             </tr>
@@ -209,17 +209,32 @@ export default async function IngestaDetallePage({
         </div>
       )}
 
-      {c.estado !== "descartado" && c.estado !== "procesado" && (
-        <div className="mt-6">
-          <form action={descartarIngesta}>
+      {c.estado !== "descartado" && (
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <form action={reparsearIngesta}>
             <input type="hidden" name="id" value={c.id} />
             <button
               type="submit"
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50"
             >
-              Descartar
+              Reprocesar desde el XML
             </button>
           </form>
+          {c.estado !== "procesado" && (
+            <form action={descartarIngesta}>
+              <input type="hidden" name="id" value={c.id} />
+              <button
+                type="submit"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50"
+              >
+                Descartar
+              </button>
+            </form>
+          )}
+          <span className="text-xs text-neutral-400">
+            Reprocesar vuelve a leer el XML con las reglas actuales (montos, IVA, impuesto
+            específico). Si ya generó factura, anulala primero.
+          </span>
         </div>
       )}
     </div>

@@ -564,6 +564,78 @@ export async function crearProveedorDesdeIngesta(formData: FormData): Promise<vo
   revalidatePath("/compras/ingestor");
 }
 
+// Vuelve a leer el XML guardado con el parser actual (útil tras corregir el
+// parser) y recalcula montos, líneas, mapeo y estado.
+export async function reparsearIngesta(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+
+  const { data: row } = await supabase
+    .from("comprobantes_ingesta")
+    .select("xml_comprobante, factura_id")
+    .eq("id", id)
+    .single();
+  if (!row?.xml_comprobante) throw new Error("No hay XML guardado para reprocesar.");
+
+  // Si ya generó una factura no anulada, no se reprocesa (se perdería el vínculo).
+  if (row.factura_id) {
+    const { data: fac } = await supabase
+      .from("facturas_compra")
+      .select("estado")
+      .eq("id", row.factura_id)
+      .single();
+    if (fac && fac.estado !== "anulada") {
+      throw new Error("Anulá primero la factura vinculada para poder reprocesar el comprobante.");
+    }
+  }
+
+  const { parseComprobante } = await import("@/lib/xml/comprobante");
+  const comp = parseComprobante(row.xml_comprobante);
+
+  const lineas = comp.lineas.map((l) => ({
+    numero: l.numero,
+    codigo_comercial: l.codigo_comercial,
+    detalle: l.detalle,
+    cantidad: l.cantidad,
+    unidad_comercial: l.unidad_comercial,
+    base_imponible: l.base_imponible, // costo (ya con específico)
+    iva_monto: l.iva_monto,
+    articulo_id: null,
+    articulo_codigo: null,
+    mapeado: false,
+  }));
+  const venc =
+    comp.fecha_emision && comp.plazo_credito != null
+      ? new Date(new Date(comp.fecha_emision + "T00:00:00").getTime() + comp.plazo_credito * 86400000)
+          .toISOString()
+          .slice(0, 10)
+      : comp.fecha_emision;
+
+  await supabase
+    .from("comprobantes_ingesta")
+    .update({
+      tipo_documento: comp.tipo,
+      fecha_emision: comp.fecha_emision || null,
+      condicion_venta: comp.condicion_venta,
+      plazo_credito: comp.plazo_credito,
+      fecha_vencimiento: venc || null,
+      moneda: comp.moneda,
+      tipo_cambio: comp.tipo_cambio,
+      subtotal: comp.subtotal,
+      iva_total: comp.iva_total,
+      total: comp.total,
+      lineas,
+      estado: "recibido",
+      factura_id: null,
+    })
+    .eq("id", id);
+
+  await reprocesarIngesta(supabase, id);
+  revalidatePath(`/compras/ingestor/${id}`);
+  revalidatePath("/compras/ingestor");
+}
+
 // Mapea un CodigoComercial del comprobante a un artículo (existente o nuevo),
 // lo guarda en proveedor_articulos (aprende) y reprocesa.
 export async function mapearLinea(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -666,32 +738,38 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
     .eq("proveedor_id", ing.proveedor_id ?? "");
   const porCodigo = new Map((maps ?? []).map((m) => [m.codigo_comercial, m]));
 
+  // base_imponible ya viene con el impuesto específico incluido (costo real);
+  // iva_monto es el IVA acreditable exacto del comprobante. NO se recalculan.
   const lineasIng = (ing.lineas ?? []) as {
     codigo_comercial: string | null;
     cantidad: number;
     base_imponible: number;
+    iva_monto: number;
     detalle: string;
   }[];
   const lineas = lineasIng.map((l) => {
     const m = l.codigo_comercial ? porCodigo.get(l.codigo_comercial) : undefined;
     const factor = Number(m?.factor_a_stock ?? 1);
     const cantidadStock = Number(l.cantidad) * factor;
-    const costo = cantidadStock > 0 ? Number(l.base_imponible) / cantidadStock : 0;
+    const base = Number(l.base_imponible);
+    const costo = cantidadStock > 0 ? base / cantidadStock : 0;
     const art = m?.articulo as unknown as { iva_tarifa_id: string } | null;
     return {
       articulo_id: m?.articulo_id ?? null,
       codigo_comercial: l.codigo_comercial,
       cantidad: cantidadStock,
       costo_unitario: costo,
+      base_imponible: base,
+      iva_monto: Number(l.iva_monto ?? 0),
       iva_tarifa_id: art?.iva_tarifa_id ?? null,
       detalle: l.detalle,
     };
   });
-  if (lineas.some((l) => !l.articulo_id || !l.iva_tarifa_id)) {
+  if (lineas.some((l) => !l.articulo_id)) {
     throw new Error("Hay líneas sin mapear; no se puede crear la factura.");
   }
 
-  const { data: facturaId, error } = await supabase.rpc("fn_crear_factura", {
+  const { data: facturaId, error } = await supabase.rpc("fn_crear_factura_xml", {
     p_proveedor: ing.proveedor_id as string,
     p_bodega: bodega,
     p_clave: ing.clave,
