@@ -55,12 +55,13 @@ export default async function CxPPage() {
               <th className="px-4 py-3 text-right font-medium">Original</th>
               <th className="px-4 py-3 text-right font-medium">Saldo</th>
               <th className="px-4 py-3 font-medium">Estado</th>
+              <th className="px-4 py-3 text-right font-medium">Pago</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {cxp.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
                   No hay cuentas por pagar.
                 </td>
               </tr>
@@ -100,6 +101,25 @@ export default async function CxPPage() {
                       {q.estado}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    {q.pagos.length === 1 ? (
+                      <Link
+                        href={`/compras/pagos/${q.pagos[0].id}`}
+                        className="text-neutral-600 hover:text-neutral-900"
+                      >
+                        Ver pago
+                      </Link>
+                    ) : q.pagos.length > 1 ? (
+                      <Link
+                        href={`/compras/facturas/${q.factura_id}`}
+                        className="text-neutral-600 hover:text-neutral-900"
+                      >
+                        {q.pagos.length} pagos
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-neutral-300">—</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -113,7 +133,7 @@ export default async function CxPPage() {
                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
                   {fmt(totalPendiente)}
                 </td>
-                <td />
+                <td colSpan={2} />
               </tr>
             </tfoot>
           )}

@@ -318,6 +318,7 @@ export interface CxPFila {
   monto_original: number;
   saldo: number;
   estado: string;
+  pagos: { id: string }[]; // pagos confirmados aplicados a esta CxP
 }
 
 interface CxPRowEmbebido {
@@ -330,6 +331,7 @@ interface CxPRowEmbebido {
   factura_id: string | null;
   proveedor: { nombre: string } | null;
   factura: { clave: string | null } | null;
+  aplicaciones: { pago: { id: string; estado: string } | null }[];
 }
 
 /** Cuentas por pagar con saldo, para el listado de antigüedad. */
@@ -339,7 +341,8 @@ export async function listarCxP(): Promise<CxPFila[]> {
     .from("cuentas_por_pagar")
     .select(
       "id, fecha, fecha_vencimiento, monto_original, saldo, estado, factura_id, " +
-        "proveedor:proveedores(nombre), factura:facturas_compra(clave)",
+        "proveedor:proveedores(nombre), factura:facturas_compra(clave), " +
+        "aplicaciones:pagos_proveedor_lineas(pago:pagos_proveedor(id, estado))",
     )
     .order("fecha_vencimiento", { ascending: true });
   if (error) throw new Error(`No se pudieron cargar las cuentas por pagar: ${error.message}`);
@@ -351,6 +354,10 @@ export async function listarCxP(): Promise<CxPFila[]> {
     proveedor_nombre: q.proveedor?.nombre ?? "",
     factura_clave: q.factura?.clave ?? null,
     factura_id: q.factura_id,
+    pagos: (q.aplicaciones ?? [])
+      .map((a) => a.pago)
+      .filter((p): p is { id: string; estado: string } => !!p && p.estado === "confirmado")
+      .map((p) => ({ id: p.id })),
     monto_original: Number(q.monto_original),
     saldo: Number(q.saldo),
     estado: q.estado,
