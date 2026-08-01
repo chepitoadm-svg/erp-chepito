@@ -28,12 +28,20 @@ export default async function FacturasPage() {
             Registrar la factura del proveedor: trae la mercadería y crea la cuenta por pagar.
           </p>
         </div>
-        <Link
-          href="/compras/facturas/nueva"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          + Nueva factura
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/compras/facturas/nueva-gasto"
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            + Gasto
+          </Link>
+          <Link
+            href="/compras/facturas/nueva"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            + Compra (inventario)
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">

@@ -9,6 +9,7 @@ import {
   editarProveedorSchema,
   agregarMapeoSchema,
   crearFacturaSchema,
+  crearFacturaGastoSchema,
   crearDevolucionSchema,
   crearRecepcionSchema,
   crearPagoSchema,
@@ -203,6 +204,56 @@ export async function crearFactura(
     };
   }
 
+  redirect(`/compras/facturas/${id}`);
+}
+
+export async function crearFacturaGasto(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const clave = String(formData.get("clave") ?? "").trim();
+  const cond = String(formData.get("condicion_venta") ?? "").trim();
+  const plazo = String(formData.get("plazo_credito") ?? "").trim();
+  const sub = String(formData.get("subtotal") ?? "").trim();
+  const iva = String(formData.get("iva_total") ?? "").trim();
+  const glosa = String(formData.get("glosa") ?? "").trim();
+
+  const parsed = crearFacturaGastoSchema.safeParse({
+    proveedor_id: String(formData.get("proveedor_id") ?? ""),
+    clave: clave || null,
+    fecha_emision: String(formData.get("fecha_emision") ?? ""),
+    condicion_venta: cond || null,
+    plazo_credito: plazo ? Number(plazo) : null,
+    cuenta_gasto_id: String(formData.get("cuenta_gasto_id") ?? ""),
+    centro_costo_id: String(formData.get("centro_costo_id") ?? ""),
+    subtotal: sub ? Number(sub) : NaN,
+    iva_total: iva ? Number(iva) : 0,
+    glosa: glosa || null,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_factura_gasto", {
+    p_proveedor: parsed.data.proveedor_id,
+    p_clave: parsed.data.clave ?? null,
+    p_fecha: parsed.data.fecha_emision,
+    p_condicion: parsed.data.condicion_venta ?? null,
+    p_plazo: parsed.data.plazo_credito ?? null,
+    p_cuenta_gasto: parsed.data.cuenta_gasto_id,
+    p_centro: parsed.data.centro_costo_id,
+    p_subtotal: parsed.data.subtotal,
+    p_iva_total: parsed.data.iva_total,
+    p_glosa: parsed.data.glosa ?? null,
+  });
+  if (error || !id) {
+    const dup = error?.message.includes("duplicate") || error?.message.includes("clave");
+    return {
+      error: dup
+        ? "Ya se registró una factura con esa clave."
+        : limpiar(error?.message ?? "No se pudo crear el gasto."),
+    };
+  }
   redirect(`/compras/facturas/${id}`);
 }
 

@@ -53,13 +53,45 @@ export default async function FacturaDetallePage({
           <p className="text-xs text-neutral-400">
             Céd. {f.proveedor_cedula}
             {f.clave ? ` · clave ${f.clave}` : ""}
-            {f.bodega_codigo ? ` · ingresa a ${f.bodega_codigo}` : ""}
+            {f.tipo === "gasto"
+              ? " · gasto"
+              : f.bodega_codigo
+                ? ` · ingresa a ${f.bodega_codigo}`
+                : ""}
           </p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[f.estado]}`}>
-          {f.estado}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[f.estado]}`}>
+            {f.estado}
+          </span>
+          {f.tipo === "gasto" && (
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">gasto</span>
+          )}
+        </div>
       </div>
+
+      {f.tipo === "gasto" && (
+        <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-4 text-sm">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-neutral-500">Cuenta de gasto</div>
+              <div className="mt-0.5 text-neutral-900">
+                <span className="font-mono text-xs text-neutral-600">{f.cuenta_gasto_codigo}</span>{" "}
+                {f.cuenta_gasto_nombre}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-neutral-500">
+                Centro de costo (negocio)
+              </div>
+              <div className="mt-0.5 font-medium text-neutral-900">
+                {f.centro_codigo} — {f.centro_nombre}
+              </div>
+            </div>
+          </div>
+          {f.glosa && <p className="mt-3 text-neutral-600">{f.glosa}</p>}
+        </div>
+      )}
 
       {f.asiento_id && (
         <p className="mb-4 text-sm text-neutral-600">
@@ -78,6 +110,26 @@ export default async function FacturaDetallePage({
         </p>
       )}
 
+      {f.tipo === "gasto" && (
+        <div className="flex justify-end">
+          <div className="w-64 space-y-1 rounded-lg border border-neutral-200 bg-white p-4 text-sm">
+            <div className="flex justify-between text-neutral-600">
+              <span>Monto</span>
+              <span className="tabular-nums">{fmt(f.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-neutral-600">
+              <span>IVA</span>
+              <span className="tabular-nums">{fmt(f.iva_total)}</span>
+            </div>
+            <div className="flex justify-between border-t border-neutral-200 pt-1 font-semibold text-neutral-900">
+              <span>Total</span>
+              <span className="tabular-nums">{fmt(f.total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {f.tipo === "inventario" && (
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
@@ -142,6 +194,7 @@ export default async function FacturaDetallePage({
           </tfoot>
         </table>
       </div>
+      )}
 
       {f.estado === "borrador" && (
         <div className="mt-6 flex items-center gap-3">
@@ -230,12 +283,14 @@ export default async function FacturaDetallePage({
           )}
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              href={`/compras/devoluciones/nueva?factura=${f.id}`}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
-            >
-              Devolver mercadería
-            </Link>
+            {f.tipo === "inventario" && (
+              <Link
+                href={`/compras/devoluciones/nueva?factura=${f.id}`}
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                Devolver mercadería
+              </Link>
+            )}
             <AnularFactura id={f.id} />
           </div>
         </div>

@@ -59,6 +59,22 @@ export const crearFacturaSchema = z.object({
 
 export type CrearFacturaInput = z.infer<typeof crearFacturaSchema>;
 
+// === Factura de GASTO (con centro de costo) ================================
+export const crearFacturaGastoSchema = z.object({
+  proveedor_id: z.string().uuid("Seleccioná el proveedor."),
+  clave: z.string().trim().max(80).nullable().optional(),
+  fecha_emision: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
+  condicion_venta: z.enum(["01", "02"]).nullable().optional(),
+  plazo_credito: z.number().int().min(0).max(365).nullable().optional(),
+  cuenta_gasto_id: z.string().uuid("Seleccioná la cuenta de gasto."),
+  centro_costo_id: z.string().uuid("El gasto exige un centro de costo."),
+  subtotal: z.number().positive("El monto debe ser mayor que cero."),
+  iva_total: z.number().min(0),
+  glosa: z.string().trim().max(200).nullable().optional(),
+});
+
+export type CrearFacturaGastoInput = z.infer<typeof crearFacturaGastoSchema>;
+
 // === Devolución de compra (D3) =============================================
 export const devolucionLineaSchema = z.object({
   articulo_id: z.string().uuid(),

@@ -124,6 +124,20 @@ export async function listarCuentasCxp() {
   return data ?? [];
 }
 
+/** Cuentas de resultado (gasto/ingreso) que aceptan movimiento, para el gasto. */
+export async function listarCuentasGasto() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cuentas")
+    .select("id, codigo, nombre")
+    .in("tipo", ["gasto", "ingreso"])
+    .eq("acepta_movimiento", true)
+    .eq("estado", "activo")
+    .order("codigo");
+  if (error) throw new Error(`No se pudieron cargar las cuentas de gasto: ${error.message}`);
+  return data ?? [];
+}
+
 /** Proveedores activos, para el selector de la factura. */
 export async function listarProveedoresActivos() {
   const supabase = await createClient();
@@ -197,16 +211,22 @@ export interface FacturaLineaDetalle {
 
 export interface FacturaDetalle {
   id: string;
+  tipo: "inventario" | "gasto";
   fecha_emision: string;
   fecha_vencimiento: string | null;
   clave: string | null;
   condicion_venta: string | null;
   plazo_credito: number | null;
+  glosa: string | null;
   proveedor_nombre: string;
   proveedor_cedula: string;
   bodega_id: string | null;
   bodega_codigo: string | null;
   bodega_nombre: string | null;
+  cuenta_gasto_codigo: string | null;
+  cuenta_gasto_nombre: string | null;
+  centro_codigo: string | null;
+  centro_nombre: string | null;
   subtotal: number;
   iva_total: number;
   total: number;
@@ -220,11 +240,13 @@ export interface FacturaDetalle {
 
 interface FacturaDetalleEmbebido {
   id: string;
+  tipo: "inventario" | "gasto";
   fecha_emision: string;
   fecha_vencimiento: string | null;
   clave: string | null;
   condicion_venta: string | null;
   plazo_credito: number | null;
+  glosa: string | null;
   subtotal: number;
   iva_total: number;
   total: number;
@@ -232,6 +254,8 @@ interface FacturaDetalleEmbebido {
   asiento_id: string | null;
   proveedor: { nombre: string; cedula_juridica: string } | null;
   bodega: { id: string; codigo: string; nombre: string } | null;
+  cuenta_gasto: { codigo: string; nombre: string } | null;
+  centro: { codigo: string; nombre: string } | null;
   asiento: { numero: number | null } | null;
   cxp: { saldo: number; estado: string }[];
   lineas: {
@@ -252,11 +276,12 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
   const { data, error } = await supabase
     .from("facturas_compra")
     .select(
-      "id, fecha_emision, fecha_vencimiento, clave, condicion_venta, plazo_credito, " +
+      "id, tipo, fecha_emision, fecha_vencimiento, clave, condicion_venta, plazo_credito, glosa, " +
         "subtotal, iva_total, total, estado, asiento_id, " +
         "proveedor:proveedores(nombre, cedula_juridica), " +
-        "bodega:bodegas(id, codigo, nombre), asiento:asientos(numero), " +
-        "cxp:cuentas_por_pagar(saldo, estado), " +
+        "bodega:bodegas(id, codigo, nombre), " +
+        "cuenta_gasto:cuentas(codigo, nombre), centro:centros_costo(codigo, nombre), " +
+        "asiento:asientos(numero), cxp:cuentas_por_pagar(saldo, estado), " +
         "lineas:facturas_compra_lineas(linea, codigo_comercial, cantidad, costo_unitario, " +
         "base_imponible, iva_monto, detalle, articulo:articulos(id, codigo, nombre), " +
         "iva:iva_tarifas(codigo))",
@@ -272,16 +297,22 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
   const cxp = f.cxp?.[0];
   return {
     id: f.id,
+    tipo: f.tipo,
     fecha_emision: f.fecha_emision,
     fecha_vencimiento: f.fecha_vencimiento,
     clave: f.clave,
     condicion_venta: f.condicion_venta,
     plazo_credito: f.plazo_credito,
+    glosa: f.glosa,
     proveedor_nombre: f.proveedor?.nombre ?? "",
     proveedor_cedula: f.proveedor?.cedula_juridica ?? "",
     bodega_id: f.bodega?.id ?? null,
     bodega_codigo: f.bodega?.codigo ?? null,
     bodega_nombre: f.bodega?.nombre ?? null,
+    cuenta_gasto_codigo: f.cuenta_gasto?.codigo ?? null,
+    cuenta_gasto_nombre: f.cuenta_gasto?.nombre ?? null,
+    centro_codigo: f.centro?.codigo ?? null,
+    centro_nombre: f.centro?.nombre ?? null,
     subtotal: Number(f.subtotal),
     iva_total: Number(f.iva_total),
     total: Number(f.total),
