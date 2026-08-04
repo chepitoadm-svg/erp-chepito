@@ -154,6 +154,7 @@ export async function crearFactura(
   const cond = String(formData.get("condicion_venta") ?? "").trim();
   const plazo = String(formData.get("plazo_credito") ?? "").trim();
   const recepcion = String(formData.get("recepcion_id") ?? "").trim();
+  const centro = String(formData.get("centro_costo_id") ?? "").trim();
   const parsed = crearFacturaSchema.safeParse({
     proveedor_id: String(formData.get("proveedor_id") ?? ""),
     bodega_id: String(formData.get("bodega_id") ?? ""),
@@ -164,6 +165,10 @@ export async function crearFactura(
     lineas: lineasRaw,
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  // Caso normal (1 paso): centro obligatorio. Caso B (recepción) lo hereda de la recepción.
+  if (!recepcion && !centro) {
+    return { error: "Elegí el centro de costo (negocio) de la compra." };
+  }
 
   const lineasPayload = parsed.data.lineas.map((l) => ({
     articulo_id: l.articulo_id,
@@ -189,6 +194,7 @@ export async function crearFactura(
     : await supabase.rpc("fn_crear_factura", {
         p_proveedor: parsed.data.proveedor_id,
         p_bodega: parsed.data.bodega_id,
+        p_centro: centro,
         p_clave: parsed.data.clave ?? null,
         p_fecha_emision: parsed.data.fecha_emision,
         p_condicion: parsed.data.condicion_venta ?? null,
@@ -770,7 +776,9 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
   await requerirPermiso("compras.facturar");
   const id = String(formData.get("id") ?? "");
   const bodega = String(formData.get("bodega_id") ?? "");
+  const centro = String(formData.get("centro_costo_id") ?? "");
   if (!bodega) throw new Error("Seleccioná la bodega de ingreso.");
+  if (!centro) throw new Error("Elegí el centro de costo (negocio) de la compra.");
 
   const supabase = await createClient();
   const { data: ing } = await supabase
@@ -823,6 +831,7 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
   const { data: facturaId, error } = await supabase.rpc("fn_crear_factura_xml", {
     p_proveedor: ing.proveedor_id as string,
     p_bodega: bodega,
+    p_centro: centro,
     p_clave: ing.clave,
     p_fecha_emision: ing.fecha_emision as string,
     p_condicion: ing.condicion_venta,

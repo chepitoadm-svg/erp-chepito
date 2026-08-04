@@ -1032,6 +1032,7 @@ export interface Database {
         Args: {
           p_proveedor: string;
           p_bodega: string;
+          p_centro: string;
           p_clave: string | null;
           p_fecha_emision: string;
           p_condicion: string | null;
@@ -1061,6 +1062,7 @@ export interface Database {
         Args: {
           p_proveedor: string;
           p_bodega: string;
+          p_centro: string;
           p_clave: string | null;
           p_fecha_emision: string;
           p_condicion: string | null;

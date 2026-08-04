@@ -8,6 +8,7 @@ import {
   listarTarifasIva,
   listarBodegas,
 } from "@/lib/data/inventario";
+import { listarCentrosCosto } from "@/lib/data/asientos";
 import { descartarIngesta, crearProveedorDesdeIngesta, reparsearIngesta } from "../../actions";
 import MapearLinea from "@/components/MapearLinea";
 import CrearFacturaIngesta from "@/components/CrearFacturaIngesta";
@@ -47,14 +48,15 @@ export default async function IngestaDetallePage({
 
   // Selectores para mapear / crear la factura (solo si aplica).
   const necesitaSelectores = c.estado === "requiere_mapeo" || c.estado === "validado";
-  const [articulos, unidades, tarifas, bodegas] = necesitaSelectores
+  const [articulos, unidades, tarifas, bodegas, centros] = necesitaSelectores
     ? await Promise.all([
         listarArticulosParaSelector(),
         listarUnidades(),
         listarTarifasIva(),
         listarBodegas(),
+        listarCentrosCosto(),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], []];
 
   return (
     <div>
@@ -205,7 +207,7 @@ export default async function IngestaDetallePage({
             Se crea en borrador aplicando la conversión de unidad (cantidad × factor). Después la
             revisás y confirmás para que ingrese al inventario y cree la CxP.
           </p>
-          <CrearFacturaIngesta id={c.id} bodegas={bodegas} />
+          <CrearFacturaIngesta id={c.id} bodegas={bodegas} centros={centros} />
         </div>
       )}
 

@@ -40,6 +40,7 @@ interface Props {
   bodegas: Bodega[];
   articulos: Articulo[];
   tarifas: Tarifa[];
+  centros?: { id: string; codigo: string; nombre: string }[];
   // Modo "salda una recepción" (caso B): proveedor y bodega fijos, líneas
   // precargadas desde la recepción (el costo se puede ajustar por diferencia).
   recepcion?: { id: string; proveedor_nombre: string; bodega_codigo: string };
@@ -68,6 +69,7 @@ export default function FacturaForm({
   bodegas,
   articulos,
   tarifas,
+  centros = [],
   recepcion,
   lineasIniciales,
 }: Props) {
@@ -77,6 +79,7 @@ export default function FacturaForm({
 
   const [proveedor, setProveedor] = useState("");
   const [bodega, setBodega] = useState("");
+  const [centro, setCentro] = useState("");
   const [clave, setClave] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [condicion, setCondicion] = useState("");
@@ -148,7 +151,7 @@ export default function FacturaForm({
       })),
   );
   const listo =
-    (modoRecepcion || (proveedor && bodega)) && JSON.parse(lineasJSON).length > 0;
+    (modoRecepcion || (proveedor && bodega && centro)) && JSON.parse(lineasJSON).length > 0;
 
   const inputCls =
     "mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -162,6 +165,7 @@ export default function FacturaForm({
       <input type="hidden" name="condicion_venta" value={condicion} />
       <input type="hidden" name="plazo_credito" value={plazo} />
       <input type="hidden" name="lineas" value={lineasJSON} />
+      <input type="hidden" name="centro_costo_id" value={centro} />
       {recepcion && <input type="hidden" name="recepcion_id" value={recepcion.id} />}
 
       {modoRecepcion ? (
@@ -195,6 +199,22 @@ export default function FacturaForm({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-neutral-700">
+              Centro de costo (negocio) <span className="text-red-500">*</span>
+            </label>
+            <select value={centro} onChange={(e) => setCentro(e.target.value)} className={inputCls}>
+              <option value="">¿De cuál negocio es esta compra?</option>
+              {centros.map((cc) => (
+                <option key={cc.id} value={cc.id}>
+                  {cc.codigo} — {cc.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-neutral-500">
+              La compra se carga como costo a este negocio (Chepito 1 / Chepito 2 / Taller).
+            </p>
           </div>
         </div>
       )}
@@ -356,8 +376,9 @@ export default function FacturaForm({
       </div>
 
       <p className="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-700">
-        Se guarda como borrador. Al confirmar, la mercadería entra al inventario y
-        se postea Debe Inventario + IVA / Haber CxP, creando la cuenta por pagar.
+        Se guarda como borrador. Al confirmar, se carga como costo del negocio (Debe Compras
+        gravadas/exentas con su centro + IVA / Haber CxP). La materia prima e insumos igual entran
+        al kardex de control por bodega.
       </p>
 
       {state.error && (

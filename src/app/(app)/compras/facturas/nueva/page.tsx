@@ -7,6 +7,7 @@ import {
   listarBodegas,
   listarTarifasIva,
 } from "@/lib/data/inventario";
+import { listarCentrosCosto } from "@/lib/data/asientos";
 import FacturaForm from "@/components/FacturaForm";
 
 export default async function NuevaFacturaPage({
@@ -17,11 +18,12 @@ export default async function NuevaFacturaPage({
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras/facturas");
   const { recepcion } = await searchParams;
 
-  const [proveedores, bodegas, articulos, tarifas] = await Promise.all([
+  const [proveedores, bodegas, articulos, tarifas, centros] = await Promise.all([
     listarProveedoresActivos(),
     listarBodegas(),
     listarArticulosParaSelector(),
     listarTarifasIva(),
+    listarCentrosCosto(),
   ]);
 
   // Modo caso B: la factura salda una recepción confirmada.
@@ -113,6 +115,7 @@ export default async function NuevaFacturaPage({
         bodegas={bodegas}
         articulos={articulos}
         tarifas={tarifas}
+        centros={centros}
       />
     </div>
   );
