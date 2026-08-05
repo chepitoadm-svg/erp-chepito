@@ -437,6 +437,8 @@ export async function subirComprobante(
       unidad_comercial: l.unidad_comercial,
       base_imponible: l.base_imponible,
       iva_monto: l.iva_monto,
+      iva_codigo_tarifa: l.iva_codigo_tarifa, // CodigoTarifaIVA del XML (08=13%, 02=1%…)
+      iva_tarifa: l.iva_tarifa,
       articulo_id: hit?.articulo_id ?? null,
       articulo_codigo: hit?.codigo ?? null,
       mapeado: !!hit,
@@ -658,6 +660,8 @@ export async function reparsearIngesta(formData: FormData): Promise<void> {
     unidad_comercial: l.unidad_comercial,
     base_imponible: l.base_imponible, // costo (ya con específico)
     iva_monto: l.iva_monto,
+    iva_codigo_tarifa: l.iva_codigo_tarifa,
+    iva_tarifa: l.iva_tarifa,
     articulo_id: null,
     articulo_codigo: null,
     mapeado: false,
@@ -797,6 +801,15 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
     .eq("proveedor_id", ing.proveedor_id ?? "");
   const porCodigo = new Map((maps ?? []).map((m) => [m.codigo_comercial, m]));
 
+  // Tarifa de IVA REAL de cada línea: el CodigoTarifaIVA del XML mapeado a
+  // nuestro catálogo por codigo_hacienda (así la leche a 1% no aparece a 13%).
+  const { data: tarifas } = await supabase
+    .from("iva_tarifas")
+    .select("id, codigo_hacienda");
+  const tarifaPorHacienda = new Map(
+    (tarifas ?? []).filter((t) => t.codigo_hacienda).map((t) => [t.codigo_hacienda as string, t.id]),
+  );
+
   // base_imponible ya viene con el impuesto específico incluido (costo real);
   // iva_monto es el IVA acreditable exacto del comprobante. NO se recalculan.
   const lineasIng = (ing.lineas ?? []) as {
@@ -804,6 +817,7 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
     cantidad: number;
     base_imponible: number;
     iva_monto: number;
+    iva_codigo_tarifa: string | null;
     detalle: string;
   }[];
   const lineas = lineasIng.map((l) => {
@@ -813,6 +827,8 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
     const base = Number(l.base_imponible);
     const costo = cantidadStock > 0 ? base / cantidadStock : 0;
     const art = m?.articulo as unknown as { iva_tarifa_id: string } | null;
+    // Tarifa de la línea: del XML si mapea; si no, la del artículo.
+    const tarifaXml = l.iva_codigo_tarifa ? tarifaPorHacienda.get(l.iva_codigo_tarifa) : undefined;
     return {
       articulo_id: m?.articulo_id ?? null,
       codigo_comercial: l.codigo_comercial,
@@ -820,7 +836,7 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
       costo_unitario: costo,
       base_imponible: base,
       iva_monto: Number(l.iva_monto ?? 0),
-      iva_tarifa_id: art?.iva_tarifa_id ?? null,
+      iva_tarifa_id: tarifaXml ?? art?.iva_tarifa_id ?? null,
       detalle: l.detalle,
     };
   });
