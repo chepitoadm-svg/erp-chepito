@@ -554,6 +554,180 @@ export async function obtenerTransferencia(id: string): Promise<TransferenciaDet
   };
 }
 
+// === CIERRE DE INVENTARIO (periódico) ======================================
+export interface ArticuloParaCierre {
+  articulo_id: string;
+  codigo: string;
+  nombre: string;
+  cantidad_teorica: number;
+  costo_promedio: number;
+}
+
+/** Artículos con existencia en una bodega, con su cantidad teórica y costo. */
+export async function articulosParaCierre(bodegaId: string): Promise<ArticuloParaCierre[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("existencias")
+    .select("cantidad, articulo:articulos!inner(id, codigo, nombre, estado)")
+    .eq("bodega_id", bodegaId)
+    .neq("cantidad", 0);
+  if (error) throw new Error(`No se pudieron cargar los artículos: ${error.message}`);
+  const filas = (data ?? []) as unknown as {
+    cantidad: number;
+    articulo: { id: string; codigo: string; nombre: string; estado: string } | null;
+  }[];
+  const ids = filas.map((f) => f.articulo?.id).filter(Boolean) as string[];
+  const { data: saldos } = ids.length
+    ? await supabase.from("articulos_saldos").select("articulo_id, costo_promedio").in("articulo_id", ids)
+    : { data: [] as { articulo_id: string; costo_promedio: number }[] };
+  const costo = new Map((saldos ?? []).map((s) => [s.articulo_id, Number(s.costo_promedio)]));
+  return filas
+    .filter((f) => f.articulo)
+    .map((f) => ({
+      articulo_id: f.articulo!.id,
+      codigo: f.articulo!.codigo,
+      nombre: f.articulo!.nombre,
+      cantidad_teorica: Number(f.cantidad),
+      costo_promedio: costo.get(f.articulo!.id) ?? 0,
+    }))
+    .sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+export type CierreEstado = "borrador" | "confirmado" | "anulado";
+
+export interface CierreListado {
+  id: string;
+  fecha: string;
+  bodega_codigo: string;
+  centro_codigo: string | null;
+  valor_teorico: number;
+  valor_fisico: number;
+  diferencia: number;
+  estado: CierreEstado;
+}
+
+export async function listarCierres(): Promise<CierreListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cierres_inventario")
+    .select(
+      "id, fecha, valor_teorico, valor_fisico, diferencia, estado, " +
+        "bodega:bodegas(codigo), centro:centros_costo(codigo)",
+    )
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar los cierres: ${error.message}`);
+  return ((data ?? []) as unknown as {
+    id: string;
+    fecha: string;
+    valor_teorico: number;
+    valor_fisico: number;
+    diferencia: number;
+    estado: CierreEstado;
+    bodega: { codigo: string } | null;
+    centro: { codigo: string } | null;
+  }[]).map((c) => ({
+    id: c.id,
+    fecha: c.fecha,
+    bodega_codigo: c.bodega?.codigo ?? "",
+    centro_codigo: c.centro?.codigo ?? null,
+    valor_teorico: Number(c.valor_teorico),
+    valor_fisico: Number(c.valor_fisico),
+    diferencia: Number(c.diferencia),
+    estado: c.estado,
+  }));
+}
+
+export interface CierreLineaDetalle {
+  linea: number;
+  articulo_codigo: string;
+  articulo_nombre: string;
+  cantidad_teorica: number;
+  cantidad_fisica: number;
+  costo_promedio: number;
+  valor_teorico: number;
+  valor_fisico: number;
+}
+
+export interface CierreDetalle {
+  id: string;
+  fecha: string;
+  bodega_codigo: string;
+  bodega_nombre: string;
+  centro_codigo: string | null;
+  estado: CierreEstado;
+  valor_teorico: number;
+  valor_fisico: number;
+  diferencia: number;
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  lineas: CierreLineaDetalle[];
+}
+
+export async function obtenerCierre(id: string): Promise<CierreDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cierres_inventario")
+    .select(
+      "id, fecha, valor_teorico, valor_fisico, diferencia, estado, asiento_id, " +
+        "bodega:bodegas(codigo, nombre), centro:centros_costo(codigo), asiento:asientos(numero), " +
+        "lineas:cierres_inventario_lineas(linea, cantidad_teorica, cantidad_fisica, costo_promedio, " +
+        "valor_teorico, valor_fisico, articulo:articulos(codigo, nombre))",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar el cierre: ${error.message}`);
+  }
+  const c = data as unknown as {
+    id: string;
+    fecha: string;
+    valor_teorico: number;
+    valor_fisico: number;
+    diferencia: number;
+    estado: CierreEstado;
+    asiento_id: string | null;
+    bodega: { codigo: string; nombre: string } | null;
+    centro: { codigo: string } | null;
+    asiento: { numero: number | null } | null;
+    lineas: {
+      linea: number;
+      cantidad_teorica: number;
+      cantidad_fisica: number;
+      costo_promedio: number;
+      valor_teorico: number;
+      valor_fisico: number;
+      articulo: { codigo: string; nombre: string } | null;
+    }[];
+  };
+  return {
+    id: c.id,
+    fecha: c.fecha,
+    bodega_codigo: c.bodega?.codigo ?? "",
+    bodega_nombre: c.bodega?.nombre ?? "",
+    centro_codigo: c.centro?.codigo ?? null,
+    estado: c.estado,
+    valor_teorico: Number(c.valor_teorico),
+    valor_fisico: Number(c.valor_fisico),
+    diferencia: Number(c.diferencia),
+    asiento_id: c.asiento_id,
+    asiento_numero: c.asiento?.numero ?? null,
+    lineas: (c.lineas ?? [])
+      .sort((a, b) => a.linea - b.linea)
+      .map((l) => ({
+        linea: l.linea,
+        articulo_codigo: l.articulo?.codigo ?? "",
+        articulo_nombre: l.articulo?.nombre ?? "",
+        cantidad_teorica: Number(l.cantidad_teorica),
+        cantidad_fisica: Number(l.cantidad_fisica),
+        costo_promedio: Number(l.costo_promedio),
+        valor_teorico: Number(l.valor_teorico),
+        valor_fisico: Number(l.valor_fisico),
+      })),
+  };
+}
+
 export interface TransitoFila {
   transferencia_id: string;
   fecha: string;

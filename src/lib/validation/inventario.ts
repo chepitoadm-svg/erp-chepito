@@ -66,3 +66,19 @@ export const crearTransferenciaSchema = z
   });
 
 export type CrearTransferenciaInput = z.infer<typeof crearTransferenciaSchema>;
+
+// === Cierre de inventario (periódico) ======================================
+export const crearCierreSchema = z.object({
+  bodega_id: z.string().uuid("Seleccioná la bodega."),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
+  lineas: z
+    .array(
+      z.object({
+        articulo_id: z.string().uuid(),
+        cantidad_fisica: z.number().min(0, "El conteo no puede ser negativo."),
+      }),
+    )
+    .min(1, "Agregá al menos un artículo."),
+});
+
+export type CrearCierreInput = z.infer<typeof crearCierreSchema>;

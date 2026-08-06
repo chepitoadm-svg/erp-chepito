@@ -39,6 +39,12 @@ const SECCIONES = [
     permiso: "inventario.ver",
   },
   {
+    href: "/inventario/cierre",
+    titulo: "Cierre de inventario",
+    desc: "Conteo físico mensual (periódico): ajusta el costo y detecta faltantes.",
+    permiso: "inventario.ver",
+  },
+  {
     href: "/inventario/libro",
     titulo: "Libro de Inventarios",
     desc: "Detalle valuado por ítem a una fecha (libro legal).",

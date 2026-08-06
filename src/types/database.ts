@@ -505,6 +505,39 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["ajustes_inventario_lineas"]["Insert"]>;
         Relationships: [];
       };
+      cierres_inventario: {
+        Row: {
+          id: string;
+          fecha: string;
+          bodega_id: string;
+          centro_costo_id: string | null;
+          estado: "borrador" | "confirmado" | "anulado";
+          valor_teorico: number;
+          valor_fisico: number;
+          diferencia: number;
+          asiento_id: string | null;
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      cierres_inventario_lineas: {
+        Row: {
+          id: string;
+          cierre_id: string;
+          linea: number;
+          articulo_id: string;
+          cantidad_teorica: number;
+          cantidad_fisica: number;
+          costo_promedio: number;
+          valor_teorico: number;
+          valor_fisico: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       transferencias: {
         Row: {
           id: string;
@@ -1015,6 +1048,12 @@ export interface Database {
       };
       fn_confirmar_ajuste: { Args: { p_ajuste: string }; Returns: string };
       fn_anular_ajuste: { Args: { p_ajuste: string; p_motivo: string }; Returns: undefined };
+      fn_crear_cierre: {
+        Args: { p_bodega: string; p_fecha: string; p_lineas: unknown };
+        Returns: string;
+      };
+      fn_confirmar_cierre: { Args: { p_cierre: string }; Returns: string };
+      fn_anular_cierre: { Args: { p_cierre: string; p_motivo: string }; Returns: undefined };
       fn_crear_transferencia: {
         Args: { p_origen: string; p_destino: string; p_glosa: string | null; p_lineas: unknown };
         Returns: string;

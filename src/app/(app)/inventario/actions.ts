@@ -10,6 +10,7 @@ import {
   cargaInicialSchema,
   crearAjusteSchema,
   crearTransferenciaSchema,
+  crearCierreSchema,
 } from "@/lib/validation/inventario";
 
 export interface FormState {
@@ -293,4 +294,58 @@ export async function anularTransferencia(
   revalidatePath(`/inventario/transferencias/${id}`);
   revalidatePath("/inventario/transferencias");
   return { ok: "Transferencia anulada." };
+}
+
+// === CIERRE DE INVENTARIO (periódico) ======================================
+export async function crearCierre(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("inventario.ajustar");
+
+  let lineasRaw: unknown = [];
+  try {
+    lineasRaw = JSON.parse(String(formData.get("lineas") ?? "[]"));
+  } catch {
+    return { error: "Conteo inválido." };
+  }
+  const parsed = crearCierreSchema.safeParse({
+    bodega_id: String(formData.get("bodega_id") ?? ""),
+    fecha: String(formData.get("fecha") ?? ""),
+    lineas: lineasRaw,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_cierre", {
+    p_bodega: parsed.data.bodega_id,
+    p_fecha: parsed.data.fecha,
+    p_lineas: parsed.data.lineas.map((l) => ({
+      articulo_id: l.articulo_id,
+      cantidad_fisica: l.cantidad_fisica,
+    })),
+  });
+  if (error || !id) return { error: limpiar(error?.message ?? "No se pudo crear el cierre.") };
+
+  redirect(`/inventario/cierre/${id}`);
+}
+
+export async function confirmarCierre(formData: FormData): Promise<void> {
+  await requerirPermiso("inventario.ajustar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_confirmar_cierre", { p_cierre: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/inventario/cierre/${id}`);
+  revalidatePath("/inventario/cierre");
+}
+
+export async function anularCierre(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("inventario.ajustar");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_cierre", { p_cierre: id, p_motivo: motivo });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/inventario/cierre/${id}`);
+  revalidatePath("/inventario/cierre");
+  return { ok: "Cierre anulado." };
 }
