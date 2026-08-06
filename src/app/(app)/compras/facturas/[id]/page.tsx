@@ -130,69 +130,86 @@ export default async function FacturaDetallePage({
       )}
 
       {f.tipo === "inventario" && (
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-            <tr>
-              <th className="px-4 py-3 font-medium">Artículo</th>
-              <th className="px-4 py-3 text-right font-medium">Cantidad</th>
-              <th className="px-4 py-3 text-right font-medium">Costo unit.</th>
-              <th className="px-4 py-3 text-right font-medium">Base</th>
-              <th className="px-4 py-3 font-medium">IVA</th>
-              <th className="px-4 py-3 text-right font-medium">IVA ₡</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {f.lineas.map((l) => (
-              <tr key={l.linea}>
-                <td className="px-4 py-3 text-neutral-900">
-                  <span className="font-mono text-xs text-neutral-600">{l.articulo_codigo}</span> —{" "}
-                  {l.articulo_nombre}
-                  {l.codigo_comercial && (
-                    <span className="block text-xs text-neutral-400">
-                      cód. proveedor {l.codigo_comercial}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-700">
-                  {fmt(l.cantidad)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-700">
-                  {fmt(l.costo_unitario)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-700">
-                  {fmt(l.base_imponible)}
-                </td>
-                <td className="px-4 py-3 text-neutral-600">{l.iva_codigo ?? "—"}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-700">
-                  {fmt(l.iva_monto)}
-                </td>
+      <div>
+        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+              <tr>
+                <th className="px-3 py-3 text-right font-medium">L#</th>
+                <th className="px-3 py-3 font-medium">Código</th>
+                <th className="px-3 py-3 font-medium">Descripción</th>
+                <th className="px-3 py-3 text-right font-medium">Cant.</th>
+                <th className="px-3 py-3 text-right font-medium">Precio unit.</th>
+                <th className="px-3 py-3 text-right font-medium">Monto</th>
+                <th className="px-3 py-3 text-right font-medium">Impu. esp.</th>
+                <th className="px-3 py-3 text-right font-medium">Desc.</th>
+                <th className="px-3 py-3 font-medium">IVA</th>
+                <th className="px-3 py-3 text-right font-medium">IVA ₡</th>
               </tr>
-            ))}
-          </tbody>
-          <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm">
-            <tr>
-              <td colSpan={5} className="px-4 py-2 text-right text-neutral-500">
-                Subtotal
-              </td>
-              <td className="px-4 py-2 text-right tabular-nums text-neutral-700">{fmt(f.subtotal)}</td>
-            </tr>
-            <tr>
-              <td colSpan={5} className="px-4 py-2 text-right text-neutral-500">
-                IVA
-              </td>
-              <td className="px-4 py-2 text-right tabular-nums text-neutral-700">{fmt(f.iva_total)}</td>
-            </tr>
-            <tr>
-              <td colSpan={5} className="px-4 py-2 text-right font-medium text-neutral-700">
-                Total
-              </td>
-              <td className="px-4 py-2 text-right font-semibold tabular-nums text-neutral-900">
-                {fmt(f.total)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {f.lineas.map((l) => (
+                <tr key={l.linea}>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-400">{l.linea}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-neutral-600">
+                    {l.codigo_comercial ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 text-neutral-900">
+                    {l.detalle || l.articulo_nombre}
+                    <span className="block text-xs text-neutral-400">
+                      → {l.articulo_codigo} {l.articulo_nombre}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-700">
+                    {fmt(l.cantidad_comercial)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-700">
+                    {fmt(l.precio_unitario_lista)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-700">
+                    {fmt(l.monto_bruto)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-500">
+                    {l.especifico > 0 ? fmt(l.especifico) : "—"}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-500">
+                    {l.descuento > 0 ? `−${fmt(l.descuento)}` : "—"}
+                  </td>
+                  <td className="px-3 py-3 text-neutral-600">{l.iva_codigo ?? "—"}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-neutral-700">
+                    {fmt(l.iva_monto)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <div className="w-80 rounded-lg border border-neutral-200 bg-white p-4 text-sm">
+            <Fila etiqueta="Subtotal" valor={fmt(f.subtotal_bruto)} />
+            {f.descuento_total > 0 && (
+              <Fila etiqueta="Descuento" valor={`− ${fmt(f.descuento_total)}`} />
+            )}
+            {f.especifico_total > 0 && (
+              <Fila etiqueta="Impuesto específico (IEBL)" valor={`+ ${fmt(f.especifico_total)}`} />
+            )}
+            {(f.descuento_total > 0 || f.especifico_total > 0) && (
+              <Fila etiqueta="Subtotal con imp. específicos" valor={fmt(f.subtotal)} sep />
+            )}
+            <Fila etiqueta="IVA" valor={`+ ${fmt(f.iva_total)}`} />
+            <Fila etiqueta="Total" valor={fmt(f.total)} fuerte sep />
+            {f.redondeo !== 0 && (
+              <>
+                <Fila etiqueta="Redondeo" valor={fmt(f.redondeo)} />
+                <Fila etiqueta="Total a pagar" valor={fmt(f.total_a_pagar)} fuerte />
+              </>
+            )}
+            <p className="mt-3 border-t border-neutral-100 pt-2 text-xs uppercase text-neutral-500">
+              {f.total_en_letras}
+            </p>
+          </div>
+        </div>
       </div>
       )}
 
@@ -295,6 +312,31 @@ export default async function FacturaDetallePage({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Fila({
+  etiqueta,
+  valor,
+  fuerte,
+  sep,
+}: {
+  etiqueta: string;
+  valor: string;
+  fuerte?: boolean;
+  sep?: boolean;
+}) {
+  return (
+    <div
+      className={
+        "flex justify-between " +
+        (sep ? "mt-1 border-t border-neutral-200 pt-1 " : "") +
+        (fuerte ? "font-semibold text-neutral-900" : "text-neutral-600")
+      }
+    >
+      <span>{etiqueta}</span>
+      <span className="tabular-nums">{valor}</span>
     </div>
   );
 }

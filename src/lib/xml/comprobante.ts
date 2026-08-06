@@ -37,6 +37,8 @@ export interface ComprobanteLinea {
   cantidad: number;
   unidad_comercial: string | null;
   precio_unitario: number;
+  subtotal_bruto: number; // MontoTotal = precio lista × cantidad (ANTES de descuento)
+  descuento: number; // MontoDescuento de la línea (0 si no trae)
   // Costo que va a INVENTARIO: mercadería (base − descuento) + impuestos
   // específicos que efectivamente se cobran (IEBL/ISC, vía Otros Cargos).
   base_imponible: number;
@@ -159,6 +161,10 @@ export function parseComprobante(xml: string): Comprobante {
       cantidad: num(l.Cantidad),
       unidad_comercial: l.UnidadMedidaComercial ? txt(l.UnidadMedidaComercial) : null,
       precio_unitario: num(l.PrecioUnitario),
+      subtotal_bruto: num(l.MontoTotal),
+      descuento: round2(
+        asArray<Record<string, unknown>>(l.Descuento).reduce((s, x) => s + num(x.MontoDescuento), 0),
+      ),
       base_mercaderia: b.mercaderia,
       especifico: extra,
       base_imponible: round2(b.mercaderia + extra), // costo a inventario

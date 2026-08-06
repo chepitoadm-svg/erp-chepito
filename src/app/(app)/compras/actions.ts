@@ -435,6 +435,10 @@ export async function subirComprobante(
       detalle: l.detalle,
       cantidad: l.cantidad,
       unidad_comercial: l.unidad_comercial,
+      precio_unitario: l.precio_unitario, // precio de lista (comercial)
+      subtotal_bruto: l.subtotal_bruto, // MontoTotal antes de descuento
+      descuento: l.descuento, // MontoDescuento de la línea
+      especifico: l.especifico, // impuesto específico (IEBL) cargado al costo
       base_imponible: l.base_imponible,
       iva_monto: l.iva_monto,
       iva_codigo_tarifa: l.iva_codigo_tarifa, // CodigoTarifaIVA del XML (08=13%, 02=1%…)
@@ -815,6 +819,9 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
   const lineasIng = (ing.lineas ?? []) as {
     codigo_comercial: string | null;
     cantidad: number;
+    precio_unitario?: number;
+    subtotal_bruto?: number;
+    descuento?: number;
     base_imponible: number;
     iva_monto: number;
     iva_codigo_tarifa: string | null;
@@ -823,7 +830,8 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
   const lineas = lineasIng.map((l) => {
     const m = l.codigo_comercial ? porCodigo.get(l.codigo_comercial) : undefined;
     const factor = Number(m?.factor_a_stock ?? 1);
-    const cantidadStock = Number(l.cantidad) * factor;
+    const cantidadComercial = Number(l.cantidad);
+    const cantidadStock = cantidadComercial * factor;
     const base = Number(l.base_imponible);
     const costo = cantidadStock > 0 ? base / cantidadStock : 0;
     const art = m?.articulo as unknown as { iva_tarifa_id: string } | null;
@@ -838,6 +846,10 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
       iva_monto: Number(l.iva_monto ?? 0),
       iva_tarifa_id: tarifaXml ?? art?.iva_tarifa_id ?? null,
       detalle: l.detalle,
+      // Cifras "como facturadas" para reproducir el documento del proveedor:
+      cantidad_comercial: cantidadComercial,
+      precio_unitario_lista: Number(l.precio_unitario ?? 0),
+      descuento: Number(l.descuento ?? 0),
     };
   });
   if (lineas.some((l) => !l.articulo_id)) {

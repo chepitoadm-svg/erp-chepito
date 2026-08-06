@@ -1,6 +1,7 @@
 // Capa de datos de COMPRAS (lecturas). Corre en el servidor con RLS.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { montoEnLetras } from "@/lib/format/montoEnLetras";
 import type { Estado } from "@/types/database";
 
 export interface ProveedorListado {
@@ -207,6 +208,12 @@ export interface FacturaLineaDetalle {
   iva_codigo: string | null;
   iva_monto: number;
   detalle: string | null;
+  // "Como lo manda el proveedor":
+  cantidad_comercial: number;
+  precio_unitario_lista: number;
+  monto_bruto: number; // precio lista × cantidad comercial (antes de descuento)
+  descuento: number; // monto del descuento de la línea
+  especifico: number; // impuesto específico (IEBL) de la línea
 }
 
 export interface FacturaDetalle {
@@ -227,7 +234,7 @@ export interface FacturaDetalle {
   cuenta_gasto_nombre: string | null;
   centro_codigo: string | null;
   centro_nombre: string | null;
-  subtotal: number;
+  subtotal: number; // base gravable (con impuestos específicos, sin IVA)
   iva_total: number;
   total: number;
   estado: FacturaEstado;
@@ -235,6 +242,13 @@ export interface FacturaDetalle {
   asiento_numero: number | null;
   cxp_saldo: number | null;
   cxp_estado: string | null;
+  // Desglose "como lo manda el proveedor":
+  subtotal_bruto: number; // suma de MONTO (antes de descuento)
+  descuento_total: number;
+  especifico_total: number; // IEBL / impuesto específico
+  redondeo: number; // redondeo del proveedor (solo visual)
+  total_a_pagar: number; // total fiscal redondeado a colón entero (solo visual)
+  total_en_letras: string;
   lineas: FacturaLineaDetalle[];
 }
 
@@ -266,6 +280,9 @@ interface FacturaDetalleEmbebido {
     base_imponible: number;
     iva_monto: number;
     detalle: string | null;
+    cantidad_comercial: number;
+    precio_unitario_lista: number;
+    descuento: number;
     articulo: { id: string; codigo: string; nombre: string } | null;
     iva: { codigo: string } | null;
   }[];
@@ -283,8 +300,8 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
         "cuenta_gasto:cuentas(codigo, nombre), centro:centros_costo(codigo, nombre), " +
         "asiento:asientos(numero), cxp:cuentas_por_pagar(saldo, estado), " +
         "lineas:facturas_compra_lineas(linea, codigo_comercial, cantidad, costo_unitario, " +
-        "base_imponible, iva_monto, detalle, articulo:articulos(id, codigo, nombre), " +
-        "iva:iva_tarifas(codigo))",
+        "base_imponible, iva_monto, detalle, cantidad_comercial, precio_unitario_lista, descuento, " +
+        "articulo:articulos(id, codigo, nombre), iva:iva_tarifas(codigo))",
     )
     .eq("id", id)
     .single();
@@ -295,6 +312,45 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
 
   const f = data as unknown as FacturaDetalleEmbebido;
   const cxp = f.cxp?.[0];
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const lineas: FacturaLineaDetalle[] = (f.lineas ?? [])
+    .sort((x, y) => x.linea - y.linea)
+    .map((l) => {
+      const cantidad_comercial = Number(l.cantidad_comercial);
+      const precio_unitario_lista = Number(l.precio_unitario_lista);
+      const descuento = Number(l.descuento);
+      const base_imponible = Number(l.base_imponible);
+      const monto_bruto = r2(cantidad_comercial * precio_unitario_lista);
+      // específico (IEBL) = base gravable − mercadería neta (monto − descuento)
+      const especifico = r2(base_imponible - (monto_bruto - descuento));
+      return {
+        linea: l.linea,
+        codigo_comercial: l.codigo_comercial,
+        articulo_id: l.articulo?.id ?? "",
+        articulo_codigo: l.articulo?.codigo ?? "",
+        articulo_nombre: l.articulo?.nombre ?? "",
+        cantidad: Number(l.cantidad),
+        costo_unitario: Number(l.costo_unitario),
+        base_imponible,
+        iva_codigo: l.iva?.codigo ?? null,
+        iva_monto: Number(l.iva_monto),
+        detalle: l.detalle,
+        cantidad_comercial,
+        precio_unitario_lista,
+        monto_bruto,
+        descuento,
+        especifico: especifico > 0 ? especifico : 0,
+      };
+    });
+
+  const subtotal_bruto = r2(lineas.reduce((s, l) => s + l.monto_bruto, 0));
+  const descuento_total = r2(lineas.reduce((s, l) => s + l.descuento, 0));
+  const especifico_total = r2(lineas.reduce((s, l) => s + l.especifico, 0));
+  const total = Number(f.total);
+  const total_a_pagar = Math.round(total);
+  const redondeo = r2(total_a_pagar - total);
+
   return {
     id: f.id,
     tipo: f.tipo,
@@ -315,27 +371,19 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
     centro_nombre: f.centro?.nombre ?? null,
     subtotal: Number(f.subtotal),
     iva_total: Number(f.iva_total),
-    total: Number(f.total),
+    total,
     estado: f.estado,
     asiento_id: f.asiento_id,
     asiento_numero: f.asiento?.numero ?? null,
     cxp_saldo: cxp ? Number(cxp.saldo) : null,
     cxp_estado: cxp?.estado ?? null,
-    lineas: (f.lineas ?? [])
-      .sort((x, y) => x.linea - y.linea)
-      .map((l) => ({
-        linea: l.linea,
-        codigo_comercial: l.codigo_comercial,
-        articulo_id: l.articulo?.id ?? "",
-        articulo_codigo: l.articulo?.codigo ?? "",
-        articulo_nombre: l.articulo?.nombre ?? "",
-        cantidad: Number(l.cantidad),
-        costo_unitario: Number(l.costo_unitario),
-        base_imponible: Number(l.base_imponible),
-        iva_codigo: l.iva?.codigo ?? null,
-        iva_monto: Number(l.iva_monto),
-        detalle: l.detalle,
-      })),
+    subtotal_bruto,
+    descuento_total,
+    especifico_total,
+    redondeo,
+    total_a_pagar,
+    total_en_letras: montoEnLetras(total_a_pagar),
+    lineas,
   };
 }
 
