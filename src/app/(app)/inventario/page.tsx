@@ -45,6 +45,12 @@ const SECCIONES = [
     permiso: "inventario.ver",
   },
   {
+    href: "/inventario/desechos",
+    titulo: "Desechos de PT",
+    desc: "Pan dañado o vencido en Chepito 1 y 2, valorizado por negocio.",
+    permiso: "inventario.ver",
+  },
+  {
     href: "/inventario/libro",
     titulo: "Libro de Inventarios",
     desc: "Detalle valuado por ítem a una fecha (libro legal).",

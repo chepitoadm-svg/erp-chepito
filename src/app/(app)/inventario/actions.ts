@@ -11,6 +11,7 @@ import {
   crearAjusteSchema,
   crearTransferenciaSchema,
   crearCierreSchema,
+  crearDesechoSchema,
 } from "@/lib/validation/inventario";
 
 export interface FormState {
@@ -348,4 +349,63 @@ export async function anularCierre(_prev: FormState, formData: FormData): Promis
   revalidatePath(`/inventario/cierre/${id}`);
   revalidatePath("/inventario/cierre");
   return { ok: "Cierre anulado." };
+}
+
+// === DESECHOS DE PRODUCTO TERMINADO ========================================
+export async function crearDesecho(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("inventario.ajustar");
+
+  let lineasRaw: unknown = [];
+  try {
+    lineasRaw = JSON.parse(String(formData.get("lineas") ?? "[]"));
+  } catch {
+    return { error: "Líneas inválidas." };
+  }
+  const parsed = crearDesechoSchema.safeParse({
+    centro_costo_id: String(formData.get("centro_costo_id") ?? ""),
+    fecha: String(formData.get("fecha") ?? ""),
+    motivo: String(formData.get("motivo") ?? "danado"),
+    glosa: String(formData.get("glosa") ?? "").trim() || null,
+    lineas: lineasRaw,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_desecho", {
+    p_centro: parsed.data.centro_costo_id,
+    p_fecha: parsed.data.fecha,
+    p_motivo: parsed.data.motivo,
+    p_glosa: parsed.data.glosa ?? null,
+    p_lineas: parsed.data.lineas.map((l) => ({
+      descripcion: l.descripcion,
+      cantidad: l.cantidad,
+      costo_unitario: l.costo_unitario,
+    })),
+  });
+  if (error || !id) return { error: limpiar(error?.message ?? "No se pudo crear el desecho.") };
+
+  redirect(`/inventario/desechos/${id}`);
+}
+
+export async function confirmarDesecho(formData: FormData): Promise<void> {
+  await requerirPermiso("inventario.ajustar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_confirmar_desecho", { p_desecho: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/inventario/desechos/${id}`);
+  revalidatePath("/inventario/desechos");
+}
+
+export async function anularDesecho(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("inventario.ajustar");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_desecho", { p_desecho: id, p_motivo: motivo });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/inventario/desechos/${id}`);
+  revalidatePath("/inventario/desechos");
+  return { ok: "Desecho anulado." };
 }

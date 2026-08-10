@@ -728,6 +728,130 @@ export async function obtenerCierre(id: string): Promise<CierreDetalle | null> {
   };
 }
 
+// === Desechos de producto terminado ========================================
+export type DesechoEstado = "borrador" | "confirmado" | "anulado";
+export type DesechoMotivo = "danado" | "vencido" | "otro";
+
+export const motivoDesechoLabel: Record<DesechoMotivo, string> = {
+  danado: "Dañado",
+  vencido: "Vencido",
+  otro: "Otro",
+};
+
+export interface DesechoListado {
+  id: string;
+  fecha: string;
+  centro_codigo: string | null;
+  centro_nombre: string | null;
+  motivo: DesechoMotivo;
+  valor_total: number;
+  estado: DesechoEstado;
+}
+
+export async function listarDesechos(): Promise<DesechoListado[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("desechos_pt")
+    .select("id, fecha, motivo, valor_total, estado, centro:centros_costo(codigo, nombre)")
+    .order("fecha", { ascending: false })
+    .order("creado_en", { ascending: false });
+  if (error) throw new Error(`No se pudieron cargar los desechos: ${error.message}`);
+  return ((data ?? []) as unknown as {
+    id: string;
+    fecha: string;
+    motivo: DesechoMotivo;
+    valor_total: number;
+    estado: DesechoEstado;
+    centro: { codigo: string; nombre: string } | null;
+  }[]).map((d) => ({
+    id: d.id,
+    fecha: d.fecha,
+    centro_codigo: d.centro?.codigo ?? null,
+    centro_nombre: d.centro?.nombre ?? null,
+    motivo: d.motivo,
+    valor_total: Number(d.valor_total),
+    estado: d.estado,
+  }));
+}
+
+export interface DesechoLineaDetalle {
+  linea: number;
+  descripcion: string;
+  cantidad: number;
+  costo_unitario: number;
+  valor: number;
+}
+
+export interface DesechoDetalle {
+  id: string;
+  fecha: string;
+  centro_codigo: string | null;
+  centro_nombre: string | null;
+  motivo: DesechoMotivo;
+  glosa: string | null;
+  estado: DesechoEstado;
+  valor_total: number;
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  lineas: DesechoLineaDetalle[];
+}
+
+export async function obtenerDesecho(id: string): Promise<DesechoDetalle | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("desechos_pt")
+    .select(
+      "id, fecha, motivo, glosa, estado, valor_total, asiento_id, " +
+        "centro:centros_costo(codigo, nombre), asiento:asientos(numero), " +
+        "lineas:desechos_pt_lineas(linea, descripcion, cantidad, costo_unitario, valor)",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar el desecho: ${error.message}`);
+  }
+  const d = data as unknown as {
+    id: string;
+    fecha: string;
+    motivo: DesechoMotivo;
+    glosa: string | null;
+    estado: DesechoEstado;
+    valor_total: number;
+    asiento_id: string | null;
+    centro: { codigo: string; nombre: string } | null;
+    asiento: { numero: number | null } | null;
+    lineas: {
+      linea: number;
+      descripcion: string;
+      cantidad: number;
+      costo_unitario: number;
+      valor: number;
+    }[];
+  };
+  return {
+    id: d.id,
+    fecha: d.fecha,
+    centro_codigo: d.centro?.codigo ?? null,
+    centro_nombre: d.centro?.nombre ?? null,
+    motivo: d.motivo,
+    glosa: d.glosa,
+    estado: d.estado,
+    valor_total: Number(d.valor_total),
+    asiento_id: d.asiento_id,
+    asiento_numero: d.asiento?.numero ?? null,
+    lineas: (d.lineas ?? [])
+      .sort((a, b) => a.linea - b.linea)
+      .map((l) => ({
+        linea: l.linea,
+        descripcion: l.descripcion,
+        cantidad: Number(l.cantidad),
+        costo_unitario: Number(l.costo_unitario),
+        valor: Number(l.valor),
+      })),
+  };
+}
+
 export interface TransitoFila {
   transferencia_id: string;
   fecha: string;

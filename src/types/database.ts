@@ -538,6 +538,36 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      desechos_pt: {
+        Row: {
+          id: string;
+          fecha: string;
+          centro_costo_id: string;
+          motivo: "danado" | "vencido" | "otro";
+          glosa: string | null;
+          estado: "borrador" | "confirmado" | "anulado";
+          valor_total: number;
+          asiento_id: string | null;
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      desechos_pt_lineas: {
+        Row: {
+          id: string;
+          desecho_id: string;
+          linea: number;
+          descripcion: string;
+          cantidad: number;
+          costo_unitario: number;
+          valor: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       transferencias: {
         Row: {
           id: string;
@@ -1054,6 +1084,18 @@ export interface Database {
       };
       fn_confirmar_cierre: { Args: { p_cierre: string }; Returns: string };
       fn_anular_cierre: { Args: { p_cierre: string; p_motivo: string }; Returns: undefined };
+      fn_crear_desecho: {
+        Args: {
+          p_centro: string;
+          p_fecha: string;
+          p_motivo: string;
+          p_glosa: string | null;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
+      fn_confirmar_desecho: { Args: { p_desecho: string }; Returns: string };
+      fn_anular_desecho: { Args: { p_desecho: string; p_motivo: string }; Returns: undefined };
       fn_crear_transferencia: {
         Args: { p_origen: string; p_destino: string; p_glosa: string | null; p_lineas: unknown };
         Returns: string;

@@ -82,3 +82,20 @@ export const crearCierreSchema = z.object({
 });
 
 export type CrearCierreInput = z.infer<typeof crearCierreSchema>;
+
+// === Desechos de producto terminado ========================================
+export const desechoLineaSchema = z.object({
+  descripcion: z.string().trim().min(1, "Poné el producto.").max(200),
+  cantidad: z.number().positive("La cantidad debe ser mayor que cero."),
+  costo_unitario: z.number().min(0, "El costo no puede ser negativo."),
+});
+
+export const crearDesechoSchema = z.object({
+  centro_costo_id: z.string().uuid("Elegí el negocio (Chepito 1 o 2)."),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
+  motivo: z.enum(["danado", "vencido", "otro"]),
+  glosa: z.string().trim().max(300).nullable().optional(),
+  lineas: z.array(desechoLineaSchema).min(1, "Agregá al menos un producto."),
+});
+
+export type CrearDesechoInput = z.infer<typeof crearDesechoSchema>;
