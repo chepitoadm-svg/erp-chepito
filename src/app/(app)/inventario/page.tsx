@@ -51,6 +51,12 @@ const SECCIONES = [
     permiso: "inventario.ver",
   },
   {
+    href: "/inventario/consumo-mp",
+    titulo: "Consumo de materia prima",
+    desc: "Materia prima consumida por la producción (leído de la app de producción).",
+    permiso: "inventario.ver",
+  },
+  {
     href: "/inventario/libro",
     titulo: "Libro de Inventarios",
     desc: "Detalle valuado por ítem a una fecha (libro legal).",
