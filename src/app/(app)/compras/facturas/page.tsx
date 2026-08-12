@@ -51,7 +51,7 @@ export default async function FacturasPage() {
             <tr>
               <th className="px-4 py-3 font-medium">Emisión</th>
               <th className="px-4 py-3 font-medium">Proveedor</th>
-              <th className="px-4 py-3 font-medium">Clave</th>
+              <th className="px-4 py-3 font-medium">Factura</th>
               <th className="px-4 py-3 text-right font-medium">Líneas</th>
               <th className="px-4 py-3 text-right font-medium">Total</th>
               <th className="px-4 py-3 font-medium">Estado</th>
