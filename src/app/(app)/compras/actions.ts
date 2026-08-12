@@ -391,16 +391,6 @@ export async function subirComprobante(
 
   const supabase = await createClient();
 
-  // Idempotencia: no reingresar la misma clave.
-  if (comp.clave) {
-    const { data: ya } = await supabase
-      .from("comprobantes_ingesta")
-      .select("id")
-      .eq("clave", comp.clave)
-      .maybeSingle();
-    if (ya) redirect(`/compras/ingestor/${ya.id}`);
-  }
-
   // Receptor debe ser nuestra empresa.
   const { data: empresa } = await supabase.from("empresa").select("cedula_juridica").limit(1).single();
   const nuestraCedula = empresa?.cedula_juridica ?? null;
@@ -473,32 +463,54 @@ export async function subirComprobante(
           .slice(0, 10)
       : comp.fecha_emision;
 
+  const payload = {
+    clave: comp.clave || null,
+    tipo_documento: comp.tipo,
+    estado,
+    emisor_cedula: comp.emisor_cedula,
+    emisor_nombre: comp.emisor_nombre,
+    receptor_cedula: comp.receptor_cedula,
+    consecutivo: comp.consecutivo,
+    fecha_emision: comp.fecha_emision || null,
+    condicion_venta: comp.condicion_venta,
+    plazo_credito: comp.plazo_credito,
+    fecha_vencimiento: venc || null,
+    moneda: comp.moneda,
+    tipo_cambio: comp.tipo_cambio,
+    subtotal: comp.subtotal,
+    iva_total: comp.iva_total,
+    total: comp.total,
+    estado_hacienda: resp?.estado ?? null,
+    proveedor_id: proveedorId,
+    error_detalle: errorDetalle,
+    lineas,
+    xml_comprobante: xmlComp,
+    xml_respuesta: xmlResp,
+  };
+
+  // ¿Ya existe la misma clave? Si ya se volvió factura (procesado), es intocable.
+  // Si no (validado / requiere_mapeo / error / descartado), re-subir lo REPROCESA
+  // con el parser actual (así se recupera de un descarte y toma correcciones).
+  if (comp.clave) {
+    const { data: ya } = await supabase
+      .from("comprobantes_ingesta")
+      .select("id, estado")
+      .eq("clave", comp.clave)
+      .maybeSingle();
+    if (ya) {
+      if (ya.estado === "procesado") {
+        return { error: "Ese comprobante ya generó una factura. Anulá esa factura si querés rehacerlo." };
+      }
+      const { error: eUp } = await supabase.from("comprobantes_ingesta").update(payload).eq("id", ya.id);
+      if (eUp) return { error: limpiar(eUp.message) };
+      revalidatePath("/compras/ingestor");
+      redirect(`/compras/ingestor/${ya.id}`);
+    }
+  }
+
   const { data: ins, error } = await supabase
     .from("comprobantes_ingesta")
-    .insert({
-      clave: comp.clave || null,
-      tipo_documento: comp.tipo,
-      estado,
-      emisor_cedula: comp.emisor_cedula,
-      emisor_nombre: comp.emisor_nombre,
-      receptor_cedula: comp.receptor_cedula,
-      consecutivo: comp.consecutivo,
-      fecha_emision: comp.fecha_emision || null,
-      condicion_venta: comp.condicion_venta,
-      plazo_credito: comp.plazo_credito,
-      fecha_vencimiento: venc || null,
-      moneda: comp.moneda,
-      tipo_cambio: comp.tipo_cambio,
-      subtotal: comp.subtotal,
-      iva_total: comp.iva_total,
-      total: comp.total,
-      estado_hacienda: resp?.estado ?? null,
-      proveedor_id: proveedorId,
-      error_detalle: errorDetalle,
-      lineas,
-      xml_comprobante: xmlComp,
-      xml_respuesta: xmlResp,
-    })
+    .insert(payload)
     .select("id")
     .single();
   if (error || !ins) {
