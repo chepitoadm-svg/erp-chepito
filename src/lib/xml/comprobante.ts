@@ -22,6 +22,15 @@ function num(x: unknown): number {
 function txt(x: unknown): string {
   return x === undefined || x === null ? "" : String(x);
 }
+// Una línea puede traer VARIOS <CodigoComercial> (ej. Tipo 01 = código del
+// proveedor, Tipo 03 = código de barras). Tomamos el del proveedor (Tipo 01);
+// si no está, el primero que tenga código. Devuelve null si no hay ninguno.
+function pickCodigoComercial(cc: unknown): string | null {
+  const arr = asArray(cc as Record<string, unknown> | Record<string, unknown>[] | null | undefined);
+  const conCodigo = arr.filter((x) => x?.Codigo != null && txt(x.Codigo).trim() !== "");
+  const elegido = conCodigo.find((x) => txt(x.Tipo) === "01") ?? conCodigo[0];
+  return elegido ? txt(elegido.Codigo).trim() : null;
+}
 
 export type TipoComprobante =
   | "FacturaElectronica"
@@ -155,7 +164,7 @@ export function parseComprobante(xml: string): Comprobante {
     const l = b.l;
     return {
       numero: num(l.NumeroLinea),
-      codigo_comercial: l.CodigoComercial?.Codigo ? txt(l.CodigoComercial.Codigo) : null,
+      codigo_comercial: pickCodigoComercial(l.CodigoComercial),
       cabys: l.CodigoCABYS ? txt(l.CodigoCABYS) : null,
       detalle: txt(l.Detalle),
       cantidad: num(l.Cantidad),
