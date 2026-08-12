@@ -4,8 +4,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
-// Rutas públicas (no requieren sesión).
-const RUTAS_PUBLICAS = ["/login", "/auth"];
+// Rutas públicas (no requieren sesión). `/api/ingesta` valida su propio token
+// (lo usa el jalador de correo, que no tiene sesión de usuario).
+const RUTAS_PUBLICAS = ["/login", "/auth", "/api/ingesta"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
