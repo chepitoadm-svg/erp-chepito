@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { crearPago, type FormState } from "@/app/(app)/compras/actions";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 interface CxP {
   id: string;
@@ -124,7 +125,7 @@ export default function PagoForm({ proveedorId, proveedorNombre, cxp, cuentas }:
                     />
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-600">
-                    {q.factura_clave ?? "—"}
+                    {numeroFactura(q.factura_clave) ?? "—"}
                   </td>
                   <td className="px-3 py-2 text-neutral-600">{q.fecha_vencimiento ?? "—"}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-neutral-700">

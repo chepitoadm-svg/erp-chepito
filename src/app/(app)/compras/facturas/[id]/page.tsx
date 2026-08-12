@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerFactura, listarPagosDeFactura, medioLabel } from "@/lib/data/compras";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 import { confirmarFactura } from "../../actions";
 import AnularFactura from "@/components/AnularFactura";
 
@@ -52,7 +53,7 @@ export default async function FacturaDetallePage({
           </p>
           <p className="text-xs text-neutral-400">
             Céd. {f.proveedor_cedula}
-            {f.clave ? ` · clave ${f.clave}` : ""}
+            {f.clave ? ` · factura ${numeroFactura(f.clave)}` : ""}
             {f.tipo === "gasto"
               ? " · gasto"
               : f.bodega_codigo

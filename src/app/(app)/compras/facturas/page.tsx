@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFacturas } from "@/lib/data/compras";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -70,7 +71,7 @@ export default async function FacturasPage() {
                 <td className="px-4 py-3 text-neutral-600">{f.fecha_emision}</td>
                 <td className="px-4 py-3 text-neutral-900">{f.proveedor_nombre}</td>
                 <td className="px-4 py-3 font-mono text-xs text-neutral-500">
-                  {f.clave ?? "—"}
+                  {numeroFactura(f.clave) ?? "—"}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{f.n_lineas}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-900">{fmt(f.total)}</td>

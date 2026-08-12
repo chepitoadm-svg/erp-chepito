@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerDevolucion } from "@/lib/data/compras";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 import { confirmarDevolucion } from "../../actions";
 import AnularDevolucion from "@/components/AnularDevolucion";
 
@@ -40,7 +41,7 @@ export default async function DevolucionDetallePage({
             <p className="text-xs text-neutral-400">
               De la factura{" "}
               <Link href={`/compras/facturas/${d.factura_id}`} className="underline">
-                {d.factura_clave ?? "ver"}
+                {numeroFactura(d.factura_clave) ?? "ver"}
               </Link>
             </p>
           )}

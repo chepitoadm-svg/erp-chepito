@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFacturasConfirmadas, obtenerFactura } from "@/lib/data/compras";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 import { listarBodegas } from "@/lib/data/inventario";
 import DevolucionForm from "@/components/DevolucionForm";
 
@@ -47,7 +48,7 @@ export default async function NuevaDevolucionPage({
                   <tr key={f.id}>
                     <td className="px-4 py-3 text-neutral-600">{f.fecha_emision}</td>
                     <td className="px-4 py-3 text-neutral-900">{f.proveedor_nombre}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-neutral-500">{f.clave ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-neutral-500">{numeroFactura(f.clave) ?? "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-700">
                       {fmt(f.total)}
                     </td>
@@ -102,7 +103,7 @@ export default async function NuevaDevolucionPage({
         Devolución — {f.proveedor_nombre}
       </h1>
       <p className="mb-4 text-sm text-neutral-500">
-        Factura {f.clave ?? "(sin clave)"} · {f.fecha_emision}
+        Factura {numeroFactura(f.clave) ?? "(sin número)"} · {f.fecha_emision}
       </p>
       <DevolucionForm
         facturaId={f.id}

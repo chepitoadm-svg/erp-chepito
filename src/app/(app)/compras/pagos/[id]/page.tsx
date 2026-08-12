@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerPago, medioLabel } from "@/lib/data/compras";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 import { confirmarPago } from "../../actions";
 import AnularPago from "@/components/AnularPago";
 
@@ -71,10 +72,10 @@ export default async function PagoDetallePage({
                       href={`/compras/facturas/${l.factura_id}`}
                       className="font-mono text-xs text-neutral-600 underline hover:text-neutral-900"
                     >
-                      {l.factura_clave ?? "ver factura"}
+                      {numeroFactura(l.factura_clave) ?? "ver factura"}
                     </Link>
                   ) : (
-                    <span className="font-mono text-xs text-neutral-500">{l.factura_clave ?? "—"}</span>
+                    <span className="font-mono text-xs text-neutral-500">{numeroFactura(l.factura_clave) ?? "—"}</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-700">{fmt(l.monto)}</td>

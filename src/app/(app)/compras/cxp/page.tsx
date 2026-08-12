@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarCxP } from "@/lib/data/compras";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -86,7 +87,7 @@ export default async function CxPPage() {
                         href={`/compras/facturas/${q.factura_id}`}
                         className="font-mono text-xs text-neutral-600 underline hover:text-neutral-900"
                       >
-                        {q.factura_clave ?? "ver"}
+                        {numeroFactura(q.factura_clave) ?? "ver"}
                       </Link>
                     ) : (
                       <span className="font-mono text-xs text-neutral-400">—</span>
