@@ -768,6 +768,36 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      correo_fuentes: {
+        Row: {
+          id: string;
+          remitente: string;
+          etiqueta: string;
+          proveedor_id: string | null;
+          activo: boolean;
+          desde: string;
+          ultimo_jalado: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          remitente: string;
+          etiqueta: string;
+          proveedor_id?: string | null;
+          activo?: boolean;
+          desde?: string;
+        };
+        Update: {
+          remitente?: string;
+          etiqueta?: string;
+          activo?: boolean;
+          desde?: string;
+          ultimo_jalado?: string | null;
+        };
+        Relationships: [];
+      };
       comprobantes_ingesta: {
         Row: {
           id: string;

@@ -62,6 +62,17 @@ export default async function ComprasPage() {
         )}
         {puedeFacturar && (
           <Link
+            href="/compras/correo"
+            className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          >
+            <div className="font-medium text-neutral-900">Jalar del correo</div>
+            <div className="mt-1 text-sm text-neutral-500">
+              Elegí los remitentes y desde qué fecha; el sistema baja los XML solo.
+            </div>
+          </Link>
+        )}
+        {puedeFacturar && (
+          <Link
             href="/compras/devoluciones"
             className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
           >
