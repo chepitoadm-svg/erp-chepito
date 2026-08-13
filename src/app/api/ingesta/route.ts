@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  let body: { xmls?: string[]; comprobante?: string; respuesta?: string };
+  let body: { xmls?: string[]; comprobante?: string; respuesta?: string; remitente?: string };
   try {
     body = await req.json();
   } catch {
@@ -37,12 +37,24 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminClient();
+
+  // Si el correo viene de un remitente con emisor fijado, solo se acepta ese emisor.
+  let cedulaPermitida: string | null = null;
+  if (body.remitente) {
+    const { data: fuente } = await supabase
+      .from("correo_fuentes")
+      .select("cedula_emisor")
+      .eq("remitente", body.remitente.toLowerCase())
+      .maybeSingle();
+    cedulaPermitida = fuente?.cedula_emisor ?? null;
+  }
+
   const resultados = [];
   for (const comp of comprobantes) {
     const clave = claveDe(comp);
     const resp =
       respuestas.find((r) => claveDe(r) === clave) ?? (respuestas.length === 1 ? respuestas[0] : null);
-    const res = await ingestarComprobante(supabase, comp, resp ?? null);
+    const res = await ingestarComprobante(supabase, comp, resp ?? null, cedulaPermitida);
     resultados.push(res.ok ? { ok: true, id: res.id, estado: res.estado } : { ok: false, error: res.error, code: res.code });
   }
 

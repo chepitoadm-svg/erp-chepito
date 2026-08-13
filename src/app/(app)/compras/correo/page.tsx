@@ -4,7 +4,7 @@ import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFuentesCorreo } from "@/lib/data/correo";
 import NuevaFuenteCorreo from "@/components/NuevaFuenteCorreo";
 import JalarAhora from "@/components/JalarAhora";
-import { toggleFuenteCorreo, editarDesdeFuente } from "./actions";
+import { toggleFuenteCorreo, editarDesdeFuente, editarCedulaFuente } from "./actions";
 
 export default async function CorreoPage() {
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras");
@@ -41,6 +41,7 @@ export default async function CorreoPage() {
               <th className="px-4 py-3 font-medium">Proveedor</th>
               <th className="px-4 py-3 font-medium">Remitente</th>
               <th className="px-4 py-3 font-medium">Desde</th>
+              <th className="px-4 py-3 font-medium">Solo cédula</th>
               <th className="px-4 py-3 font-medium">Último jalado</th>
               <th className="px-4 py-3 font-medium">Estado</th>
             </tr>
@@ -48,7 +49,7 @@ export default async function CorreoPage() {
           <tbody className="divide-y divide-neutral-100">
             {fuentes.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
                   Todavía no hay remitentes. Agregá uno arriba.
                 </td>
               </tr>
@@ -71,6 +72,23 @@ export default async function CorreoPage() {
                       className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
                     >
                       Guardar
+                    </button>
+                  </form>
+                </td>
+                <td className="px-4 py-3">
+                  <form action={editarCedulaFuente} className="flex items-center gap-1">
+                    <input type="hidden" name="id" value={f.id} />
+                    <input
+                      name="cedula_emisor"
+                      defaultValue={f.cedula_emisor ?? ""}
+                      placeholder="cualquiera"
+                      className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
+                    >
+                      OK
                     </button>
                   </form>
                 </td>

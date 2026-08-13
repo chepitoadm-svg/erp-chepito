@@ -23,6 +23,10 @@ export default function NuevaFuenteCorreo({ hoy }: { hoy: string }) {
         <span className="text-xs uppercase tracking-wide text-neutral-500">Desde</span>
         <input type="date" name="desde" required defaultValue={hoy} className={inputCls + " mt-1"} />
       </label>
+      <label className="block">
+        <span className="text-xs uppercase tracking-wide text-neutral-500">Solo cédula (opcional)</span>
+        <input name="cedula_emisor" placeholder="si es compartido" className={inputCls + " mt-1 w-40"} />
+      </label>
       <button
         type="submit"
         disabled={pending}

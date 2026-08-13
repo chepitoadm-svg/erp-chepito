@@ -11,18 +11,23 @@ type Sb = SupabaseClient<Database>;
 
 export type IngestaResultado =
   | { ok: true; id: string; estado: string; nuevo: boolean }
-  | { ok: false; error: string; code?: "parse" | "procesado" };
+  | { ok: false; error: string; code?: "parse" | "procesado" | "emisor_no_permitido" };
 
 export async function ingestarComprobante(
   supabase: Sb,
   xmlComp: string,
   xmlResp: string | null,
+  // Si se pasa, solo se acepta ese emisor (para remitentes de correo compartidos).
+  cedulaPermitida?: string | null,
 ): Promise<IngestaResultado> {
   let comp;
   try {
     comp = parseComprobante(xmlComp);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "No se pudo leer el XML del comprobante.", code: "parse" };
+  }
+  if (cedulaPermitida && comp.emisor_cedula && comp.emisor_cedula !== cedulaPermitida) {
+    return { ok: false, error: `Emisor ${comp.emisor_cedula} no permitido para este remitente.`, code: "emisor_no_permitido" };
   }
   let resp = null;
   if (xmlResp) {

@@ -102,7 +102,7 @@ async function main() {
         const pRes = await fetch(`${ERP}/api/ingesta`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ xmls }),
+          body: JSON.stringify({ xmls, remitente: f.remitente }),
         });
         if (pRes.ok) {
           ok++;

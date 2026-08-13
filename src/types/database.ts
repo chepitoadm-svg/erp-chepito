@@ -776,6 +776,7 @@ export interface Database {
           proveedor_id: string | null;
           activo: boolean;
           desde: string;
+          cedula_emisor: string | null;
           ultimo_jalado: string | null;
           creado_en: string;
           creado_por: string | null;
@@ -788,12 +789,14 @@ export interface Database {
           proveedor_id?: string | null;
           activo?: boolean;
           desde?: string;
+          cedula_emisor?: string | null;
         };
         Update: {
           remitente?: string;
           etiqueta?: string;
           activo?: boolean;
           desde?: string;
+          cedula_emisor?: string | null;
           ultimo_jalado?: string | null;
         };
         Relationships: [];

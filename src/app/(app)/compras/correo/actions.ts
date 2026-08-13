@@ -23,11 +23,13 @@ export async function crearFuenteCorreo(_prev: FormState, formData: FormData): P
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  const cedula = String(formData.get("cedula_emisor") ?? "").replace(/\D/g, "") || null;
   const supabase = await createClient();
   const { error } = await supabase.from("correo_fuentes").insert({
     remitente: parsed.data.remitente,
     etiqueta: parsed.data.etiqueta,
     desde: parsed.data.desde,
+    cedula_emisor: cedula,
   });
   if (error) {
     return {
@@ -88,5 +90,15 @@ export async function editarDesdeFuente(formData: FormData): Promise<void> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) return;
   const supabase = await createClient();
   await supabase.from("correo_fuentes").update({ desde }).eq("id", id);
+  revalidatePath("/compras/correo");
+}
+
+// Fija (o limpia) la cédula del emisor permitido para un remitente compartido.
+export async function editarCedulaFuente(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const cedula = String(formData.get("cedula_emisor") ?? "").replace(/\D/g, "") || null;
+  const supabase = await createClient();
+  await supabase.from("correo_fuentes").update({ cedula_emisor: cedula }).eq("id", id);
   revalidatePath("/compras/correo");
 }
