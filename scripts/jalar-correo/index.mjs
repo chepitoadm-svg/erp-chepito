@@ -75,8 +75,11 @@ async function main() {
         console.log(`  ${f.etiqueta}: sin correos nuevos.`);
         continue;
       }
+      console.log(`  ${f.etiqueta}: ${uids.length} correos encontrados.`);
       let ok = 0;
-      for await (const msg of client.fetch(uids, { uid: true, flags: true, source: true })) {
+      // OJO: al buscar por UID, hay que pasar { uid: true } como TERCER argumento
+      // de fetch, si no imapflow trata los números como secuencia (trae otros correos).
+      for await (const msg of client.fetch(uids, { uid: true, flags: true, source: true }, { uid: true })) {
         if (msg.flags && msg.flags.has(LABEL)) continue; // ya procesado
         let xmls = [];
         try {
