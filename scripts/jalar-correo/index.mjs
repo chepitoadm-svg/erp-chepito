@@ -58,7 +58,10 @@ async function main() {
     secure: true,
     auth: { user: USER, pass: PASS },
     logger: false,
+    socketTimeout: 120000, // 2 min; evita cortes en descargas
   });
+  // Evita que un error de socket tumbe el proceso (unhandled 'error').
+  client.on("error", (e) => console.warn("IMAP aviso:", e?.message || e));
   await client.connect();
   const lock = await client.getMailboxLock("INBOX");
   let totalOk = 0;
@@ -76,14 +79,20 @@ async function main() {
         continue;
       }
       console.log(`  ${f.etiqueta}: ${uids.length} correos encontrados.`);
-      let ok = 0;
+      // 1) DESCARGAR rápido (sin HTTP en medio, para no colgar el socket IMAP).
       // OJO: al buscar por UID, hay que pasar { uid: true } como TERCER argumento
       // de fetch, si no imapflow trata los números como secuencia (trae otros correos).
+      const pendientes = [];
       for await (const msg of client.fetch(uids, { uid: true, flags: true, source: true }, { uid: true })) {
         if (msg.flags && msg.flags.has(LABEL)) continue; // ya procesado
+        pendientes.push({ uid: msg.uid, source: msg.source });
+      }
+      // 2) PROCESAR (parse + subir al ERP) con la descarga ya terminada.
+      let ok = 0;
+      for (const m of pendientes) {
         let xmls = [];
         try {
-          const parsed = await simpleParser(msg.source);
+          const parsed = await simpleParser(m.source);
           xmls = xmlsDeAdjuntos(parsed.attachments);
         } catch (e) {
           console.warn("  no pude parsear el correo:", e.message);
@@ -99,7 +108,7 @@ async function main() {
           ok++;
           totalOk++;
           try {
-            await client.messageFlagsAdd(msg.uid, [LABEL], { uid: true });
+            await client.messageFlagsAdd(m.uid, [LABEL], { uid: true });
           } catch {
             /* si Gmail no acepta el keyword, igual el ERP deduplica por clave */
           }
