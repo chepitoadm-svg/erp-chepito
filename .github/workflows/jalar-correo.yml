@@ -1,0 +1,34 @@
+name: Jalar facturas del correo
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # cada 15 minutos
+  workflow_dispatch: {} # también se puede correr a mano desde la pestaña Actions
+
+# Evita que dos corridas se pisen.
+concurrency:
+  group: jalar-correo
+  cancel-in-progress: false
+
+jobs:
+  jalar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependencias
+        working-directory: scripts/jalar-correo
+        run: npm install --no-audit --no-fund
+
+      - name: Jalar del correo
+        working-directory: scripts/jalar-correo
+        env:
+          ERP_URL: https://erp-chepito.netlify.app
+          GMAIL_USER: chepitoadm@gmail.com
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          INGESTA_TOKEN: ${{ secrets.INGESTA_TOKEN }}
+        run: node index.mjs

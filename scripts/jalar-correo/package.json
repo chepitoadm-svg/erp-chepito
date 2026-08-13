@@ -1,0 +1,11 @@
+{
+  "name": "jalar-correo",
+  "private": true,
+  "type": "module",
+  "description": "Jalador de XML de facturas desde el correo hacia el ERP (GitHub Actions + IMAP).",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "imapflow": "^1.0.191",
+    "mailparser": "^3.7.2"
+  }
+}
