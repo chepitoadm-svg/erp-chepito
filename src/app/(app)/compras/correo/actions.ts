@@ -49,6 +49,38 @@ export async function toggleFuenteCorreo(formData: FormData): Promise<void> {
   revalidatePath("/compras/correo");
 }
 
+// Dispara el workflow "Jalar facturas del correo" en GitHub Actions, para jalar
+// on-demand sin esperar los 15 min. Necesita GITHUB_DISPATCH_TOKEN (PAT con
+// permiso Actions: read/write sobre el repo) en las env vars del ERP.
+export async function lanzarJalado(_prev: FormState, _formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  if (!token) {
+    return { error: "Falta configurar GITHUB_DISPATCH_TOKEN en el servidor (Netlify)." };
+  }
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/chepitoadm-svg/erp-chepito/actions/workflows/jalar-correo.yml/dispatches",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      },
+    );
+    if (res.status === 204) {
+      return { ok: "Lanzado. En ~1 minuto las facturas nuevas aparecen en el ingestor." };
+    }
+    const txt = await res.text();
+    return { error: `GitHub respondió ${res.status}. ${limpiar(txt).slice(0, 160)}` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo lanzar el jalado." };
+  }
+}
+
 export async function editarDesdeFuente(formData: FormData): Promise<void> {
   await requerirPermiso("compras.facturar");
   const id = String(formData.get("id") ?? "");

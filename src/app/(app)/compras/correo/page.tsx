@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFuentesCorreo } from "@/lib/data/correo";
 import NuevaFuenteCorreo from "@/components/NuevaFuenteCorreo";
+import JalarAhora from "@/components/JalarAhora";
 import { toggleFuenteCorreo, editarDesdeFuente } from "./actions";
 
 export default async function CorreoPage() {
@@ -21,6 +22,13 @@ export default async function CorreoPage() {
         Cada factura entra en <strong>borrador</strong> para que la revisés y confirmés. Prendé o
         apagá cada remitente cuando quieras.
       </p>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+        <p className="text-sm text-neutral-600">
+          El sistema revisa el correo <strong>solo cada 15 minutos</strong>. Si querés traerlas ya:
+        </p>
+        <JalarAhora />
+      </div>
 
       <div className="mb-5">
         <NuevaFuenteCorreo hoy={hoy} />
