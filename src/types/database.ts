@@ -568,6 +568,24 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      ventas_dia: {
+        Row: {
+          id: string;
+          fecha: string;
+          centro_costo_id: string;
+          gravado: number;
+          exento: number;
+          iva: number;
+          total: number;
+          estado: "borrador" | "confirmado" | "anulado";
+          asiento_id: string | null;
+          glosa: string | null;
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       transferencias: {
         Row: {
           id: string;
@@ -1129,6 +1147,19 @@ export interface Database {
       };
       fn_confirmar_desecho: { Args: { p_desecho: string }; Returns: string };
       fn_anular_desecho: { Args: { p_desecho: string; p_motivo: string }; Returns: undefined };
+      fn_crear_venta_dia: {
+        Args: {
+          p_centro: string;
+          p_fecha: string;
+          p_gravado: number;
+          p_exento: number;
+          p_iva: number;
+          p_glosa: string | null;
+        };
+        Returns: string;
+      };
+      fn_confirmar_venta_dia: { Args: { p_venta: string }; Returns: string };
+      fn_anular_venta_dia: { Args: { p_venta: string; p_motivo: string }; Returns: undefined };
       fn_crear_transferencia: {
         Args: { p_origen: string; p_destino: string; p_glosa: string | null; p_lineas: unknown };
         Returns: string;
