@@ -26,12 +26,20 @@ export default async function VentasPage() {
             costo.
           </p>
         </div>
-        <Link
-          href="/ventas/nueva"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          + Nueva venta
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/ventas/importar"
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+          >
+            Importar de QuPOS
+          </Link>
+          <Link
+            href="/ventas/nueva"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            + Nueva venta
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
