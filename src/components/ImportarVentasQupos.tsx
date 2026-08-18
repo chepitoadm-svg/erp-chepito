@@ -1,9 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import {
   analizarQupos,
   registrarVentaImportada,
+  registrarTodasImportadas,
   type AnalisisQuposState,
   type FormState,
 } from "@/app/(app)/ventas/actions";
@@ -59,8 +61,11 @@ function FilaDia({ dia, centro }: { dia: DiaVentaQupos; centro: Centro }) {
   );
 }
 
+const inicialBatch: FormState = {};
+
 export default function ImportarVentasQupos({ centros }: { centros: Centro[] }) {
   const [analisis, analizarAction, analizando] = useActionState(analizarQupos, inicialAnalisis);
+  const [batch, batchAction, registrandoTodo] = useActionState(registrarTodasImportadas, inicialBatch);
   const [centroSel, setCentroSel] = useState("");
 
   const centro = centros.find((c) => c.id === (analisis.centro_costo_id ?? centroSel));
@@ -115,12 +120,53 @@ export default function ImportarVentasQupos({ centros }: { centros: Centro[] }) 
 
       {analisis.dias && centro && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-neutral-900">
               {centro.codigo} — {centro.nombre}: {analisis.dias.length}{" "}
               {analisis.dias.length === 1 ? "día" : "días"} de venta
             </h2>
+            {analisis.dias.length > 1 && (
+              <form action={batchAction}>
+                <input type="hidden" name="centro_costo_id" value={centro.id} />
+                <input
+                  type="hidden"
+                  name="dias"
+                  value={JSON.stringify(
+                    analisis.dias.map((d) => ({
+                      fecha: d.fecha,
+                      gravado: d.gravado,
+                      exento: d.exento,
+                      iva: d.iva,
+                      tickets: d.tickets,
+                    })),
+                  )}
+                />
+                <button
+                  type="submit"
+                  disabled={registrandoTodo}
+                  className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  {registrandoTodo
+                    ? "Registrando…"
+                    : `Registrar y postear los ${analisis.dias.length} días`}
+                </button>
+              </form>
+            )}
           </div>
+
+          {batch.ok && (
+            <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              {batch.ok}{" "}
+              <Link href="/ventas" className="font-medium underline hover:no-underline">
+                Ver ventas
+              </Link>
+            </p>
+          )}
+          {batch.error && (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {batch.error}
+            </p>
+          )}
 
           <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full min-w-[720px] text-sm">
@@ -151,7 +197,9 @@ export default function ImportarVentasQupos({ centros }: { centros: Centro[] }) 
             </p>
           )}
           <p className="text-xs text-neutral-500">
-            Cada día se registra como venta en borrador. Revisá y confirmá el asiento en su detalle.
+            El botón de arriba registra y postea todos los días de una. El{" "}
+            <span className="font-medium">Registrar</span> de cada fila deja ese día en borrador
+            para revisar y confirmar su asiento aparte.
           </p>
         </div>
       )}

@@ -135,6 +135,62 @@ export async function registrarVentaImportada(
   redirect(`/ventas/${id}`);
 }
 
+// Registra Y postea de una vez todos los días del importador. Salta los que ya
+// existan (por si se corre dos veces) y no aborta el lote si uno falla.
+export async function registrarTodasImportadas(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requerirPermiso("ventas.registrar");
+  const centro = String(formData.get("centro_costo_id") ?? "");
+  if (!centro) return { error: "Falta el negocio." };
+  let dias: { fecha: string; gravado: number; exento: number; iva: number; tickets: number }[];
+  try {
+    dias = JSON.parse(String(formData.get("dias") ?? "[]"));
+  } catch {
+    return { error: "No se pudo leer el detalle." };
+  }
+  if (!Array.isArray(dias) || dias.length === 0) return { error: "No hay días para registrar." };
+
+  const supabase = await createClient();
+  let posteadas = 0;
+  let duplicadas = 0;
+  let fallidas = 0;
+  let primerError = "";
+
+  for (const d of dias) {
+    const { data: id, error } = await supabase.rpc("fn_crear_venta_dia", {
+      p_centro: centro,
+      p_fecha: d.fecha,
+      p_gravado: d.gravado,
+      p_exento: d.exento,
+      p_iva: d.iva,
+      p_glosa: `QuPOS ${d.fecha} · ${d.tickets} tickets`,
+    });
+    if (error || !id) {
+      if ((error?.message ?? "").includes("ventas_dia_unica")) duplicadas++;
+      else {
+        fallidas++;
+        if (!primerError) primerError = limpiar(error?.message ?? "");
+      }
+      continue;
+    }
+    const { error: eConf } = await supabase.rpc("fn_confirmar_venta_dia", { p_venta: id });
+    if (eConf) {
+      fallidas++;
+      if (!primerError) primerError = limpiar(eConf.message);
+    } else {
+      posteadas++;
+    }
+  }
+
+  revalidatePath("/ventas");
+  const partes = [`${posteadas} ${posteadas === 1 ? "día registrado y posteado" : "días registrados y posteados"}`];
+  if (duplicadas > 0) partes.push(`${duplicadas} ya ${duplicadas === 1 ? "existía" : "existían"}`);
+  if (fallidas > 0) partes.push(`${fallidas} con error${primerError ? ` (${primerError})` : ""}`);
+  return { ok: partes.join(" · ") };
+}
+
 export async function confirmarVentaDia(formData: FormData): Promise<void> {
   await requerirPermiso("ventas.registrar");
   const id = String(formData.get("id") ?? "");
