@@ -568,6 +568,31 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      costo_produccion_mes: {
+        Row: {
+          id: string;
+          periodo: string;
+          estado: "borrador" | "confirmado" | "anulado";
+          total: number;
+          asiento_id: string | null;
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      costo_produccion_mes_lineas: {
+        Row: {
+          id: string;
+          mes_id: string;
+          centro_costo_id: string;
+          monto: number;
+          unidades_sin_receta: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       gastos: {
         Row: {
           id: string;
@@ -1193,6 +1218,9 @@ export interface Database {
       };
       fn_confirmar_gasto: { Args: { p_gasto: string }; Returns: string };
       fn_anular_gasto: { Args: { p_gasto: string; p_motivo: string }; Returns: undefined };
+      fn_crear_costo_mes: { Args: { p_periodo: string; p_lineas: unknown }; Returns: string };
+      fn_confirmar_costo_mes: { Args: { p_mes: string }; Returns: string };
+      fn_anular_costo_mes: { Args: { p_mes: string; p_motivo: string }; Returns: undefined };
       fn_crear_transferencia: {
         Args: { p_origen: string; p_destino: string; p_glosa: string | null; p_lineas: unknown };
         Returns: string;

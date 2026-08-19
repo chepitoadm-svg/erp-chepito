@@ -85,6 +85,17 @@ const UNIDADES: Record<string, { familia: string; factor: number }> = {
 const toBase = (cant: number | string, unidad: string) =>
   (parseFloat(String(cant)) || 0) * (UNIDADES[unidad] ? UNIDADES[unidad].factor : 1);
 
+// Costo en colones del consumo de insumos: base_qty (g/ml/u) × costo por unidad
+// base del insumo (costo de compra / cantidad comprada llevada a base).
+export function costoDeConsumo(res: ResultadoConsumo, insumos: Insumo[]): number {
+  const cpb: Record<string, number> = {};
+  insumos.forEach((i) => {
+    const b = toBase(i.cantCompra ?? 0, i.unidad);
+    cpb[i.id] = b > 0 ? Number(i.costo ?? 0) / b : 0;
+  });
+  return res.insumos.reduce((s, c) => s + c.base_qty * (cpb[c.insumo_id] ?? 0), 0);
+}
+
 export function familiaBase(unidad: string): "peso" | "volumen" | "conteo" {
   const f = (UNIDADES[unidad] || {}).familia;
   return f === "peso" ? "peso" : f === "volumen" ? "volumen" : "conteo";

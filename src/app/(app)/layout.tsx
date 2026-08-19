@@ -72,6 +72,12 @@ export default async function AppLayout({
                 Gastos
               </Link>
               <Link
+                href="/costos"
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Costos
+              </Link>
+              <Link
                 href="/reportes"
                 className="text-neutral-600 hover:text-neutral-900"
               >
