@@ -2,15 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarCentrosCosto } from "@/lib/data/asientos";
-import { listarCuentasGasto } from "@/lib/data/compras";
-import { listarCuentasPagoGasto } from "@/lib/data/gastos";
+import { listarCuentasSoloGasto, listarCuentasPagoGasto } from "@/lib/data/gastos";
 import GastoForm from "@/components/GastoForm";
 
 export default async function NuevoGastoPage() {
   if (!(await tienePermiso("gastos.registrar"))) redirect("/gastos");
   const [centros, cuentasGasto, cuentasPago] = await Promise.all([
     listarCentrosCosto(),
-    listarCuentasGasto(),
+    listarCuentasSoloGasto(),
     listarCuentasPagoGasto(),
   ]);
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });

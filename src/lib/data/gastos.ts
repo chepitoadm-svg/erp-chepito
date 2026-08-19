@@ -10,6 +10,20 @@ export interface CuentaOpcion {
   nombre: string;
 }
 
+/** Cuentas de GASTO (solo tipo gasto, no ingreso) para el selector de la pantalla de gastos. */
+export async function listarCuentasSoloGasto(): Promise<CuentaOpcion[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cuentas")
+    .select("id, codigo, nombre")
+    .eq("tipo", "gasto")
+    .eq("acepta_movimiento", true)
+    .eq("estado", "activo")
+    .order("codigo");
+  if (error) throw new Error(`No se pudieron cargar las cuentas de gasto: ${error.message}`);
+  return (data ?? []) as CuentaOpcion[];
+}
+
 /** Cuentas para el selector "de dónde salió / contra qué queda": caja/banco y por pagar. */
 export interface CuentasPagoGasto {
   pagado_con: CuentaOpcion[]; // caja / banco (activo)
