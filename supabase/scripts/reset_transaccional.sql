@@ -81,6 +81,13 @@ delete from ordenes_compra;
 delete from transferencias_lineas;
 delete from transferencias;
 
+-- Ventas, gastos y costo de producción (módulos nuevos; sus asientos se borran
+-- abajo, así que hay que limpiar estas tablas para no dejar huérfanos).
+delete from ventas_dia;
+delete from gastos;
+delete from costo_produccion_mes_lineas;
+delete from costo_produccion_mes;
+
 delete from asientos_adjuntos;
 delete from asientos_anulaciones;
 delete from asientos_lineas;
@@ -115,6 +122,9 @@ begin
   or (select count(*) from asientos_lineas)        <> 0
   or (select count(*) from existencias)            <> 0
   or (select count(*) from comprobantes_ingesta)   <> 0
+  or (select count(*) from ventas_dia)             <> 0
+  or (select count(*) from gastos)                 <> 0
+  or (select count(*) from costo_produccion_mes)   <> 0
   or (select count(*) from articulos_saldos
         where existencia_total <> 0 or valor_total <> 0 or costo_promedio <> 0) <> 0 then
     raise exception 'Verificación falló: quedó data transaccional. Rollback.';
