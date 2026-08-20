@@ -24,6 +24,7 @@ export default async function CostoDetallePage({
   const c = await obtenerCostoMes(id);
   if (!c) notFound();
   const hayHuecos = c.lineas.some((l) => l.sin_receta > 0);
+  const variacion = Math.round((c.total - c.consumo_teorico) * 100) / 100;
 
   return (
     <div>
@@ -51,13 +52,13 @@ export default async function CostoDetallePage({
         </p>
       )}
 
-      <div className="max-w-xl overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+      <div className="max-w-2xl overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              <th className="px-4 py-3 font-medium">Centro</th>
-              <th className="px-4 py-3 text-right font-medium">Costo</th>
-              <th className="px-4 py-3 text-right font-medium">Sin receta (u)</th>
+              <th className="px-4 py-3 font-medium">Panadería</th>
+              <th className="px-4 py-3 text-right font-medium">Consumo teórico</th>
+              <th className="px-4 py-3 text-right font-medium">Costo real (prorrateado)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -65,30 +66,46 @@ export default async function CostoDetallePage({
               <tr key={l.centro_codigo}>
                 <td className="px-4 py-3 text-neutral-800">
                   {l.centro_codigo} — {l.centro_nombre}
+                  {l.sin_receta > 0 && (
+                    <span className="ml-1 text-[10px] text-amber-600">· {fmt(l.sin_receta)} u sin receta</span>
+                  )}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-900">{fmt(l.monto)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-400">
-                  {l.sin_receta > 0 ? fmt(l.sin_receta) : "—"}
-                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-neutral-400">{fmt(l.consumo_teorico)}</td>
+                <td className="px-4 py-3 text-right tabular-nums font-medium text-neutral-900">{fmt(l.monto)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot className="border-t border-neutral-200 bg-neutral-50">
             <tr>
               <td className="px-4 py-3 font-medium text-neutral-700">Total</td>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
-                {fmt(c.total)}
-              </td>
-              <td />
+              <td className="px-4 py-3 text-right tabular-nums text-neutral-500">{fmt(c.consumo_teorico)}</td>
+              <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">{fmt(c.total)}</td>
             </tr>
           </tfoot>
         </table>
       </div>
 
+      <div
+        className={`mt-3 max-w-2xl rounded-md border px-3 py-2 text-sm ${
+          Math.abs(variacion) < 0.005
+            ? "border-neutral-200 bg-neutral-50 text-neutral-600"
+            : variacion > 0
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-blue-200 bg-blue-50 text-blue-700"
+        }`}
+      >
+        <b>Control:</b> MP comprada ₡{fmt(c.total)} vs consumo teórico ₡{fmt(c.consumo_teorico)}.{" "}
+        {variacion > 0.005
+          ? `Compraste ₡${fmt(variacion)} de más (posible desperdicio/robo/stock).`
+          : variacion < -0.005
+            ? `Compraste ₡${fmt(-variacion)} menos (se usó inventario o las recetas sobrestiman).`
+            : "Calza con lo esperado."}
+      </div>
+
       {hayHuecos && (
-        <p className="mt-3 max-w-xl rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Hay pan producido sin receta (no costeado); el costo está subestimado hasta completar esas
-          recetas en el app de producción.
+        <p className="mt-3 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Hay pan producido sin receta en el app; no cuenta en el consumo teórico, así que el reparto entre
+          panaderías puede quedar corrido. Se corrige completando esas recetas.
         </p>
       )}
 

@@ -132,6 +132,85 @@ export async function calcularCostoProduccionMes(periodo: string): Promise<Costo
   return { periodo, ini, fin, centros, total, sin_mapear: sinMapear, filas: rows.length };
 }
 
+// MP comprada del mes: suma de las líneas de factura de compra (confirmadas, de
+// inventario) cuyos artículos son materia prima, en el rango del mes.
+export async function mpCompradaMes(ini: string, fin: string): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("facturas_compra_lineas")
+    .select(
+      "base_imponible, factura:facturas_compra!inner(estado, tipo, fecha_emision), articulo:articulos!inner(tipo)",
+    )
+    .eq("factura.estado", "confirmada")
+    .eq("factura.tipo", "inventario")
+    .eq("articulo.tipo", "materia_prima")
+    .gte("factura.fecha_emision", ini)
+    .lte("factura.fecha_emision", fin);
+  if (error) throw new Error(`No se pudo sumar la MP comprada: ${error.message}`);
+  const total = ((data ?? []) as { base_imponible: number }[]).reduce((s, l) => s + Number(l.base_imponible ?? 0), 0);
+  return Math.round(total * 100) / 100;
+}
+
+export interface CierreCentro {
+  centro_id: string;
+  centro_codigo: string;
+  centro_nombre: string;
+  consumo_teorico: number; // costo por recetas (base de reparto)
+  monto: number; // MP comprada prorrateada (el costo real de la panadería)
+  sin_receta: number;
+}
+
+export interface CierreMp {
+  periodo: string;
+  ini: string;
+  fin: string;
+  centros: CierreCentro[];
+  mp_comprada: number; // total comprado (= suma de montos prorrateados)
+  consumo_teorico_total: number;
+  variacion: number; // comprado − consumido teórico (la alarma)
+  sin_mapear: { sucursal: string; monto: number }[];
+}
+
+// Cierre de MP del mes: reparte la MP comprada real a cada panadería según su
+// participación en el consumo teórico, y calcula la variación de control.
+export async function cierreMpMes(periodo: string): Promise<CierreMp> {
+  const calc = await calcularCostoProduccionMes(periodo); // centros con monto = consumo teórico
+  const mp = await mpCompradaMes(calc.ini, calc.fin);
+  const totalTeorico = calc.total;
+
+  // Prorrateo con la regla de redondeo: las primeras n−1 se redondean y la
+  // última absorbe el residuo, para que la suma cuadre exacto con lo comprado.
+  const centros: CierreCentro[] = [];
+  let acumulado = 0;
+  calc.centros.forEach((c, i) => {
+    const esUltima = i === calc.centros.length - 1;
+    const share = totalTeorico > 0 ? c.monto / totalTeorico : 0;
+    const prorrateado = esUltima
+      ? Math.round((mp - acumulado) * 100) / 100
+      : Math.round(mp * share * 100) / 100;
+    acumulado += prorrateado;
+    centros.push({
+      centro_id: c.centro_id,
+      centro_codigo: c.centro_codigo,
+      centro_nombre: c.centro_nombre,
+      consumo_teorico: c.monto,
+      monto: prorrateado,
+      sin_receta: c.sin_receta,
+    });
+  });
+
+  return {
+    periodo,
+    ini: calc.ini,
+    fin: calc.fin,
+    centros,
+    mp_comprada: mp,
+    consumo_teorico_total: totalTeorico,
+    variacion: Math.round((mp - totalTeorico) * 100) / 100,
+    sin_mapear: calc.sin_mapear,
+  };
+}
+
 // === Listado / detalle desde el ERP ==========================================
 export type CostoMesEstado = "borrador" | "confirmado" | "anulado";
 
@@ -160,11 +239,18 @@ export async function listarCostosMes(): Promise<CostoMesListado[]> {
 export interface CostoMesDetalle {
   id: string;
   periodo: string;
-  total: number;
+  total: number; // MP comprada prorrateada
+  consumo_teorico: number;
   estado: CostoMesEstado;
   asiento_id: string | null;
   asiento_numero: number | null;
-  lineas: { centro_codigo: string | null; centro_nombre: string | null; monto: number; sin_receta: number }[];
+  lineas: {
+    centro_codigo: string | null;
+    centro_nombre: string | null;
+    monto: number;
+    consumo_teorico: number;
+    sin_receta: number;
+  }[];
 }
 
 export async function obtenerCostoMes(id: string): Promise<CostoMesDetalle | null> {
@@ -172,8 +258,8 @@ export async function obtenerCostoMes(id: string): Promise<CostoMesDetalle | nul
   const { data, error } = await supabase
     .from("costo_produccion_mes")
     .select(
-      "id, periodo, total, estado, asiento_id, asiento:asientos(numero), " +
-        "lineas:costo_produccion_mes_lineas(monto, unidades_sin_receta, centro:centros_costo(codigo, nombre))",
+      "id, periodo, total, consumo_teorico, estado, asiento_id, asiento:asientos(numero), " +
+        "lineas:costo_produccion_mes_lineas(monto, consumo_teorico, unidades_sin_receta, centro:centros_costo(codigo, nombre))",
     )
     .eq("id", id)
     .single();
@@ -185,15 +271,17 @@ export async function obtenerCostoMes(id: string): Promise<CostoMesDetalle | nul
     id: string;
     periodo: string;
     total: number;
+    consumo_teorico: number;
     estado: CostoMesEstado;
     asiento_id: string | null;
     asiento: { numero: number | null } | null;
-    lineas: { monto: number; unidades_sin_receta: number; centro: { codigo: string; nombre: string } | null }[];
+    lineas: { monto: number; consumo_teorico: number; unidades_sin_receta: number; centro: { codigo: string; nombre: string } | null }[];
   };
   return {
     id: r.id,
     periodo: r.periodo,
     total: Number(r.total),
+    consumo_teorico: Number(r.consumo_teorico),
     estado: r.estado,
     asiento_id: r.asiento_id,
     asiento_numero: r.asiento?.numero ?? null,
@@ -202,6 +290,7 @@ export async function obtenerCostoMes(id: string): Promise<CostoMesDetalle | nul
         centro_codigo: l.centro?.codigo ?? null,
         centro_nombre: l.centro?.nombre ?? null,
         monto: Number(l.monto),
+        consumo_teorico: Number(l.consumo_teorico),
         sin_receta: Number(l.unidades_sin_receta),
       }))
       .sort((a, b) => (a.centro_codigo ?? "").localeCompare(b.centro_codigo ?? "")),

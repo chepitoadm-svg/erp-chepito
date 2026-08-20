@@ -574,6 +574,7 @@ export interface Database {
           periodo: string;
           estado: "borrador" | "confirmado" | "anulado";
           total: number;
+          consumo_teorico: number;
           asiento_id: string | null;
           creado_en: string;
         };
@@ -587,6 +588,7 @@ export interface Database {
           mes_id: string;
           centro_costo_id: string;
           monto: number;
+          consumo_teorico: number;
           unidades_sin_receta: number;
         };
         Insert: never;
@@ -1218,7 +1220,10 @@ export interface Database {
       };
       fn_confirmar_gasto: { Args: { p_gasto: string }; Returns: string };
       fn_anular_gasto: { Args: { p_gasto: string; p_motivo: string }; Returns: undefined };
-      fn_crear_costo_mes: { Args: { p_periodo: string; p_lineas: unknown }; Returns: string };
+      fn_crear_costo_mes: {
+        Args: { p_periodo: string; p_consumo_teorico: number; p_lineas: unknown };
+        Returns: string;
+      };
       fn_confirmar_costo_mes: { Args: { p_mes: string }; Returns: string };
       fn_anular_costo_mes: { Args: { p_mes: string; p_motivo: string }; Returns: undefined };
       fn_crear_transferencia: {
