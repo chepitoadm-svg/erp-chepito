@@ -608,6 +608,8 @@ export interface Database {
           total: number;
           estado: "borrador" | "confirmado" | "anulado";
           asiento_id: string | null;
+          proveedor_id: string | null;
+          fecha_vencimiento: string | null;
           creado_en: string;
         };
         Insert: never;
@@ -1211,10 +1213,12 @@ export interface Database {
           p_centro: string;
           p_fecha: string;
           p_cuenta_gasto: string;
-          p_cuenta_pago: string;
+          p_cuenta_pago: string | null;
           p_subtotal: number;
           p_iva: number;
           p_descripcion: string | null;
+          p_proveedor?: string | null;
+          p_vencimiento?: string | null;
         };
         Returns: string;
       };

@@ -19,20 +19,28 @@ const parse = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+interface Proveedor {
+  id: string;
+  nombre: string;
+}
+
 export default function GastoForm({
   centros,
   cuentasGasto,
   cuentasPago,
+  proveedores,
   hoy,
 }: {
   centros: Centro[];
   cuentasGasto: CuentaOpcion[];
   cuentasPago: CuentasPagoGasto;
+  proveedores: Proveedor[];
   hoy: string;
 }) {
   const [state, formAction, pending] = useActionState(crearGasto, inicial);
   const [subtotal, setSubtotal] = useState("");
   const [iva, setIva] = useState("");
+  const [modo, setModo] = useState<"pagado" | "por_pagar">("pagado");
 
   const total = useMemo(() => parse(subtotal) + parse(iva), [subtotal, iva]);
   const sugerirIva = () => setIva((Math.round(parse(subtotal) * 0.13 * 100) / 100).toString());
@@ -78,30 +86,73 @@ export default function GastoForm({
         </select>
       </label>
 
-      <label className="block">
-        <span className="text-xs uppercase tracking-wide text-neutral-500">
-          ¿De dónde sale / contra qué queda?
-        </span>
-        <select name="cuenta_pago_id" required defaultValue="" className={campo}>
-          <option value="" disabled>
-            Elegí caja/banco o por pagar…
-          </option>
-          <optgroup label="Pagado con (caja / banco)">
-            {cuentasPago.pagado_con.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
+      <input type="hidden" name="modo" value={modo} />
+      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <span className="text-xs uppercase tracking-wide text-neutral-500">Forma de pago</span>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setModo("pagado")}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              modo === "pagado"
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            Pagado (caja / banco)
+          </button>
+          <button
+            type="button"
+            onClick={() => setModo("por_pagar")}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              modo === "por_pagar"
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            Queda por pagar
+          </button>
+        </div>
+
+        {modo === "pagado" ? (
+          <label className="mt-3 block">
+            <span className="text-xs uppercase tracking-wide text-neutral-500">¿De dónde sale?</span>
+            <select name="cuenta_pago_id" required defaultValue="" className={campo}>
+              <option value="" disabled>
+                Elegí caja / banco…
               </option>
-            ))}
-          </optgroup>
-          <optgroup label="Queda por pagar">
-            {cuentasPago.por_pagar.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-      </label>
+              {cuentasPago.pagado_con.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs uppercase tracking-wide text-neutral-500">Proveedor / beneficiario</span>
+              <select name="proveedor_id" required defaultValue="" className={campo}>
+                <option value="" disabled>
+                  Elegí el proveedor…
+                </option>
+                {proveedores.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs uppercase tracking-wide text-neutral-500">Vence</span>
+              <input type="date" name="fecha_vencimiento" required defaultValue={hoy} className={campo} />
+            </label>
+            <p className="text-xs text-neutral-500 sm:col-span-2">
+              Queda como cuenta por pagar; lo pagás después en <b>Compras → Pagos</b>.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="rounded-lg border border-neutral-200 bg-white p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

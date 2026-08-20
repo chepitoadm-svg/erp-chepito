@@ -100,6 +100,8 @@ export interface GastoDetalle {
   cuenta_nombre: string | null;
   pago_codigo: string | null;
   pago_nombre: string | null;
+  proveedor_nombre: string | null;
+  fecha_vencimiento: string | null;
   descripcion: string | null;
   subtotal: number;
   iva: number;
@@ -114,10 +116,11 @@ export async function obtenerGasto(id: string): Promise<GastoDetalle | null> {
   const { data, error } = await supabase
     .from("gastos")
     .select(
-      "id, fecha, descripcion, subtotal, iva, total, estado, asiento_id, " +
+      "id, fecha, descripcion, subtotal, iva, total, estado, asiento_id, fecha_vencimiento, " +
         "centro:centros_costo(codigo, nombre), " +
         "cuenta:cuentas!gastos_cuenta_gasto_id_fkey(codigo, nombre), " +
         "pago:cuentas!gastos_cuenta_pago_id_fkey(codigo, nombre), " +
+        "proveedor:proveedores(nombre), " +
         "asiento:asientos(numero)",
     )
     .eq("id", id)
@@ -135,9 +138,11 @@ export async function obtenerGasto(id: string): Promise<GastoDetalle | null> {
     total: number;
     estado: GastoEstado;
     asiento_id: string | null;
+    fecha_vencimiento: string | null;
     centro: { codigo: string; nombre: string } | null;
     cuenta: { codigo: string; nombre: string } | null;
     pago: { codigo: string; nombre: string } | null;
+    proveedor: { nombre: string } | null;
     asiento: { numero: number | null } | null;
   };
   return {
@@ -149,6 +154,8 @@ export async function obtenerGasto(id: string): Promise<GastoDetalle | null> {
     cuenta_nombre: g.cuenta?.nombre ?? null,
     pago_codigo: g.pago?.codigo ?? null,
     pago_nombre: g.pago?.nombre ?? null,
+    proveedor_nombre: g.proveedor?.nombre ?? null,
+    fecha_vencimiento: g.fecha_vencimiento,
     descripcion: g.descripcion,
     subtotal: Number(g.subtotal),
     iva: Number(g.iva),

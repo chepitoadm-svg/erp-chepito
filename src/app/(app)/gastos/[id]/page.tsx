@@ -69,9 +69,19 @@ export default async function GastoDetallePage({
               <td className="px-4 py-3 text-right text-neutral-800">{g.cuenta_nombre}</td>
             </tr>
             <tr>
-              <td className="px-4 py-3 text-neutral-600">Pago / contrapartida</td>
-              <td className="px-4 py-3 text-right text-neutral-800">{g.pago_nombre}</td>
+              <td className="px-4 py-3 text-neutral-600">
+                {g.proveedor_nombre ? "Por pagar a" : "Pago / contrapartida"}
+              </td>
+              <td className="px-4 py-3 text-right text-neutral-800">
+                {g.proveedor_nombre ?? g.pago_nombre}
+              </td>
             </tr>
+            {g.proveedor_nombre && (
+              <tr>
+                <td className="px-4 py-3 text-neutral-600">Vence</td>
+                <td className="px-4 py-3 text-right text-neutral-800">{g.fecha_vencimiento ?? "—"}</td>
+              </tr>
+            )}
             <tr>
               <td className="px-4 py-3 text-neutral-600">Monto</td>
               <td className="px-4 py-3 text-right tabular-nums text-neutral-800">{fmt(g.subtotal)}</td>
@@ -91,6 +101,12 @@ export default async function GastoDetallePage({
           </tfoot>
         </table>
       </div>
+
+      {g.proveedor_nombre && g.estado === "confirmado" && (
+        <p className="mt-3 max-w-md rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Deuda por pagar a <b>{g.proveedor_nombre}</b>. Saldala en <b>Compras → Pagos</b>.
+        </p>
+      )}
 
       {g.estado === "borrador" && (
         <div className="mt-6 flex items-center gap-3">

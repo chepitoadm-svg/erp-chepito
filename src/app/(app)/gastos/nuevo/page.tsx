@@ -3,14 +3,16 @@ import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarCentrosCosto } from "@/lib/data/asientos";
 import { listarCuentasSoloGasto, listarCuentasPagoGasto } from "@/lib/data/gastos";
+import { listarProveedoresActivos } from "@/lib/data/compras";
 import GastoForm from "@/components/GastoForm";
 
 export default async function NuevoGastoPage() {
   if (!(await tienePermiso("gastos.registrar"))) redirect("/gastos");
-  const [centros, cuentasGasto, cuentasPago] = await Promise.all([
+  const [centros, cuentasGasto, cuentasPago, proveedores] = await Promise.all([
     listarCentrosCosto(),
     listarCuentasSoloGasto(),
     listarCuentasPagoGasto(),
+    listarProveedoresActivos(),
   ]);
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 
@@ -24,7 +26,13 @@ export default async function NuevoGastoPage() {
         Registrá un gasto con su centro de costo. Al confirmar postea el asiento (Debe la cuenta de
         gasto por centro, Haber la caja/banco o la cuenta por pagar).
       </p>
-      <GastoForm centros={centros} cuentasGasto={cuentasGasto} cuentasPago={cuentasPago} hoy={hoy} />
+      <GastoForm
+        centros={centros}
+        cuentasGasto={cuentasGasto}
+        cuentasPago={cuentasPago}
+        proveedores={proveedores}
+        hoy={hoy}
+      />
     </div>
   );
 }

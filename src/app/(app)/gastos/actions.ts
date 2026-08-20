@@ -24,11 +24,17 @@ function num(raw: FormDataEntryValue | null): number {
 export async function crearGasto(_prev: FormState, formData: FormData): Promise<FormState> {
   await requerirPermiso("gastos.registrar");
   const desc = String(formData.get("descripcion") ?? "").trim();
+  const porPagar = String(formData.get("modo") ?? "pagado") === "por_pagar";
+  const cuentaPago = String(formData.get("cuenta_pago_id") ?? "").trim();
+  const proveedor = String(formData.get("proveedor_id") ?? "").trim();
+  const vencimiento = String(formData.get("fecha_vencimiento") ?? "").trim();
   const parsed = crearGastoSchema.safeParse({
     centro_costo_id: String(formData.get("centro_costo_id") ?? ""),
     fecha: String(formData.get("fecha") ?? ""),
     cuenta_gasto_id: String(formData.get("cuenta_gasto_id") ?? ""),
-    cuenta_pago_id: String(formData.get("cuenta_pago_id") ?? ""),
+    cuenta_pago_id: porPagar ? null : cuentaPago || null,
+    proveedor_id: porPagar ? proveedor || null : null,
+    fecha_vencimiento: porPagar ? vencimiento || null : null,
     subtotal: num(formData.get("subtotal")),
     iva: num(formData.get("iva")),
     descripcion: desc || null,
@@ -40,10 +46,12 @@ export async function crearGasto(_prev: FormState, formData: FormData): Promise<
     p_centro: parsed.data.centro_costo_id,
     p_fecha: parsed.data.fecha,
     p_cuenta_gasto: parsed.data.cuenta_gasto_id,
-    p_cuenta_pago: parsed.data.cuenta_pago_id,
+    p_cuenta_pago: parsed.data.cuenta_pago_id ?? null,
     p_subtotal: parsed.data.subtotal,
     p_iva: parsed.data.iva,
     p_descripcion: parsed.data.descripcion ?? null,
+    p_proveedor: parsed.data.proveedor_id ?? null,
+    p_vencimiento: parsed.data.fecha_vencimiento ?? null,
   });
   if (error || !id) return { error: limpiar(error?.message ?? "No se pudo registrar el gasto.") };
   redirect(`/gastos/${id}`);
