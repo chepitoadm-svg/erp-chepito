@@ -61,7 +61,7 @@ export async function guardarBases(
   return { ok: "Bases guardadas." };
 }
 
-export async function generarProrrateo(formData: FormData): Promise<void> {
+export async function generarProrrateo(_prev: FormState, formData: FormData): Promise<FormState> {
   await requerirPermiso("prorrateo.gestionar");
   const periodo = String(formData.get("periodo") ?? "");
   const origen = String(formData.get("origen") ?? "");
@@ -70,7 +70,7 @@ export async function generarProrrateo(formData: FormData): Promise<void> {
     p_periodo_id: periodo,
     p_centro_origen_id: origen,
   });
-  if (error) throw new Error(limpiar(error.message));
+  if (error) return { error: limpiar(error.message) };
   // El asiento nace en borrador; se lleva al usuario a revisarlo.
   redirect(`/asientos/${data}`);
 }

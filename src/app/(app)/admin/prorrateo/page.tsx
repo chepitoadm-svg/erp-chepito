@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarPeriodos, estadoProrrateo, listarCentrosFinales } from "@/lib/data/admin";
 import ProrrateoBases from "@/components/ProrrateoBases";
-import { generarProrrateo } from "../actions";
+import GenerarProrrateoBtn from "@/components/GenerarProrrateoBtn";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -96,26 +96,20 @@ export default async function ProrrateoPage({
               />
 
               <div className="mt-3 border-t border-neutral-100 pt-3">
-                <form action={generarProrrateo}>
-                  <input type="hidden" name="periodo" value={periodoSel.id} />
-                  <input type="hidden" name="origen" value={c.centro_id} />
-                  <button
-                    type="submit"
-                    disabled={!puedeGenerar}
-                    className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    title={
-                      !suma100
-                        ? "Las bases deben sumar 100"
-                        : Number(c.pool) === 0
-                          ? "No hay saldo que prorratear"
-                          : periodoSel.estado !== "abierto"
-                            ? "El periodo no está abierto"
-                            : undefined
-                    }
-                  >
-                    Generar asiento de prorrateo
-                  </button>
-                </form>
+                <GenerarProrrateoBtn
+                  periodoId={periodoSel.id}
+                  origenId={c.centro_id}
+                  disabled={!puedeGenerar}
+                  title={
+                    !suma100
+                      ? "Las bases deben sumar 100"
+                      : Number(c.pool) === 0
+                        ? "No hay saldo que prorratear"
+                        : periodoSel.estado !== "abierto"
+                          ? "El periodo no está abierto"
+                          : undefined
+                  }
+                />
               </div>
             </div>
           );
