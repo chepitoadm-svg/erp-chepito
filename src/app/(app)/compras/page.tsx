@@ -62,6 +62,17 @@ export default async function ComprasPage() {
         )}
         {puedeFacturar && (
           <Link
+            href="/compras/importar"
+            className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          >
+            <div className="font-medium text-neutral-900">Importar compras (Excel)</div>
+            <div className="mt-1 text-sm text-neutral-500">
+              Subir el Excel resumen de facturas; cada bodega va a su centro (compra periódica + CxP).
+            </div>
+          </Link>
+        )}
+        {puedeFacturar && (
+          <Link
             href="/compras/correo"
             className="rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
           >
