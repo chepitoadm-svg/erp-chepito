@@ -57,6 +57,39 @@ export async function crearGasto(_prev: FormState, formData: FormData): Promise<
   redirect(`/gastos/${id}`);
 }
 
+// Crea un proveedor rápido (solo nombre + cédula) desde el formulario de gasto,
+// para no tener que salir a Compras → Proveedores. Devuelve el id para
+// seleccionarlo de una.
+export async function crearProveedorRapido(
+  nombre: string,
+  cedula: string,
+): Promise<{ ok: true; id: string; nombre: string } | { ok: false; error: string }> {
+  try {
+    await requerirPermiso("proveedores.gestionar");
+  } catch {
+    return { ok: false, error: "No tenés permiso para crear proveedores." };
+  }
+  const n = nombre.trim();
+  const c = cedula.replace(/\D/g, "");
+  if (n.length < 2) return { ok: false, error: "El nombre es obligatorio." };
+  if (c.length < 9 || c.length > 12) return { ok: false, error: "Cédula jurídica inválida (9–12 dígitos)." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("proveedores")
+    .insert({ nombre: n, cedula_juridica: c })
+    .select("id, nombre")
+    .single();
+  if (error || !data) {
+    const msg = error?.message ?? "No se pudo crear el proveedor.";
+    return {
+      ok: false,
+      error: msg.includes("duplicate") ? "Ya existe un proveedor con esa cédula." : limpiar(msg),
+    };
+  }
+  return { ok: true, id: data.id, nombre: data.nombre };
+}
+
 export async function confirmarGasto(formData: FormData): Promise<void> {
   await requerirPermiso("gastos.registrar");
   const id = String(formData.get("id") ?? "");

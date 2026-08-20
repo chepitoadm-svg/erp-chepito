@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { crearGasto, type FormState } from "@/app/(app)/gastos/actions";
+import { useActionState, useMemo, useState, useTransition } from "react";
+import { crearGasto, crearProveedorRapido, type FormState } from "@/app/(app)/gastos/actions";
 import type { CuentaOpcion, CuentasPagoGasto } from "@/lib/data/gastos";
 
 const inicial: FormState = {};
@@ -41,6 +41,32 @@ export default function GastoForm({
   const [subtotal, setSubtotal] = useState("");
   const [iva, setIva] = useState("");
   const [modo, setModo] = useState<"pagado" | "por_pagar">("pagado");
+
+  // Proveedor: lista + los creados al vuelo desde este form.
+  const [provExtra, setProvExtra] = useState<Proveedor[]>([]);
+  const [provSel, setProvSel] = useState("");
+  const [nuevoProv, setNuevoProv] = useState(false);
+  const [pNombre, setPNombre] = useState("");
+  const [pCedula, setPCedula] = useState("");
+  const [pError, setPError] = useState("");
+  const [pPending, startProv] = useTransition();
+  const todosProveedores = [...proveedores, ...provExtra];
+
+  const crearProv = () => {
+    setPError("");
+    startProv(async () => {
+      const r = await crearProveedorRapido(pNombre, pCedula);
+      if (!r.ok) {
+        setPError(r.error);
+        return;
+      }
+      setProvExtra((x) => [...x, { id: r.id, nombre: r.nombre }]);
+      setProvSel(r.id);
+      setNuevoProv(false);
+      setPNombre("");
+      setPCedula("");
+    });
+  };
 
   const total = useMemo(() => parse(subtotal) + parse(iva), [subtotal, iva]);
   const sugerirIva = () => setIva((Math.round(parse(subtotal) * 0.13 * 100) / 100).toString());
@@ -131,12 +157,30 @@ export default function GastoForm({
         ) : (
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs uppercase tracking-wide text-neutral-500">Proveedor / beneficiario</span>
-              <select name="proveedor_id" required defaultValue="" className={campo}>
+              <span className="flex items-center justify-between text-xs uppercase tracking-wide text-neutral-500">
+                Proveedor / beneficiario
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNuevoProv((v) => !v);
+                    setPError("");
+                  }}
+                  className="rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] font-medium normal-case text-neutral-600 hover:bg-neutral-50"
+                >
+                  {nuevoProv ? "Cancelar" : "+ Nuevo"}
+                </button>
+              </span>
+              <select
+                name="proveedor_id"
+                required
+                value={provSel}
+                onChange={(e) => setProvSel(e.target.value)}
+                className={campo}
+              >
                 <option value="" disabled>
                   Elegí el proveedor…
                 </option>
-                {proveedores.map((p) => (
+                {todosProveedores.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nombre}
                   </option>
@@ -147,6 +191,37 @@ export default function GastoForm({
               <span className="text-xs uppercase tracking-wide text-neutral-500">Vence</span>
               <input type="date" name="fecha_vencimiento" required defaultValue={hoy} className={campo} />
             </label>
+
+            {nuevoProv && (
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 sm:col-span-2">
+                <p className="mb-2 text-xs font-medium text-neutral-700">Nuevo proveedor</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    value={pNombre}
+                    onChange={(e) => setPNombre(e.target.value)}
+                    placeholder="Nombre / beneficiario"
+                    className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+                  />
+                  <input
+                    type="text"
+                    value={pCedula}
+                    onChange={(e) => setPCedula(e.target.value)}
+                    placeholder="Cédula jurídica (o física)"
+                    className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+                  />
+                </div>
+                {pError && <p className="mt-2 text-xs text-red-600">{pError}</p>}
+                <button
+                  type="button"
+                  onClick={crearProv}
+                  disabled={pPending}
+                  className="mt-2 rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  {pPending ? "Creando…" : "Crear proveedor"}
+                </button>
+              </div>
+            )}
             <p className="text-xs text-neutral-500 sm:col-span-2">
               Queda como cuenta por pagar; lo pagás después en <b>Compras → Pagos</b>.
             </p>
