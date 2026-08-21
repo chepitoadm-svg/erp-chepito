@@ -95,6 +95,20 @@ export async function importarEstadoCuenta(_prev: FormState, formData: FormData)
   redirect(`/tesoreria/conciliaciones/${id}`);
 }
 
+// Vuelve a correr el emparejado automático sobre lo que quede pendiente.
+export async function conciliarAutomatico(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { data: c } = await supabase
+    .from("conciliaciones_banco")
+    .select("cuenta_id")
+    .eq("id", id)
+    .single();
+  if (c?.cuenta_id) await autoEmparejar(supabase, id, c.cuenta_id);
+  revalidatePath(`/tesoreria/conciliaciones/${id}`);
+}
+
 export async function conciliarLinea(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const linea = String(formData.get("linea_id") ?? "");
