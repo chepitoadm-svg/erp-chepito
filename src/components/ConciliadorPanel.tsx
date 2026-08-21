@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   conciliarLinea,
   desconciliarLinea,
@@ -32,30 +33,160 @@ function comparar(a: string | number, b: string | number, dir: "asc" | "desc") {
   return dir === "asc" ? r : -r;
 }
 
-// Encabezado ordenable: un clic ordena asc; otro clic invierte.
+// Encabezado ordenable: un clic ordena asc; otro clic invierte. `extra` (ej. el
+// botón de filtro) se renderiza al lado y no dispara el orden.
 function Th({
   label,
   k,
   sort,
   setSort,
   align = "left",
+  extra,
 }: {
   label: string;
   k: SortKey;
   sort: SortState;
   setSort: (s: SortState) => void;
   align?: "left" | "right";
+  extra?: React.ReactNode;
 }) {
   const active = sort.key === k;
   const flecha = active ? (sort.dir === "asc" ? "▲" : "▼") : "↕";
   return (
-    <th
-      onClick={() => setSort({ key: k, dir: active && sort.dir === "asc" ? "desc" : "asc" })}
-      className={`cursor-pointer select-none px-2 py-1 font-medium hover:text-neutral-700 ${align === "right" ? "text-right" : "text-left"}`}
-      title="Ordenar por esta columna"
-    >
-      {label} <span className={active ? "text-neutral-600" : "text-neutral-300"}>{flecha}</span>
+    <th className={`px-2 py-1 font-medium ${align === "right" ? "text-right" : "text-left"}`}>
+      <span className="inline-flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setSort({ key: k, dir: active && sort.dir === "asc" ? "desc" : "asc" })}
+          className="cursor-pointer select-none uppercase hover:text-neutral-700"
+          title="Ordenar por esta columna"
+        >
+          {label} <span className={active ? "text-neutral-600" : "text-neutral-300"}>{flecha}</span>
+        </button>
+        {extra}
+      </span>
     </th>
+  );
+}
+
+// Filtro tipo Excel: botón ▾ que abre una lista de valores para marcar cuáles
+// mostrar. `null` = todos. Se posiciona con portal para no ser recortado.
+function FiltroColumna({
+  valores,
+  seleccion,
+  onAplicar,
+}: {
+  valores: string[];
+  seleccion: Set<string> | null;
+  onAplicar: (s: Set<string> | null) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [busca, setBusca] = useState("");
+  const [draft, setDraft] = useState<Set<string>>(new Set());
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const distintos = useMemo(
+    () => Array.from(new Set(valores.map((v) => v || "(vacío)"))).sort((a, b) => a.localeCompare(b, "es")),
+    [valores],
+  );
+  const activo = seleccion !== null;
+
+  const abrir = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 288)) });
+    setDraft(seleccion ? new Set(seleccion) : new Set(distintos));
+    setBusca("");
+    setAbierto(true);
+  };
+  useEffect(() => {
+    if (!abierto) return;
+    const cerrar = () => setAbierto(false);
+    window.addEventListener("scroll", cerrar, true);
+    window.addEventListener("resize", cerrar);
+    return () => {
+      window.removeEventListener("scroll", cerrar, true);
+      window.removeEventListener("resize", cerrar);
+    };
+  }, [abierto]);
+
+  const visibles = busca.trim() ? distintos.filter((v) => v.toLowerCase().includes(busca.trim().toLowerCase())) : distintos;
+  const todosMarcados = visibles.length > 0 && visibles.every((v) => draft.has(v));
+  const toggle = (v: string) => {
+    const s = new Set(draft);
+    if (s.has(v)) s.delete(v);
+    else s.add(v);
+    setDraft(s);
+  };
+  const toggleTodos = () => {
+    const s = new Set(draft);
+    if (todosMarcados) visibles.forEach((v) => s.delete(v));
+    else visibles.forEach((v) => s.add(v));
+    setDraft(s);
+  };
+  const aplicar = () => {
+    onAplicar(draft.size >= distintos.length ? null : new Set(draft));
+    setAbierto(false);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => (abierto ? setAbierto(false) : abrir())}
+        className={`rounded px-1 text-[11px] leading-none ${activo ? "bg-blue-100 text-blue-700" : "text-neutral-400 hover:text-neutral-700"}`}
+        title="Filtrar valores"
+      >
+        ▼
+      </button>
+      {abierto &&
+        pos &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
+            <div
+              className="fixed z-50 w-72 rounded-md border border-neutral-300 bg-white shadow-lg"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              <div className="border-b border-neutral-200 p-2">
+                <input
+                  autoFocus
+                  type="search"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar valor…"
+                  className="w-full rounded border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
+                />
+              </div>
+              <label className="flex items-center gap-2 border-b border-neutral-200 px-2 py-1.5 text-xs font-medium text-neutral-700">
+                <input type="checkbox" checked={todosMarcados} onChange={toggleTodos} />
+                Seleccionar todos {busca.trim() ? "(filtrados)" : ""}
+              </label>
+              <div className="max-h-64 overflow-y-auto py-1">
+                {visibles.length === 0 && <p className="px-2 py-2 text-xs text-neutral-400">Sin coincidencias.</p>}
+                {visibles.map((v) => (
+                  <label key={v} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50">
+                    <input type="checkbox" checked={draft.has(v)} onChange={() => toggle(v)} />
+                    <span className="truncate" title={v}>
+                      {v}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 border-t border-neutral-200 p-2">
+                <button type="button" onClick={() => setAbierto(false)} className="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100">
+                  Cancelar
+                </button>
+                <button type="button" onClick={aplicar} className="rounded bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800">
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          </>,
+          document.body,
+        )}
+    </>
   );
 }
 
@@ -88,6 +219,8 @@ export default function ConciliadorPanel({
   const [sortBanco, setSortBanco] = useState<SortState>({ key: null, dir: "asc" });
   const [filtroLibros, setFiltroLibros] = useState("");
   const [filtroBanco, setFiltroBanco] = useState("");
+  const [selLibros, setSelLibros] = useState<Set<string> | null>(null);
+  const [selBancoDoc, setSelBancoDoc] = useState<Set<string> | null>(null);
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
 
   const pendientes = lineas.filter((l) => l.estado === "pendiente");
@@ -132,14 +265,19 @@ export default function ConciliadorPanel({
 
   // Filtro "empieza con" (case-insensitive) por texto o por número de documento.
   const empiezaCon = (texto: string, f: string) => texto.toLowerCase().startsWith(f.trim().toLowerCase());
-  const movimientosVis = filtroLibros.trim()
-    ? movimientosOrd.filter(
-        (m) => empiezaCon(m.glosa ?? "", filtroLibros) || empiezaCon(m.numero != null ? String(m.numero) : "", filtroLibros),
-      )
-    : movimientosOrd;
-  const pendientesVis = filtroBanco.trim()
-    ? pendientesOrd.filter((l) => empiezaCon(l.descripcion ?? "", filtroBanco) || empiezaCon(l.referencia ?? "", filtroBanco))
-    : pendientesOrd;
+  const docVal = (s: string | null) => s || "(vacío)";
+  const movimientosVis = movimientosOrd.filter(
+    (m) =>
+      (!filtroLibros.trim() ||
+        empiezaCon(m.glosa ?? "", filtroLibros) ||
+        empiezaCon(m.numero != null ? String(m.numero) : "", filtroLibros)) &&
+      (selLibros === null || selLibros.has(docVal(m.glosa))),
+  );
+  const pendientesVis = pendientesOrd.filter(
+    (l) =>
+      (!filtroBanco.trim() || empiezaCon(l.descripcion ?? "", filtroBanco) || empiezaCon(l.referencia ?? "", filtroBanco)) &&
+      (selBancoDoc === null || selBancoDoc.has(docVal(l.descripcion))),
+  );
 
   const totLibrosDebito = movimientosVis.reduce((s, m) => s + m.debito, 0);
   const totLibrosCredito = movimientosVis.reduce((s, m) => s + m.credito, 0);
@@ -299,7 +437,15 @@ export default function ConciliadorPanel({
                   <thead className="sticky top-0 bg-white text-[10px] uppercase text-neutral-400">
                     <tr>
                       <Th label="Fecha" k="fecha" sort={sortLibros} setSort={setSortLibros} />
-                      <Th label="Asiento" k="doc" sort={sortLibros} setSort={setSortLibros} />
+                      <Th
+                        label="Asiento"
+                        k="doc"
+                        sort={sortLibros}
+                        setSort={setSortLibros}
+                        extra={
+                          <FiltroColumna valores={movimientos.map((m) => m.glosa ?? "")} seleccion={selLibros} onAplicar={setSelLibros} />
+                        }
+                      />
                       <Th label="Débito" k="debito" sort={sortLibros} setSort={setSortLibros} align="right" />
                       <Th label="Crédito" k="credito" sort={sortLibros} setSort={setSortLibros} align="right" />
                     </tr>
@@ -363,7 +509,15 @@ export default function ConciliadorPanel({
                   <thead className="sticky top-0 bg-white text-[10px] uppercase text-neutral-400">
                     <tr>
                       <Th label="Fecha" k="fecha" sort={sortBanco} setSort={setSortBanco} />
-                      <Th label="Documento / detalle" k="doc" sort={sortBanco} setSort={setSortBanco} />
+                      <Th
+                        label="Documento / detalle"
+                        k="doc"
+                        sort={sortBanco}
+                        setSort={setSortBanco}
+                        extra={
+                          <FiltroColumna valores={pendientes.map((l) => l.descripcion ?? "")} seleccion={selBancoDoc} onAplicar={setSelBancoDoc} />
+                        }
+                      />
                       <Th label="Débito" k="debito" sort={sortBanco} setSort={setSortBanco} align="right" />
                       <Th label="Crédito" k="credito" sort={sortBanco} setSort={setSortBanco} align="right" />
                     </tr>
