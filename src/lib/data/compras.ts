@@ -161,6 +161,8 @@ export interface FacturaListado {
   total: number;
   estado: FacturaEstado;
   n_lineas: number;
+  centro_codigo: string | null;
+  centro_nombre: string | null;
 }
 
 interface FacturaRowEmbebido {
@@ -170,19 +172,52 @@ interface FacturaRowEmbebido {
   total: number;
   estado: FacturaEstado;
   proveedor: { nombre: string } | null;
+  centro: { codigo: string; nombre: string } | null;
   lineas: { count: number }[];
 }
 
-export async function listarFacturas(): Promise<FacturaListado[]> {
+export interface FacturasFiltro {
+  proveedorId?: string;
+  desde?: string; // fecha_emision >=
+  hasta?: string; // fecha_emision <=
+  centroId?: string;
+  estado?: FacturaEstado;
+}
+
+/** Proveedores que aparecen en alguna factura, para el filtro. */
+export async function listarProveedoresDeFacturas(): Promise<{ id: string; nombre: string }[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("facturas_compra")
+    .select("proveedor_id, proveedor:proveedores(nombre)");
+  if (error) throw new Error(`No se pudieron cargar los proveedores: ${error.message}`);
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as unknown as { proveedor_id: string; proveedor: { nombre: string } | null }[]) {
+    if (r.proveedor_id) map.set(r.proveedor_id, r.proveedor?.nombre ?? "");
+  }
+  return [...map.entries()]
+    .map(([id, nombre]) => ({ id, nombre }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+export async function listarFacturas(filtro: FacturasFiltro = {}): Promise<FacturaListado[]> {
+  const supabase = await createClient();
+  let q = supabase
+    .from("facturas_compra")
     .select(
       "id, fecha_emision, clave, total, estado, " +
-        "proveedor:proveedores(nombre), lineas:facturas_compra_lineas(count)",
+        "proveedor:proveedores(nombre), centro:centros_costo(codigo, nombre), lineas:facturas_compra_lineas(count)",
     )
     .order("fecha_emision", { ascending: false })
     .order("creado_en", { ascending: false });
+
+  if (filtro.proveedorId) q = q.eq("proveedor_id", filtro.proveedorId);
+  if (filtro.centroId) q = q.eq("centro_costo_id", filtro.centroId);
+  if (filtro.estado) q = q.eq("estado", filtro.estado);
+  if (filtro.desde) q = q.gte("fecha_emision", filtro.desde);
+  if (filtro.hasta) q = q.lte("fecha_emision", filtro.hasta);
+
+  const { data, error } = await q;
   if (error) throw new Error(`No se pudieron cargar las facturas: ${error.message}`);
 
   return ((data ?? []) as unknown as FacturaRowEmbebido[]).map((f) => ({
@@ -193,6 +228,8 @@ export async function listarFacturas(): Promise<FacturaListado[]> {
     total: Number(f.total),
     estado: f.estado,
     n_lineas: f.lineas?.[0]?.count ?? 0,
+    centro_codigo: f.centro?.codigo ?? null,
+    centro_nombre: f.centro?.nombre ?? null,
   }));
 }
 

@@ -734,6 +734,10 @@ export interface Database {
           total: number;
           estado: "borrador" | "confirmada" | "anulada";
           asiento_id: string | null;
+          tipo: "inventario" | "gasto";
+          cuenta_gasto_id: string | null;
+          centro_costo_id: string | null;
+          glosa: string | null;
           creado_en: string;
           creado_por: string | null;
         };
