@@ -20,11 +20,15 @@ const inicial: FormState = {};
 type SortKey = "fecha" | "doc" | "debito" | "credito";
 type SortState = { key: SortKey | null; dir: "asc" | "desc" };
 
+// Los montos (number) se comparan por valor; el resto (documento, fecha) como
+// texto alfabético. NO se usa numeric:true a propósito: el documento se ordena
+// alfabéticamente (ej. "301438829" antes que "63006688"), como el usuario lo
+// espera, no por magnitud del número.
 function comparar(a: string | number, b: string | number, dir: "asc" | "desc") {
   const r =
     typeof a === "number" && typeof b === "number"
       ? a - b
-      : String(a).localeCompare(String(b), "es", { numeric: true });
+      : String(a).localeCompare(String(b), "es");
   return dir === "asc" ? r : -r;
 }
 
@@ -87,10 +91,12 @@ export default function ConciliadorPanel({
   const pendientes = lineas.filter((l) => l.estado === "pendiente");
   const conciliadas = lineas.filter((l) => l.estado === "conciliada");
 
+  // "doc" ordena por el TEXTO/detalle (glosa/descripción), alfabético — lo que
+  // empieza con A sale primero — no por el número de documento.
   const valLibro = (m: MovimientoLibro, k: SortKey): string | number =>
-    k === "fecha" ? m.fecha : k === "debito" ? m.debito : k === "credito" ? m.credito : m.numero != null ? String(m.numero) : m.glosa ?? m.tipo;
+    k === "fecha" ? m.fecha : k === "debito" ? m.debito : k === "credito" ? m.credito : (m.glosa ?? "").toLowerCase();
   const valBanco = (l: LineaBanco, k: SortKey): string | number =>
-    k === "fecha" ? l.fecha : k === "debito" ? l.debito : k === "credito" ? l.credito : l.referencia ?? l.descripcion ?? "";
+    k === "fecha" ? l.fecha : k === "debito" ? l.debito : k === "credito" ? l.credito : (l.descripcion ?? "").toLowerCase();
 
   const movimientosOrd = useMemo(() => {
     if (!sortLibros.key) return movimientos;
