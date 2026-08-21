@@ -19,6 +19,8 @@ export interface AnalisisComprasState {
   filas?: number;
   total?: number;
   pagadas?: number;
+  ya_ingresadas?: number; // ya existen en el sistema, se saltan
+  por_importar?: number; // las que faltan
   centros?: { codigo: string; n: number; total: number; iva: number }[];
   proveedores?: { razon: string; estado: "existe" | "nuevo" }[];
   ignoradas?: { bodega: string; total: number }[];
@@ -54,6 +56,34 @@ function emparejar(razon: string, proveedores: { id: string; nombre: string }[])
   return null;
 }
 
+// Clave de identidad de una compra para no re-ingresarla: (proveedor + número
+// de factura). Si la fila no trae número, cae a (proveedor + fecha + total).
+function keyFila(provId: string, f: CompraExcelFila): string {
+  const factura = String(f.factura ?? "").trim();
+  return factura
+    ? `${provId}|F|${factura}`
+    : `${provId}|D|${f.fecha}|${Math.round((f.gravado + f.exento + f.iva) * 100)}`;
+}
+
+// Facturas ya ingresadas (no anuladas) de esos proveedores, como set de claves.
+async function cargarExistentes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  provIds: string[],
+): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (provIds.length === 0) return set;
+  const { data } = await supabase
+    .from("facturas_compra")
+    .select("proveedor_id, clave, fecha_emision, total, estado")
+    .in("proveedor_id", provIds)
+    .neq("estado", "anulada");
+  for (const r of (data ?? []) as { proveedor_id: string; clave: string | null; fecha_emision: string; total: number }[]) {
+    if (r.clave) set.add(`${r.proveedor_id}|F|${String(r.clave).trim()}`);
+    else set.add(`${r.proveedor_id}|D|${r.fecha_emision}|${Math.round(Number(r.total) * 100)}`);
+  }
+  return set;
+}
+
 async function leerExcel(formData: FormData): Promise<ResumenComprasExcel> {
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File) || archivo.size === 0) throw new Error("Subí el Excel de compras.");
@@ -87,10 +117,25 @@ export async function analizarCompras(
     porCentro.set(f.centro_codigo, a);
   }
 
+  // Cuántas ya están ingresadas (por proveedor + número de factura).
+  const provMap = new Map<string, string>();
+  for (const razon of resumen.proveedores) {
+    const id = emparejar(razon, proveedores);
+    if (id) provMap.set(razon, id);
+  }
+  const existentes = await cargarExistentes(supabase, [...new Set(provMap.values())]);
+  let ya = 0;
+  for (const f of resumen.filas) {
+    const pid = provMap.get(f.razon_comercial);
+    if (pid && existentes.has(keyFila(pid, f))) ya++;
+  }
+
   return {
     filas: resumen.filas.length,
     total: Math.round(resumen.filas.reduce((s, f) => s + f.total, 0) * 100) / 100,
     pagadas: resumen.filas.filter((f) => f.cancelada).length,
+    ya_ingresadas: ya,
+    por_importar: resumen.filas.length - ya,
     centros: [...porCentro.entries()]
       .map(([codigo, a]) => ({ codigo, n: a.n, total: Math.round(a.total * 100) / 100, iva: Math.round(a.iva * 100) / 100 }))
       .sort((x, y) => x.codigo.localeCompare(y.codigo)),
@@ -150,6 +195,9 @@ export async function importarCompras(_prev: FormState, formData: FormData): Pro
     provMap.set(razon, id);
   }
 
+  // Facturas ya ingresadas de estos proveedores: se saltan (no se re-ingresan).
+  const existentes = await cargarExistentes(supabase, [...new Set(provMap.values())]);
+
   let ok = 0;
   let dup = 0;
   let err = 0;
@@ -159,6 +207,11 @@ export async function importarCompras(_prev: FormState, formData: FormData): Pro
     const cen = centro.get(f.centro_codigo);
     if (!prov || !cen) {
       err++;
+      continue;
+    }
+    const key = keyFila(prov, f);
+    if (existentes.has(key)) {
+      dup++;
       continue;
     }
     const cuenta = f.gravado >= f.exento ? cta02 : cta01;
@@ -186,14 +239,17 @@ export async function importarCompras(_prev: FormState, formData: FormData): Pro
     if (e2) {
       err++;
       if (!primerError) primerError = limpiar(e2.message);
-    } else ok++;
+    } else {
+      ok++;
+      existentes.add(key); // evita re-ingresar la misma factura repetida en el archivo
+    }
   }
 
   revalidatePath("/compras/facturas");
   revalidatePath("/compras/cxp");
   const partes = [`${ok} compras importadas y posteadas`];
   if (creados > 0) partes.push(`${creados} proveedores nuevos`);
-  if (dup > 0) partes.push(`${dup} ya existían`);
+  if (dup > 0) partes.push(`${dup} ya estaban ingresadas (se saltaron)`);
   if (err > 0) partes.push(`${err} con error${primerError ? ` (${primerError})` : ""}`);
   return { ok: partes.join(" · ") };
 }

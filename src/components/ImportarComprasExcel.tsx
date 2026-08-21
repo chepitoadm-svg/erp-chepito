@@ -53,6 +53,13 @@ export default function ImportarComprasExcel() {
             {a.filas} facturas de compra · total ₡{fmt(a.total ?? 0)}
           </h2>
 
+          {!!a.ya_ingresadas && a.ya_ingresadas > 0 && (
+            <p className="max-w-xl rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              <b>{a.ya_ingresadas}</b> {a.ya_ingresadas === 1 ? "factura ya está ingresada" : "facturas ya están ingresadas"} y se
+              saltarán. Se importarán solo las <b>{a.por_importar}</b> que faltan.
+            </p>
+          )}
+
           <div className="max-w-xl overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
@@ -109,7 +116,11 @@ export default function ImportarComprasExcel() {
               disabled={importando}
               className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
             >
-              {importando ? "Importando…" : `Importar y postear las ${a.filas} compras`}
+              {importando
+                ? "Importando…"
+                : a.ya_ingresadas
+                  ? `Importar las ${a.por_importar} que faltan`
+                  : `Importar y postear las ${a.filas} compras`}
             </button>
           </form>
           <p className="text-xs text-neutral-500">
