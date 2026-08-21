@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { crearGasto, crearProveedorRapido, type FormState } from "@/app/(app)/gastos/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 export interface GastoInicial {
   id: string;
@@ -120,16 +121,13 @@ export default function GastoForm({
 
       <label className="block">
         <span className="text-xs uppercase tracking-wide text-neutral-500">Cuenta de gasto</span>
-        <select name="cuenta_gasto_id" required defaultValue={initial?.cuenta_gasto_id ?? ""} className={campo}>
-          <option value="" disabled>
-            Elegí la cuenta…
-          </option>
-          {cuentasGasto.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.codigo} — {c.nombre}
-            </option>
-          ))}
-        </select>
+        <SelectBuscable
+          name="cuenta_gasto_id"
+          required
+          defaultValue={initial?.cuenta_gasto_id}
+          placeholder="Escribí para buscar la cuenta…"
+          options={cuentasGasto.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
+        />
       </label>
 
       <input type="hidden" name="modo" value={modo} />
@@ -190,22 +188,14 @@ export default function GastoForm({
                   {nuevoProv ? "Cancelar" : "+ Nuevo"}
                 </button>
               </span>
-              <select
+              <SelectBuscable
                 name="proveedor_id"
                 required
                 value={provSel}
-                onChange={(e) => setProvSel(e.target.value)}
-                className={campo}
-              >
-                <option value="" disabled>
-                  Elegí el proveedor…
-                </option>
-                {todosProveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+                onChange={setProvSel}
+                placeholder="Escribí para buscar…"
+                options={todosProveedores.map((p) => ({ value: p.id, label: p.nombre }))}
+              />
             </label>
             <label className="block">
               <span className="text-xs uppercase tracking-wide text-neutral-500">Vence</span>
