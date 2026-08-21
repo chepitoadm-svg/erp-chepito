@@ -78,6 +78,12 @@ export default async function AppLayout({
                 Costos
               </Link>
               <Link
+                href="/tesoreria/conciliaciones"
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Tesorería
+              </Link>
+              <Link
                 href="/reportes"
                 className="text-neutral-600 hover:text-neutral-900"
               >

@@ -616,6 +616,39 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      conciliaciones_banco: {
+        Row: {
+          id: string;
+          cuenta_id: string;
+          fecha_corte: string;
+          saldo_inicial: number;
+          saldo_final: number;
+          estado: "borrador" | "conciliada" | "anulada";
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      estado_cuenta_lineas: {
+        Row: {
+          id: string;
+          conciliacion_id: string;
+          orden: number;
+          fecha: string;
+          referencia: string | null;
+          codigo: string | null;
+          descripcion: string | null;
+          debito: number;
+          credito: number;
+          balance: number | null;
+          asiento_linea_id: string | null;
+          estado: "pendiente" | "conciliada";
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       ventas_dia: {
         Row: {
           id: string;
@@ -1224,6 +1257,14 @@ export interface Database {
       };
       fn_confirmar_gasto: { Args: { p_gasto: string }; Returns: string };
       fn_anular_gasto: { Args: { p_gasto: string; p_motivo: string }; Returns: undefined };
+      fn_crear_conciliacion: {
+        Args: { p_cuenta: string; p_fecha_corte: string; p_saldo_inicial: number; p_saldo_final: number; p_lineas: unknown };
+        Returns: string;
+      };
+      fn_conciliar_linea: { Args: { p_linea: string; p_asiento_linea: string }; Returns: undefined };
+      fn_desconciliar_linea: { Args: { p_linea: string }; Returns: undefined };
+      fn_marcar_conciliada: { Args: { p_conciliacion: string }; Returns: undefined };
+      fn_anular_conciliacion: { Args: { p_conciliacion: string; p_motivo: string }; Returns: undefined };
       fn_actualizar_gasto: {
         Args: {
           p_gasto: string;
