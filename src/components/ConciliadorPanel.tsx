@@ -17,6 +17,44 @@ const money = (n: number) =>
 const c2 = (n: number) => Math.round(Number(n) * 100);
 const inicial: FormState = {};
 
+type SortKey = "fecha" | "doc" | "debito" | "credito";
+type SortState = { key: SortKey | null; dir: "asc" | "desc" };
+
+function comparar(a: string | number, b: string | number, dir: "asc" | "desc") {
+  const r =
+    typeof a === "number" && typeof b === "number"
+      ? a - b
+      : String(a).localeCompare(String(b), "es", { numeric: true });
+  return dir === "asc" ? r : -r;
+}
+
+// Encabezado ordenable: un clic ordena asc; otro clic invierte.
+function Th({
+  label,
+  k,
+  sort,
+  setSort,
+  align = "left",
+}: {
+  label: string;
+  k: SortKey;
+  sort: SortState;
+  setSort: (s: SortState) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === k;
+  const flecha = active ? (sort.dir === "asc" ? "▲" : "▼") : "↕";
+  return (
+    <th
+      onClick={() => setSort({ key: k, dir: active && sort.dir === "asc" ? "desc" : "asc" })}
+      className={`cursor-pointer select-none px-2 py-1 font-medium hover:text-neutral-700 ${align === "right" ? "text-right" : "text-left"}`}
+      title="Ordenar por esta columna"
+    >
+      {label} <span className={active ? "text-neutral-600" : "text-neutral-300"}>{flecha}</span>
+    </th>
+  );
+}
+
 interface Centro {
   id: string;
   codigo: string;
@@ -42,10 +80,29 @@ export default function ConciliadorPanel({
   const [selBanco, setSelBanco] = useState<string | null>(null);
   const [selLibro, setSelLibro] = useState<string | null>(null);
   const [modoRegistrar, setModoRegistrar] = useState(false);
+  const [sortLibros, setSortLibros] = useState<SortState>({ key: null, dir: "asc" });
+  const [sortBanco, setSortBanco] = useState<SortState>({ key: null, dir: "asc" });
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
 
   const pendientes = lineas.filter((l) => l.estado === "pendiente");
   const conciliadas = lineas.filter((l) => l.estado === "conciliada");
+
+  const valLibro = (m: MovimientoLibro, k: SortKey): string | number =>
+    k === "fecha" ? m.fecha : k === "debito" ? m.debito : k === "credito" ? m.credito : m.numero != null ? String(m.numero) : m.glosa ?? m.tipo;
+  const valBanco = (l: LineaBanco, k: SortKey): string | number =>
+    k === "fecha" ? l.fecha : k === "debito" ? l.debito : k === "credito" ? l.credito : l.referencia ?? l.descripcion ?? "";
+
+  const movimientosOrd = useMemo(() => {
+    if (!sortLibros.key) return movimientos;
+    const k = sortLibros.key;
+    return [...movimientos].sort((a, b) => comparar(valLibro(a, k), valLibro(b, k), sortLibros.dir));
+  }, [movimientos, sortLibros]);
+  const pendientesOrd = useMemo(() => {
+    if (!sortBanco.key) return pendientes;
+    const k = sortBanco.key;
+    return [...pendientes].sort((a, b) => comparar(valBanco(a, k), valBanco(b, k), sortBanco.dir));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineas, sortBanco]);
 
   const banco = pendientes.find((l) => l.id === selBanco) ?? null;
   const libro = movimientos.find((m) => m.id === selLibro) ?? null;
@@ -213,12 +270,12 @@ export default function ConciliadorPanel({
               </div>
               <div className="max-h-[520px] overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white text-left text-[10px] uppercase text-neutral-400">
+                  <thead className="sticky top-0 bg-white text-[10px] uppercase text-neutral-400">
                     <tr>
-                      <th className="px-2 py-1 font-medium">Fecha</th>
-                      <th className="px-2 py-1 font-medium">Asiento</th>
-                      <th className="px-2 py-1 text-right font-medium">Débito</th>
-                      <th className="px-2 py-1 text-right font-medium">Crédito</th>
+                      <Th label="Fecha" k="fecha" sort={sortLibros} setSort={setSortLibros} />
+                      <Th label="Asiento" k="doc" sort={sortLibros} setSort={setSortLibros} />
+                      <Th label="Débito" k="debito" sort={sortLibros} setSort={setSortLibros} align="right" />
+                      <Th label="Crédito" k="credito" sort={sortLibros} setSort={setSortLibros} align="right" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
@@ -229,7 +286,7 @@ export default function ConciliadorPanel({
                         </td>
                       </tr>
                     )}
-                    {movimientos.map((m) => {
+                    {movimientosOrd.map((m) => {
                       const sel = m.id === selLibro;
                       const sug = librosSugeridos.has(m.id);
                       return (
@@ -269,12 +326,12 @@ export default function ConciliadorPanel({
               </div>
               <div className="max-h-[520px] overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white text-left text-[10px] uppercase text-neutral-400">
+                  <thead className="sticky top-0 bg-white text-[10px] uppercase text-neutral-400">
                     <tr>
-                      <th className="px-2 py-1 font-medium">Fecha</th>
-                      <th className="px-2 py-1 font-medium">Documento / detalle</th>
-                      <th className="px-2 py-1 text-right font-medium">Débito</th>
-                      <th className="px-2 py-1 text-right font-medium">Crédito</th>
+                      <Th label="Fecha" k="fecha" sort={sortBanco} setSort={setSortBanco} />
+                      <Th label="Documento / detalle" k="doc" sort={sortBanco} setSort={setSortBanco} />
+                      <Th label="Débito" k="debito" sort={sortBanco} setSort={setSortBanco} align="right" />
+                      <Th label="Crédito" k="credito" sort={sortBanco} setSort={setSortBanco} align="right" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
@@ -285,7 +342,7 @@ export default function ConciliadorPanel({
                         </td>
                       </tr>
                     )}
-                    {pendientes.map((l) => {
+                    {pendientesOrd.map((l) => {
                       const sel = l.id === selBanco;
                       const sug = bancosSugeridos.has(l.id);
                       return (
