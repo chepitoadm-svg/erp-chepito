@@ -13,6 +13,7 @@ interface MayorRow {
   asiento_id: string;
   asiento_numero: number | null;
   asiento_tipo: string;
+  asiento_estado: string;
   glosa: string | null;
   centro_codigo: string | null;
   origen_tipo: string | null;
@@ -143,22 +144,25 @@ export default async function MayorPage({
                     </td>
                   </tr>
                 )}
-                {movs.map((m, i) => (
-                  <tr key={i} className="border-t border-neutral-100">
-                    <td className="px-3 py-1.5 text-neutral-600">{m.fecha}</td>
+                {movs.map((m, i) => {
+                  const anulado = m.asiento_estado === "anulado";
+                  return (
+                  <tr key={i} className={`border-t border-neutral-100 ${anulado ? "text-neutral-400" : ""}`}>
+                    <td className="px-3 py-1.5">{m.fecha}</td>
                     <td className="px-3 py-1.5">
                       <Link
                         href={hrefOrigen(m)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-neutral-700 underline decoration-dotted underline-offset-2 hover:text-neutral-900"
+                        className={`underline decoration-dotted underline-offset-2 hover:text-neutral-900 ${anulado ? "" : "text-neutral-700"}`}
                         title="Abrir el origen (gasto/factura/asiento) en otra pestaña"
                       >
                         {m.asiento_numero ? `${m.asiento_tipo.slice(0, 3).toUpperCase()}-${m.asiento_numero}` : m.asiento_tipo}
                       </Link>
                     </td>
-                    <td className="px-3 py-1.5 text-neutral-600">
+                    <td className="px-3 py-1.5">
                       {m.glosa}
+                      {anulado && <span className="ml-1 rounded bg-red-50 px-1 text-[10px] text-red-600">anulado</span>}
                       {m.centro_codigo ? <span className="ml-1 text-xs text-neutral-400">[{m.centro_codigo}]</span> : null}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-neutral-600">
@@ -171,7 +175,8 @@ export default async function MayorPage({
                       {money(m.saldoCalc)}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               {movs.length > 0 && (
                 <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm font-medium text-neutral-700">

@@ -1136,6 +1136,7 @@ export interface Database {
           asiento_id: string;
           asiento_tipo: AsientoTipo;
           asiento_numero: number | null;
+          asiento_estado: string;
           glosa: string;
           centro_codigo: string | null;
           origen_tipo: string | null;
