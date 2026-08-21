@@ -158,7 +158,9 @@ export interface FacturaListado {
   fecha_emision: string;
   clave: string | null;
   proveedor_nombre: string;
-  total: number;
+  subtotal: number; // base sin IVA (lo que va a 51-10 / al Estado de Resultados)
+  iva: number;
+  total: number; // base + IVA
   estado: FacturaEstado;
   n_lineas: number;
   centro_codigo: string | null;
@@ -169,6 +171,8 @@ interface FacturaRowEmbebido {
   id: string;
   fecha_emision: string;
   clave: string | null;
+  subtotal: number;
+  iva_total: number;
   total: number;
   estado: FacturaEstado;
   proveedor: { nombre: string } | null;
@@ -205,7 +209,7 @@ export async function listarFacturas(filtro: FacturasFiltro = {}): Promise<Factu
   let q = supabase
     .from("facturas_compra")
     .select(
-      "id, fecha_emision, clave, total, estado, " +
+      "id, fecha_emision, clave, subtotal, iva_total, total, estado, " +
         "proveedor:proveedores(nombre), centro:centros_costo(codigo, nombre), lineas:facturas_compra_lineas(count)",
     )
     .order("fecha_emision", { ascending: false })
@@ -225,6 +229,8 @@ export async function listarFacturas(filtro: FacturasFiltro = {}): Promise<Factu
     fecha_emision: f.fecha_emision,
     clave: f.clave,
     proveedor_nombre: f.proveedor?.nombre ?? "",
+    subtotal: Number(f.subtotal),
+    iva: Number(f.iva_total),
     total: Number(f.total),
     estado: f.estado,
     n_lineas: f.lineas?.[0]?.count ?? 0,

@@ -35,7 +35,10 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
     listarCentrosCosto(),
   ]);
 
-  const total = facturas.reduce((s, f) => s + (f.estado === "anulada" ? 0 : f.total), 0);
+  const vivas = facturas.filter((f) => f.estado !== "anulada");
+  const totBase = vivas.reduce((s, f) => s + f.subtotal, 0);
+  const totIva = vivas.reduce((s, f) => s + f.iva, 0);
+  const total = vivas.reduce((s, f) => s + f.total, 0);
 
   return (
     <div>
@@ -201,11 +204,24 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
             ))}
           </tbody>
           {facturas.length > 0 && (
-            <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm font-medium text-neutral-700">
-              <tr>
-                <td className="px-4 py-2" colSpan={5}>
-                  {facturas.length} factura{facturas.length !== 1 ? "s" : ""} (sin anuladas)
+            <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm text-neutral-700">
+              <tr className="font-medium">
+                <td className="px-4 py-2" colSpan={4}>
+                  {vivas.length} factura{vivas.length !== 1 ? "s" : ""} (sin anuladas)
                 </td>
+                <td className="px-4 py-2 text-right text-xs font-normal text-neutral-500">Base sin IVA</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmt(totBase)}</td>
+                <td className="px-4 py-2" colSpan={2} />
+              </tr>
+              <tr>
+                <td className="px-4 py-1" colSpan={4} />
+                <td className="px-4 py-1 text-right text-xs text-neutral-500">IVA</td>
+                <td className="px-4 py-1 text-right tabular-nums text-neutral-600">{fmt(totIva)}</td>
+                <td className="px-4 py-1" colSpan={2} />
+              </tr>
+              <tr className="border-t border-neutral-200 font-semibold">
+                <td className="px-4 py-2" colSpan={4} />
+                <td className="px-4 py-2 text-right text-xs font-normal text-neutral-500">Total con IVA</td>
                 <td className="px-4 py-2 text-right tabular-nums">{fmt(total)}</td>
                 <td className="px-4 py-2" colSpan={2} />
               </tr>
@@ -213,6 +229,14 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
           )}
         </table>
       </div>
+
+      {facturas.length > 0 && (
+        <p className="mt-3 text-xs text-neutral-500">
+          La <strong>Base sin IVA</strong> es lo que aparece como compras en el Estado de Resultados (el IVA es un
+          crédito recuperable, no un costo). El <strong>Total con IVA</strong> es lo que se le debe al proveedor (la
+          cuenta por pagar).
+        </p>
+      )}
     </div>
   );
 }
