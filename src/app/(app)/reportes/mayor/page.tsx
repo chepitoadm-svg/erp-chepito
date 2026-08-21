@@ -15,9 +15,20 @@ interface MayorRow {
   asiento_tipo: string;
   glosa: string | null;
   centro_codigo: string | null;
+  origen_tipo: string | null;
+  origen_id: string | null;
   debito: number;
   credito: number;
   saldo: number;
+}
+
+// Pantalla de origen del asiento, para abrirlo y ver/modificar.
+function hrefOrigen(m: MayorRow): string {
+  if (m.origen_id) {
+    if (m.origen_tipo === "gasto") return `/gastos/${m.origen_id}`;
+    if (m.origen_tipo === "factura_compra") return `/compras/facturas/${m.origen_id}`;
+  }
+  return `/asientos/${m.asiento_id}`;
 }
 
 export default async function MayorPage({
@@ -136,7 +147,13 @@ export default async function MayorPage({
                   <tr key={i} className="border-t border-neutral-100">
                     <td className="px-3 py-1.5 text-neutral-600">{m.fecha}</td>
                     <td className="px-3 py-1.5">
-                      <Link href={`/asientos/${m.asiento_id}`} className="text-neutral-700 hover:text-neutral-900">
+                      <Link
+                        href={hrefOrigen(m)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-neutral-700 underline decoration-dotted underline-offset-2 hover:text-neutral-900"
+                        title="Abrir el origen (gasto/factura/asiento) en otra pestaña"
+                      >
                         {m.asiento_numero ? `${m.asiento_tipo.slice(0, 3).toUpperCase()}-${m.asiento_numero}` : m.asiento_tipo}
                       </Link>
                     </td>

@@ -1138,6 +1138,8 @@ export interface Database {
           asiento_numero: number | null;
           glosa: string;
           centro_codigo: string | null;
+          origen_tipo: string | null;
+          origen_id: string | null;
           debito: number;
           credito: number;
           saldo: number;
