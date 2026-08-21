@@ -4,6 +4,7 @@ import { tienePermiso } from "@/lib/auth/permisos";
 import { mayorCuenta } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 import SelectBuscable from "@/components/SelectBuscable";
+import BotonVolver from "@/components/BotonVolver";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -68,9 +69,7 @@ export default async function MayorPage({
 
   return (
     <div>
-      <Link href="/reportes" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Reportes
-      </Link>
+      <BotonVolver fallback="/reportes" />
       <h1 className="mt-1 text-lg font-semibold text-neutral-900">Libro Mayor</h1>
       <p className="mb-4 text-sm text-neutral-500">Movimientos y saldo acumulado de una cuenta.</p>
 
@@ -152,10 +151,8 @@ export default async function MayorPage({
                     <td className="px-3 py-1.5">
                       <Link
                         href={hrefOrigen(m)}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className={`underline decoration-dotted underline-offset-2 hover:text-neutral-900 ${anulado ? "" : "text-neutral-700"}`}
-                        title="Abrir el origen (gasto/factura/asiento) en otra pestaña"
+                        title="Abrir el origen (gasto/factura/asiento)"
                       >
                         {m.asiento_numero ? `${m.asiento_tipo.slice(0, 3).toUpperCase()}-${m.asiento_numero}` : m.asiento_tipo}
                       </Link>

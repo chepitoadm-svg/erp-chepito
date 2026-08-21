@@ -4,6 +4,7 @@ import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerGasto, bancoDeAsiento } from "@/lib/data/gastos";
 import { confirmarGasto } from "../actions";
 import AnularGasto from "@/components/AnularGasto";
+import BotonVolver from "@/components/BotonVolver";
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,9 +28,7 @@ export default async function GastoDetallePage({
 
   return (
     <div>
-      <Link href="/gastos" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Gastos
-      </Link>
+      <BotonVolver fallback="/gastos" />
 
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
