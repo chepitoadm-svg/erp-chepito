@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { crearAjuste, type FormState } from "@/app/(app)/inventario/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -110,18 +111,13 @@ export default function AjusteForm({ articulos, bodegas }: Props) {
             {lineas.map((l, i) => (
               <tr key={i}>
                 <td className="px-3 py-2">
-                  <select
+                  <SelectBuscable
                     value={l.articulo_id}
-                    onChange={(e) => setLinea(i, "articulo_id", e.target.value)}
-                    className="w-full min-w-[220px] rounded-md border border-neutral-300 px-2 py-1.5 outline-none focus:border-neutral-900"
-                  >
-                    <option value="">Elegí un artículo…</option>
-                    {articulos.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.codigo} — {a.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setLinea(i, "articulo_id", v)}
+                    placeholder="Buscar artículo…"
+                    options={articulos.map((a) => ({ value: a.id, label: `${a.codigo} — ${a.nombre}` }))}
+                    className="w-full min-w-[220px] rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-900"
+                  />
                   <input
                     type="text"
                     value={l.detalle}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import type { FormState } from "@/app/(app)/compras/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -87,18 +88,13 @@ export default function ProveedorForm({ modo, action, cuentasCxp, inicial }: Pro
 
       <div>
         <label className="block text-sm font-medium text-neutral-700">Cuenta de CxP</label>
-        <select
+        <SelectBuscable
           name="cuenta_cxp_id"
           defaultValue={inicial?.cuenta_cxp_id ?? ""}
+          placeholder="— Cuenta de CxP por defecto —"
+          options={cuentasCxp.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
           className={inputCls}
-        >
-          <option value="">— Cuenta de CxP por defecto —</option>
-          {cuentasCxp.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.codigo} — {c.nombre}
-            </option>
-          ))}
-        </select>
+        />
         <p className="mt-1 text-xs text-neutral-500">
           Si se deja vacío, las facturas usan la CxP general (21-10-01).
         </p>

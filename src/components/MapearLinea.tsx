@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { mapearLinea, type FormState } from "@/app/(app)/compras/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -83,14 +84,12 @@ export default function MapearLinea({
 
       {modo === "existente" ? (
         <div className="mb-2">
-          <select name="articulo_id" defaultValue="" className={inputCls + " w-full sm:w-96"}>
-            <option value="">Elegí el artículo…</option>
-            {articulos.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.codigo} — {a.nombre}
-              </option>
-            ))}
-          </select>
+          <SelectBuscable
+            name="articulo_id"
+            placeholder="Escribí para buscar el artículo…"
+            options={articulos.map((a) => ({ value: a.id, label: `${a.codigo} — ${a.nombre}` }))}
+            className={inputCls + " w-full sm:w-96"}
+          />
         </div>
       ) : (
         <div className="mb-2 flex flex-wrap gap-2">

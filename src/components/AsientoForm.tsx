@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import type { FormState } from "@/app/(app)/asientos/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Cuenta {
   id: string;
@@ -163,18 +164,13 @@ export default function AsientoForm({ modo, action, cuentas, centros, inicial }:
               return (
                 <tr key={i}>
                   <td className="px-3 py-2">
-                    <select
+                    <SelectBuscable
                       value={l.cuenta_id}
-                      onChange={(e) => setLinea(i, "cuenta_id", e.target.value)}
-                      className="w-full min-w-[220px] rounded-md border border-neutral-300 px-2 py-1.5 outline-none focus:border-neutral-900"
-                    >
-                      <option value="">Elegí una cuenta…</option>
-                      {cuentas.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.codigo} — {c.nombre}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setLinea(i, "cuenta_id", v)}
+                      placeholder="Escribí para buscar la cuenta…"
+                      options={cuentas.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
+                      className="w-full min-w-[220px] rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-900"
+                    />
                     {l.detalle !== undefined && (
                       <input
                         type="text"

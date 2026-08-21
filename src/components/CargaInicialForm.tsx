@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { cargarSaldoInicial, type FormState } from "@/app/(app)/inventario/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -28,16 +29,13 @@ export default function CargaInicialForm({ articulos, bodegas }: Props) {
     >
       <div>
         <label className="block text-xs text-neutral-500">Artículo</label>
-        <select name="articulo_id" required defaultValue="" className={inputCls + " w-64"}>
-          <option value="" disabled>
-            Seleccioná…
-          </option>
-          {articulos.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.codigo} — {a.nombre}
-            </option>
-          ))}
-        </select>
+        <SelectBuscable
+          name="articulo_id"
+          required
+          placeholder="Escribí para buscar el artículo…"
+          options={articulos.map((a) => ({ value: a.id, label: `${a.codigo} — ${a.nombre}` }))}
+          className={inputCls + " w-64"}
+        />
       </div>
       <div>
         <label className="block text-xs text-neutral-500">Bodega</label>

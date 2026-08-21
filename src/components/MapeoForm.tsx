@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { agregarMapeo, type FormState } from "@/app/(app)/compras/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -34,16 +35,13 @@ export default function MapeoForm({ proveedorId, articulos, unidades }: Props) {
       </div>
       <div>
         <label className="block text-xs text-neutral-500">Artículo</label>
-        <select name="articulo_id" required defaultValue="" className={inputCls + " w-56"}>
-          <option value="" disabled>
-            Seleccioná…
-          </option>
-          {articulos.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.codigo} — {a.nombre}
-            </option>
-          ))}
-        </select>
+        <SelectBuscable
+          name="articulo_id"
+          required
+          placeholder="Escribí para buscar…"
+          options={articulos.map((a) => ({ value: a.id, label: `${a.codigo} — ${a.nombre}` }))}
+          className={inputCls + " w-56"}
+        />
       </div>
       <div>
         <label className="block text-xs text-neutral-500">Unidad compra</label>

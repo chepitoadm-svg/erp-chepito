@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarArticulosParaSelector, listarKardex } from "@/lib/data/inventario";
+import SelectBuscable from "@/components/SelectBuscable";
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -43,18 +44,13 @@ export default async function KardexPage({
       <form method="GET" className="mb-6 flex items-end gap-3">
         <div>
           <label className="block text-xs text-neutral-500">Artículo</label>
-          <select
+          <SelectBuscable
             name="articulo"
             defaultValue={seleccionado}
+            placeholder="Escribí para buscar el artículo…"
+            options={articulos.map((a) => ({ value: a.id, label: `${a.codigo} — ${a.nombre}` }))}
             className="mt-1 w-80 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-          >
-            <option value="">Seleccioná un artículo…</option>
-            {articulos.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.codigo} — {a.nombre}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <button
           type="submit"

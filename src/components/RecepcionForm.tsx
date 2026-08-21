@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { crearRecepcion, type FormState } from "@/app/(app)/compras/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -68,18 +69,13 @@ export default function RecepcionForm({ proveedores, bodegas, articulos }: Props
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label className="block text-sm font-medium text-neutral-700">Proveedor</label>
-          <select
+          <SelectBuscable
             value={proveedor}
-            onChange={(e) => setProveedor(e.target.value)}
+            onChange={setProveedor}
+            placeholder="Escribí para buscar…"
+            options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
             className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-          >
-            <option value="">Seleccioná…</option>
-            {proveedores.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Bodega de ingreso</label>
@@ -123,18 +119,13 @@ export default function RecepcionForm({ proveedores, bodegas, articulos }: Props
             {lineas.map((l, i) => (
               <tr key={i}>
                 <td className="px-3 py-2">
-                  <select
+                  <SelectBuscable
                     value={l.articulo_id}
-                    onChange={(e) => setLinea(i, "articulo_id", e.target.value)}
-                    className="w-full min-w-[220px] rounded-md border border-neutral-300 px-2 py-1.5 outline-none focus:border-neutral-900"
-                  >
-                    <option value="">Elegí…</option>
-                    {articulos.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.codigo} — {a.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setLinea(i, "articulo_id", v)}
+                    placeholder="Buscar artículo…"
+                    options={articulos.map((a) => ({ value: a.id, label: `${a.codigo} — ${a.nombre}` }))}
+                    className="w-full min-w-[220px] rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-900"
+                  />
                 </td>
                 <td className="px-3 py-2">
                   <input

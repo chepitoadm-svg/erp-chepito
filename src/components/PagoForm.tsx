@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { crearPago, type FormState } from "@/app/(app)/compras/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 interface CxP {
@@ -78,14 +79,13 @@ export default function PagoForm({ proveedorId, proveedorNombre, cxp, cuentas }:
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Cuenta de origen</label>
-          <select value={cuenta} onChange={(e) => setCuenta(e.target.value)} className={inputCls}>
-            <option value="">Caja o banco…</option>
-            {cuentas.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.codigo} — {c.nombre}
-              </option>
-            ))}
-          </select>
+          <SelectBuscable
+            value={cuenta}
+            onChange={setCuenta}
+            placeholder="Caja o banco…"
+            options={cuentas.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
+            className={inputCls}
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Referencia</label>

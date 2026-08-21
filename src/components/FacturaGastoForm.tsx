@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { crearFacturaGasto, type FormState } from "@/app/(app)/compras/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 
 interface Opcion {
   id: string;
@@ -72,14 +73,13 @@ export default function FacturaGastoForm({ proveedores, cuentas, centros }: Prop
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-neutral-700">Proveedor</label>
-          <select value={proveedor} onChange={(e) => onProveedor(e.target.value)} className={inputCls}>
-            <option value="">Seleccioná…</option>
-            {proveedores.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+          <SelectBuscable
+            value={proveedor}
+            onChange={onProveedor}
+            placeholder="Escribí para buscar…"
+            options={proveedores.map((p) => ({ value: p.id, label: p.nombre }))}
+            className={inputCls}
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Clave / N.º factura</label>
@@ -89,14 +89,13 @@ export default function FacturaGastoForm({ proveedores, cuentas, centros }: Prop
 
       <div>
         <label className="block text-sm font-medium text-neutral-700">Cuenta de gasto</label>
-        <select value={cuenta} onChange={(e) => setCuenta(e.target.value)} className={inputCls}>
-          <option value="">Elegí a qué gasto va…</option>
-          {cuentas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.codigo} — {c.nombre}
-            </option>
-          ))}
-        </select>
+        <SelectBuscable
+          value={cuenta}
+          onChange={setCuenta}
+          placeholder="Escribí para buscar la cuenta…"
+          options={cuentas.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
+          className={inputCls}
+        />
       </div>
 
       <div>

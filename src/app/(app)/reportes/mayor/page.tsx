@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { mayorCuenta } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
+import SelectBuscable from "@/components/SelectBuscable";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -34,14 +35,13 @@ export default async function MayorPage({
       <form method="get" className="mb-5 flex flex-wrap items-end gap-3 text-sm">
         <div>
           <label className="block text-xs text-neutral-500">Cuenta</label>
-          <select name="cuenta" defaultValue={cuentaId} className="min-w-[280px] rounded-md border border-neutral-300 px-2 py-1.5">
-            <option value="">Elegí una cuenta…</option>
-            {cuentas.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.codigo} — {c.nombre}
-              </option>
-            ))}
-          </select>
+          <SelectBuscable
+            name="cuenta"
+            defaultValue={cuentaId}
+            placeholder="Escribí para buscar la cuenta…"
+            options={cuentas.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
+            className="mt-1 min-w-[280px] rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+          />
         </div>
         <div>
           <label className="block text-xs text-neutral-500">Desde</label>

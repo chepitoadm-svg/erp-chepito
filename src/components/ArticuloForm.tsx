@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import type { FormState } from "@/app/(app)/inventario/actions";
+import SelectBuscable from "@/components/SelectBuscable";
 import type { ArticuloTipo } from "@/types/database";
 
 interface Opcion {
@@ -126,18 +127,13 @@ export default function ArticuloForm({
         <label className="block text-sm font-medium text-neutral-700">
           Cuenta de inventario
         </label>
-        <select
+        <SelectBuscable
           name="cuenta_inventario_id"
           defaultValue={inicial?.cuenta_inventario_id ?? ""}
+          placeholder="— Sin cuenta específica —"
+          options={cuentas.map((c) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
           className={inputCls}
-        >
-          <option value="">— Sin cuenta específica —</option>
-          {cuentas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.codigo} — {c.nombre}
-            </option>
-          ))}
-        </select>
+        />
         <p className="mt-1 text-xs text-neutral-500">
           A dónde postea el valor del inventario de este artículo.
         </p>
