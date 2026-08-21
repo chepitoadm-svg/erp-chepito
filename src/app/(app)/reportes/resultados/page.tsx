@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { estadoResultados } from "@/lib/data/reportes";
+import { listarCuentasPosteables } from "@/lib/data/asientos";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -26,7 +27,21 @@ export default async function ResultadosPage({
   const hasta = sp.hasta || "2026-07-31";
   const conProrrateo = sp.prorrateo !== "no";
 
-  const filas = (await estadoResultados(desde, hasta, conProrrateo)) as Fila[];
+  const [filas, cuentas] = await Promise.all([
+    estadoResultados(desde, hasta, conProrrateo) as Promise<Fila[]>,
+    listarCuentasPosteables(),
+  ]);
+  // código de cuenta -> id, para enlazar cada celda al Libro Mayor (drill-down).
+  const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
+  const hrefMayor = (cod: string, centro: string) => {
+    const id = codToId.get(cod);
+    if (!id) return null;
+    const p = new URLSearchParams({ cuenta: id, desde, hasta });
+    if (centro !== "TOTAL") p.set("centro", centro);
+    if (!conProrrateo) p.set("prorrateo", "no");
+    return `/reportes/mayor?${p.toString()}`;
+  };
+
   const centros = Array.from(new Set(filas.map((f) => f.centro_codigo))).sort();
   const cols = [...centros, "TOTAL"];
   const conTotal = (celdas: Record<string, number>) => {
@@ -73,13 +88,6 @@ export default async function ResultadosPage({
   const utilOper = combinar((c) => utilBruta[c] - (tGastosOper[c] ?? 0));
   const antesImp = combinar((c) => utilOper[c] + (tOtrosIng[c] ?? 0) - (tOtrosGas[c] ?? 0));
 
-  const Celdas = ({ celdas, neg }: { celdas: Record<string, number>; neg?: boolean }) =>
-    cols.map((c) => (
-      <td key={c} className="px-3 py-1.5 text-right tabular-nums text-neutral-600">
-        {celdas[c] ? (neg && celdas[c] > 0 ? `(${money(celdas[c])})` : money(celdas[c])) : ""}
-      </td>
-    ));
-
   const SeccionRows = ({ titulo, rows, total, neg }: { titulo: string; rows: ReturnType<typeof armar>; total: Record<string, number>; neg?: boolean }) =>
     rows.length === 0 ? null : (
       <>
@@ -93,7 +101,26 @@ export default async function ResultadosPage({
             <td className="px-3 py-1.5 text-neutral-700">
               <span className="text-neutral-400">{r.cod}</span> {r.nombre}
             </td>
-            <Celdas celdas={r.celdas} neg={neg} />
+            {cols.map((c) => {
+              const v = r.celdas[c] ?? 0;
+              const txt = v ? (neg && v > 0 ? `(${money(v)})` : money(v)) : "";
+              const href = v ? hrefMayor(r.cod, c) : null;
+              return (
+                <td key={c} className="px-3 py-1.5 text-right tabular-nums">
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="text-neutral-600 underline decoration-dotted underline-offset-2 hover:text-neutral-900"
+                      title="Ver el detalle en el Libro Mayor"
+                    >
+                      {txt}
+                    </Link>
+                  ) : (
+                    <span className="text-neutral-600">{txt}</span>
+                  )}
+                </td>
+              );
+            })}
           </tr>
         ))}
         <tr className="border-t border-neutral-200 text-sm font-medium text-neutral-700">
