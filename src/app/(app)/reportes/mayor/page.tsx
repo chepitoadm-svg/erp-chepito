@@ -36,14 +36,12 @@ export default async function MayorPage({
   const centro = sp.centro || "";
   const sinProrrateo = sp.prorrateo === "no";
 
-  const crudos = (cuentaId ? await mayorCuenta(cuentaId, desde || undefined, hasta || undefined) : []) as MayorRow[];
-  // Filtros de drill-down: por centro y (opcional) excluyendo prorrateo, para que
-  // el detalle cuadre con la celda del Estado de Resultados desde donde se llegó.
-  const filtrados = crudos.filter(
-    (m) => (!centro || m.centro_codigo === centro) && (!sinProrrateo || m.asiento_tipo !== "prorrateo"),
-  );
-  // Cuando hay filtro, el saldo acumulado del RPC ya no aplica: se recalcula.
-  const hayFiltro = !!centro || sinProrrateo;
+  // El prorrateo (y sus reversiones) se excluye en el servidor cuando sinProrrateo,
+  // igual que en el Estado de Resultados, para que el detalle cuadre con la celda.
+  const crudos = (cuentaId ? await mayorCuenta(cuentaId, desde || undefined, hasta || undefined, sinProrrateo) : []) as MayorRow[];
+  const filtrados = centro ? crudos.filter((m) => m.centro_codigo === centro) : crudos;
+  // Al filtrar por centro el saldo acumulado del RPC ya no aplica: se recalcula.
+  const hayFiltro = !!centro;
   let acc = 0;
   const movs = filtrados.map((m) => {
     acc += Number(m.debito) - Number(m.credito);

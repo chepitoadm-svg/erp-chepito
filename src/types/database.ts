@@ -1130,7 +1130,7 @@ export interface Database {
         }[];
       };
       app_mayor_cuenta: {
-        Args: { p_cuenta_id: string; p_desde?: string | null; p_hasta?: string | null };
+        Args: { p_cuenta_id: string; p_desde?: string | null; p_hasta?: string | null; p_excluir_prorrateo?: boolean };
         Returns: {
           fecha: string;
           asiento_id: string;
