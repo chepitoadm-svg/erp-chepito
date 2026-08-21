@@ -111,6 +111,42 @@ export interface GastoDetalle {
   asiento_numero: number | null;
 }
 
+export interface GastoEditable {
+  id: string;
+  estado: GastoEstado;
+  centro_costo_id: string;
+  fecha: string;
+  cuenta_gasto_id: string;
+  cuenta_pago_id: string;
+  proveedor_id: string | null;
+  fecha_vencimiento: string | null;
+  subtotal: number;
+  iva: number;
+  descripcion: string | null;
+}
+
+/** Campos crudos de un gasto, para precargar el formulario de edición. */
+export async function obtenerGastoEditable(id: string): Promise<GastoEditable | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("gastos")
+    .select(
+      "id, estado, centro_costo_id, fecha, cuenta_gasto_id, cuenta_pago_id, proveedor_id, fecha_vencimiento, subtotal, iva, descripcion",
+    )
+    .eq("id", id)
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`No se pudo cargar el gasto: ${error.message}`);
+  }
+  const g = data as unknown as GastoEditable;
+  return {
+    ...g,
+    subtotal: Number(g.subtotal),
+    iva: Number(g.iva),
+  };
+}
+
 export async function obtenerGasto(id: string): Promise<GastoDetalle | null> {
   const supabase = await createClient();
   const { data, error } = await supabase

@@ -40,7 +40,17 @@ export default async function GastoDetallePage({
           </p>
           {g.descripcion && <p className="text-xs text-neutral-400">{g.descripcion}</p>}
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[g.estado]}`}>{g.estado}</span>
+        <div className="flex items-center gap-3">
+          {g.estado !== "anulado" && (
+            <Link
+              href={`/gastos/${g.id}/editar`}
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              Editar
+            </Link>
+          )}
+          <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[g.estado]}`}>{g.estado}</span>
+        </div>
       </div>
 
       {g.asiento_id && (

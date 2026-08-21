@@ -57,6 +57,91 @@ export async function crearGasto(_prev: FormState, formData: FormData): Promise<
   redirect(`/gastos/${id}`);
 }
 
+// Lee del FormData los campos del gasto (compartido crear/editar).
+function leerGasto(formData: FormData) {
+  const desc = String(formData.get("descripcion") ?? "").trim();
+  const porPagar = String(formData.get("modo") ?? "pagado") === "por_pagar";
+  const cuentaPago = String(formData.get("cuenta_pago_id") ?? "").trim();
+  const proveedor = String(formData.get("proveedor_id") ?? "").trim();
+  const vencimiento = String(formData.get("fecha_vencimiento") ?? "").trim();
+  return {
+    centro_costo_id: String(formData.get("centro_costo_id") ?? ""),
+    fecha: String(formData.get("fecha") ?? ""),
+    cuenta_gasto_id: String(formData.get("cuenta_gasto_id") ?? ""),
+    cuenta_pago_id: porPagar ? null : cuentaPago || null,
+    proveedor_id: porPagar ? proveedor || null : null,
+    fecha_vencimiento: porPagar ? vencimiento || null : null,
+    subtotal: num(formData.get("subtotal")),
+    iva: num(formData.get("iva")),
+    descripcion: desc || null,
+  };
+}
+
+// Edita un gasto. Borrador: actualiza en el acto. Confirmado: anula el viejo
+// (reversa asiento + CxP) y crea+confirma el corregido (el asiento es inmutable).
+export async function editarGasto(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("gastos.registrar");
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Falta el gasto." };
+  const parsed = crearGastoSchema.safeParse(leerGasto(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const d = parsed.data;
+
+  const supabase = await createClient();
+  const { data: g } = await supabase.from("gastos").select("estado").eq("id", id).single();
+  if (!g) return { error: "Gasto inexistente." };
+
+  if (g.estado === "borrador") {
+    const { error } = await supabase.rpc("fn_actualizar_gasto", {
+      p_gasto: id,
+      p_centro: d.centro_costo_id,
+      p_fecha: d.fecha,
+      p_cuenta_gasto: d.cuenta_gasto_id,
+      p_cuenta_pago: d.cuenta_pago_id ?? null,
+      p_subtotal: d.subtotal,
+      p_iva: d.iva,
+      p_descripcion: d.descripcion ?? null,
+      p_proveedor: d.proveedor_id ?? null,
+      p_vencimiento: d.fecha_vencimiento ?? null,
+    });
+    if (error) return { error: limpiar(error.message) };
+    redirect(`/gastos/${id}`);
+  }
+
+  if (g.estado === "confirmado") {
+    const { error: eAnul } = await supabase.rpc("fn_anular_gasto", {
+      p_gasto: id,
+      p_motivo: "Editado (corrección)",
+    });
+    if (eAnul) {
+      const m = eAnul.message;
+      return {
+        error: m.includes("pagos aplicados")
+          ? "Este gasto ya tiene un pago aplicado; anulá el pago antes de editarlo."
+          : limpiar(m),
+      };
+    }
+    const { data: nuevoId, error: eCrear } = await supabase.rpc("fn_crear_gasto", {
+      p_centro: d.centro_costo_id,
+      p_fecha: d.fecha,
+      p_cuenta_gasto: d.cuenta_gasto_id,
+      p_cuenta_pago: d.cuenta_pago_id ?? null,
+      p_subtotal: d.subtotal,
+      p_iva: d.iva,
+      p_descripcion: d.descripcion ?? null,
+      p_proveedor: d.proveedor_id ?? null,
+      p_vencimiento: d.fecha_vencimiento ?? null,
+    });
+    if (eCrear || !nuevoId) return { error: limpiar(eCrear?.message ?? "No se pudo recrear el gasto.") };
+    const { error: eConf } = await supabase.rpc("fn_confirmar_gasto", { p_gasto: nuevoId });
+    if (eConf) return { error: limpiar(eConf.message) };
+    revalidatePath("/gastos");
+    redirect(`/gastos/${nuevoId}`);
+  }
+
+  return { error: "Un gasto anulado no se edita." };
+}
+
 // Crea un proveedor rápido (solo nombre + cédula) desde el formulario de gasto,
 // para no tener que salir a Compras → Proveedores. Devuelve el id para
 // seleccionarlo de una.

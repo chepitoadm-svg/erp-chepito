@@ -2,6 +2,21 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { crearGasto, crearProveedorRapido, type FormState } from "@/app/(app)/gastos/actions";
+
+export interface GastoInicial {
+  id: string;
+  centro_costo_id: string;
+  fecha: string;
+  cuenta_gasto_id: string;
+  cuenta_pago_id: string;
+  proveedor_id: string | null;
+  fecha_vencimiento: string | null;
+  subtotal: number;
+  iva: number;
+  descripcion: string | null;
+}
+
+type AccionGasto = (prev: FormState, formData: FormData) => Promise<FormState>;
 import type { CuentaOpcion, CuentasPagoGasto } from "@/lib/data/gastos";
 
 const inicial: FormState = {};
@@ -30,21 +45,25 @@ export default function GastoForm({
   cuentasPago,
   proveedores,
   hoy,
+  accion = crearGasto,
+  initial,
 }: {
   centros: Centro[];
   cuentasGasto: CuentaOpcion[];
   cuentasPago: CuentasPagoGasto;
   proveedores: Proveedor[];
   hoy: string;
+  accion?: AccionGasto;
+  initial?: GastoInicial;
 }) {
-  const [state, formAction, pending] = useActionState(crearGasto, inicial);
-  const [subtotal, setSubtotal] = useState("");
-  const [iva, setIva] = useState("");
-  const [modo, setModo] = useState<"pagado" | "por_pagar">("pagado");
+  const [state, formAction, pending] = useActionState(accion, inicial);
+  const [subtotal, setSubtotal] = useState(initial ? String(initial.subtotal) : "");
+  const [iva, setIva] = useState(initial ? String(initial.iva) : "");
+  const [modo, setModo] = useState<"pagado" | "por_pagar">(initial?.proveedor_id ? "por_pagar" : "pagado");
 
   // Proveedor: lista + los creados al vuelo desde este form.
   const [provExtra, setProvExtra] = useState<Proveedor[]>([]);
-  const [provSel, setProvSel] = useState("");
+  const [provSel, setProvSel] = useState(initial?.proveedor_id ?? "");
   const [nuevoProv, setNuevoProv] = useState(false);
   const [pNombre, setPNombre] = useState("");
   const [pCedula, setPCedula] = useState("");
@@ -78,10 +97,11 @@ export default function GastoForm({
 
   return (
     <form action={formAction} className="max-w-xl space-y-5">
+      {initial && <input type="hidden" name="id" value={initial.id} />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="text-xs uppercase tracking-wide text-neutral-500">Centro de costo</span>
-          <select name="centro_costo_id" required defaultValue="" className={campo}>
+          <select name="centro_costo_id" required defaultValue={initial?.centro_costo_id ?? ""} className={campo}>
             <option value="" disabled>
               Elegí el centro…
             </option>
@@ -94,13 +114,13 @@ export default function GastoForm({
         </label>
         <label className="block">
           <span className="text-xs uppercase tracking-wide text-neutral-500">Fecha</span>
-          <input type="date" name="fecha" required defaultValue={hoy} className={campo} />
+          <input type="date" name="fecha" required defaultValue={initial?.fecha ?? hoy} className={campo} />
         </label>
       </div>
 
       <label className="block">
         <span className="text-xs uppercase tracking-wide text-neutral-500">Cuenta de gasto</span>
-        <select name="cuenta_gasto_id" required defaultValue="" className={campo}>
+        <select name="cuenta_gasto_id" required defaultValue={initial?.cuenta_gasto_id ?? ""} className={campo}>
           <option value="" disabled>
             Elegí la cuenta…
           </option>
@@ -143,7 +163,7 @@ export default function GastoForm({
         {modo === "pagado" ? (
           <label className="mt-3 block">
             <span className="text-xs uppercase tracking-wide text-neutral-500">¿De dónde sale?</span>
-            <select name="cuenta_pago_id" required defaultValue="" className={campo}>
+            <select name="cuenta_pago_id" required defaultValue={initial?.cuenta_pago_id ?? ""} className={campo}>
               <option value="" disabled>
                 Elegí caja / banco…
               </option>
@@ -189,7 +209,13 @@ export default function GastoForm({
             </label>
             <label className="block">
               <span className="text-xs uppercase tracking-wide text-neutral-500">Vence</span>
-              <input type="date" name="fecha_vencimiento" required defaultValue={hoy} className={campo} />
+              <input
+                type="date"
+                name="fecha_vencimiento"
+                required
+                defaultValue={initial?.fecha_vencimiento ?? hoy}
+                className={campo}
+              />
             </label>
 
             {nuevoProv && (
@@ -279,6 +305,7 @@ export default function GastoForm({
           type="text"
           name="descripcion"
           maxLength={300}
+          defaultValue={initial?.descripcion ?? ""}
           placeholder="Ej: alquiler de julio, recibo de luz…"
           className={campo}
         />
@@ -296,9 +323,11 @@ export default function GastoForm({
           disabled={pending || parse(subtotal) <= 0}
           className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
         >
-          {pending ? "Guardando…" : "Guardar borrador"}
+          {pending ? "Guardando…" : initial ? "Guardar cambios" : "Guardar borrador"}
         </button>
-        <span className="text-sm text-neutral-500">El asiento se postea al confirmar.</span>
+        <span className="text-sm text-neutral-500">
+          {initial ? "Si el gasto estaba confirmado, se rehace el asiento solo." : "El asiento se postea al confirmar."}
+        </span>
       </div>
     </form>
   );

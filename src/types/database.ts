@@ -1224,6 +1224,21 @@ export interface Database {
       };
       fn_confirmar_gasto: { Args: { p_gasto: string }; Returns: string };
       fn_anular_gasto: { Args: { p_gasto: string; p_motivo: string }; Returns: undefined };
+      fn_actualizar_gasto: {
+        Args: {
+          p_gasto: string;
+          p_centro: string;
+          p_fecha: string;
+          p_cuenta_gasto: string;
+          p_cuenta_pago: string | null;
+          p_subtotal: number;
+          p_iva: number;
+          p_descripcion: string | null;
+          p_proveedor?: string | null;
+          p_vencimiento?: string | null;
+        };
+        Returns: undefined;
+      };
       fn_crear_costo_mes: {
         Args: { p_periodo: string; p_consumo_teorico: number; p_lineas: unknown };
         Returns: string;
