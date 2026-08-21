@@ -1262,6 +1262,7 @@ export interface Database {
         Returns: string;
       };
       fn_conciliar_linea: { Args: { p_linea: string; p_asiento_linea: string }; Returns: undefined };
+      fn_conciliar_grupo: { Args: { p_asiento_linea: string; p_lineas: string[] }; Returns: undefined };
       fn_desconciliar_linea: { Args: { p_linea: string }; Returns: undefined };
       fn_marcar_conciliada: { Args: { p_conciliacion: string }; Returns: undefined };
       fn_anular_conciliacion: { Args: { p_conciliacion: string; p_motivo: string }; Returns: undefined };

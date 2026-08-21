@@ -120,6 +120,21 @@ export async function conciliarLinea(formData: FormData): Promise<void> {
   revalidatePath(`/tesoreria/conciliaciones`);
 }
 
+// Empareja UN movimiento de libros con VARIAS líneas del banco (si la suma calza).
+export async function conciliarGrupo(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const mov = String(formData.get("asiento_linea_id") ?? "");
+  const lineas = String(formData.get("lineas") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!mov || lineas.length === 0) throw new Error("Elegí un movimiento de libros y al menos una línea del banco.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/tesoreria/conciliaciones`);
+}
+
 export async function desconciliarLinea(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const linea = String(formData.get("linea_id") ?? "");

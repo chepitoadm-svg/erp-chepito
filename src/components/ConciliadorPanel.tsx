@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
-  conciliarLinea,
+  conciliarGrupo,
   desconciliarLinea,
   conciliarAutomatico,
   registrarAsientoBanco,
@@ -222,7 +222,7 @@ export default function ConciliadorPanel({
   editable: boolean;
 }) {
   const [tab, setTab] = useState<"pendientes" | "conciliados">("pendientes");
-  const [selBanco, setSelBanco] = useState<string | null>(null);
+  const [selBancos, setSelBancos] = useState<Set<string>>(new Set());
   const [selLibro, setSelLibro] = useState<string | null>(null);
   const [modoRegistrar, setModoRegistrar] = useState(false);
   const [sortLibros, setSortLibros] = useState<SortState>({ key: null, dir: "asc" });
@@ -255,23 +255,32 @@ export default function ConciliadorPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lineas, sortBanco]);
 
-  const banco = pendientes.find((l) => l.id === selBanco) ?? null;
+  const bancosSel = pendientes.filter((l) => selBancos.has(l.id));
   const libro = movimientos.find((m) => m.id === selLibro) ?? null;
+  const toggleBanco = (id: string) =>
+    setSelBancos((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
 
-  // Regla: débito del banco = crédito en libros y viceversa.
+  // Suma de las líneas del banco seleccionadas.
+  const sumBancoDebito = bancosSel.reduce((s, l) => s + l.debito, 0);
+  const sumBancoCredito = bancosSel.reduce((s, l) => s + l.credito, 0);
+  // Regla: SUM(crédito banco) = Debe libros y SUM(débito banco) = Haber libros.
+  const grupoCalza =
+    !!libro && bancosSel.length > 0 && c2(sumBancoCredito) === c2(libro.debito) && c2(sumBancoDebito) === c2(libro.credito);
+
+  // Sugerencias: al elegir un movimiento de libros, resaltar las líneas del
+  // banco que calzan una a una (atajo para el caso 1:1).
   const compatible = (l: LineaBanco, m: MovimientoLibro) =>
     c2(l.debito) === c2(m.credito) && c2(l.credito) === c2(m.debito);
-  const parCalza = banco && libro ? compatible(banco, libro) : false;
-
-  // Sugerencias: al elegir un lado, resaltar los del otro que calzan.
-  const librosSugeridos = useMemo(
-    () => (banco ? new Set(movimientos.filter((m) => compatible(banco, m)).map((m) => m.id)) : new Set<string>()),
-    [banco, movimientos],
-  );
   const bancosSugeridos = useMemo(
     () => (libro ? new Set(pendientes.filter((l) => compatible(l, libro)).map((l) => l.id)) : new Set<string>()),
     [libro, pendientes],
   );
+  const librosSugeridos = useMemo(() => new Set<string>(), []);
 
   // Filtro "empieza con" (case-insensitive) por texto o por número de documento.
   const empiezaCon = (texto: string, f: string) => texto.toLowerCase().startsWith(f.trim().toLowerCase());
@@ -321,14 +330,14 @@ export default function ConciliadorPanel({
           {/* Barra de acciones */}
           {editable && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <form action={conciliarLinea}>
-                <input type="hidden" name="linea_id" value={selBanco ?? ""} />
+              <form action={conciliarGrupo}>
                 <input type="hidden" name="asiento_linea_id" value={selLibro ?? ""} />
+                <input type="hidden" name="lineas" value={Array.from(selBancos).join(",")} />
                 <button
                   type="submit"
-                  disabled={!parCalza}
+                  disabled={!grupoCalza}
                   className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-                  title={parCalza ? "" : "Elegí una línea de cada lado con montos que calcen"}
+                  title={grupoCalza ? "" : "Elegí un movimiento de libros y una o varias líneas del banco cuya suma calce"}
                 >
                   Conciliar seleccionados
                 </button>
@@ -344,37 +353,42 @@ export default function ConciliadorPanel({
               </form>
               <button
                 type="button"
-                disabled={!selBanco}
+                disabled={bancosSel.length !== 1}
                 onClick={() => setModoRegistrar((v) => !v)}
                 className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-                title={selBanco ? "" : "Elegí primero una línea del banco"}
+                title={bancosSel.length === 1 ? "" : "Elegí exactamente una línea del banco"}
               >
                 Generar asiento del banco
               </button>
 
-              {/* Estado del par seleccionado */}
+              {/* Estado de la selección */}
               <div className="ml-auto text-xs">
-                {banco && libro ? (
-                  parCalza ? (
-                    <span className="rounded-full bg-green-50 px-2 py-1 text-green-700">✓ Montos calzan</span>
+                {libro && bancosSel.length > 0 ? (
+                  grupoCalza ? (
+                    <span className="rounded-full bg-green-50 px-2 py-1 text-green-700">
+                      ✓ Suma calza ({bancosSel.length} línea{bancosSel.length > 1 ? "s" : ""} del banco)
+                    </span>
                   ) : (
-                    <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">✗ No calzan</span>
+                    <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">
+                      ✗ No calza — banco {money(sumBancoCredito - sumBancoDebito)} vs libros {money(libro.debito - libro.credito)}
+                    </span>
                   )
                 ) : (
-                  <span className="text-neutral-400">Elegí una línea de libros y una del banco</span>
+                  <span className="text-neutral-400">Elegí un movimiento de libros y una o varias líneas del banco</span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Registrar asiento del banco (comisión / interés / SINPE) */}
-          {editable && modoRegistrar && banco && (
+          {/* Registrar asiento del banco (comisión / interés / SINPE) — una línea */}
+          {editable && modoRegistrar && bancosSel.length === 1 && (
             <form action={formAction} className="mb-4 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
-              <input type="hidden" name="linea_id" value={banco.id} />
+              <input type="hidden" name="linea_id" value={bancosSel[0].id} />
               <p className="mb-2 text-xs text-neutral-600">
                 Crear el asiento de{" "}
                 <span className="font-medium">
-                  {banco.descripcion} · {banco.debito > 0 ? `sale ₡${money(banco.debito)}` : `entra ₡${money(banco.credito)}`}
+                  {bancosSel[0].descripcion} ·{" "}
+                  {bancosSel[0].debito > 0 ? `sale ₡${money(bancosSel[0].debito)}` : `entra ₡${money(bancosSel[0].credito)}`}
                 </span>{" "}
                 y conciliarlo.
               </p>
@@ -408,7 +422,7 @@ export default function ConciliadorPanel({
               <input
                 type="text"
                 name="glosa"
-                defaultValue={banco.descripcion ?? ""}
+                defaultValue={bancosSel[0].descripcion ?? ""}
                 placeholder="Glosa"
                 className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
               />
@@ -541,15 +555,18 @@ export default function ConciliadorPanel({
                       </tr>
                     )}
                     {pendientesVis.map((l) => {
-                      const sel = l.id === selBanco;
+                      const sel = selBancos.has(l.id);
                       const sug = bancosSugeridos.has(l.id);
                       return (
                         <tr
                           key={l.id}
-                          onClick={editable ? () => setSelBanco(sel ? null : l.id) : undefined}
+                          onClick={editable ? () => toggleBanco(l.id) : undefined}
                           className={`${editable ? "cursor-pointer" : ""} ${sel ? "bg-blue-50" : sug ? "bg-green-50/50" : "hover:bg-neutral-50"}`}
                         >
-                          <td className="whitespace-nowrap px-2 py-1 text-neutral-600">{l.fecha}</td>
+                          <td className="whitespace-nowrap px-2 py-1 text-neutral-600">
+                            {editable && <input type="checkbox" readOnly checked={sel} className="mr-1.5 align-middle" />}
+                            {l.fecha}
+                          </td>
                           <td className="px-2 py-1 text-neutral-700">
                             {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
                             {l.descripcion}
