@@ -201,3 +201,71 @@ export async function obtenerGasto(id: string): Promise<GastoDetalle | null> {
     asiento_numero: g.asiento?.numero ?? null,
   };
 }
+
+export interface MovimientoBancoDeAsiento {
+  cuenta_codigo: string;
+  cuenta_nombre: string;
+  debito: number; // entró al banco
+  credito: number; // salió del banco
+  // Si la línea del banco ya se concilió con el estado de cuenta real:
+  conciliacion_id: string | null;
+  ec_fecha: string | null;
+  ec_referencia: string | null;
+  ec_descripcion: string | null;
+  ec_debito: number | null;
+  ec_credito: number | null;
+}
+
+// Movimiento(s) en cuentas de banco/caja del asiento de un gasto, con la línea
+// del estado de cuenta conciliada si ya se casó. Permite, desde el gasto, ver
+// "cuál fue ese gasto en el banco".
+export async function bancoDeAsiento(asientoId: string): Promise<MovimientoBancoDeAsiento[]> {
+  const supabase = await createClient();
+  const { data: lineas } = await supabase
+    .from("asientos_lineas")
+    .select("id, debito, credito, cuenta:cuentas!inner(codigo, nombre)")
+    .eq("asiento_id", asientoId);
+  const filas = (lineas ?? []) as unknown as {
+    id: string;
+    debito: number;
+    credito: number;
+    cuenta: { codigo: string; nombre: string };
+  }[];
+  const banco = filas.filter((l) => /^11-10-(10|15)-/.test(l.cuenta.codigo));
+  if (banco.length === 0) return [];
+
+  const { data: matches } = await supabase
+    .from("estado_cuenta_lineas")
+    .select("asiento_linea_id, fecha, referencia, descripcion, debito, credito, conciliacion_id")
+    .in(
+      "asiento_linea_id",
+      banco.map((l) => l.id),
+    );
+  const porLinea = new Map(
+    ((matches ?? []) as unknown as {
+      asiento_linea_id: string;
+      fecha: string;
+      referencia: string | null;
+      descripcion: string | null;
+      debito: number;
+      credito: number;
+      conciliacion_id: string;
+    }[]).map((m) => [m.asiento_linea_id, m]),
+  );
+
+  return banco.map((l) => {
+    const m = porLinea.get(l.id);
+    return {
+      cuenta_codigo: l.cuenta.codigo,
+      cuenta_nombre: l.cuenta.nombre,
+      debito: Number(l.debito),
+      credito: Number(l.credito),
+      conciliacion_id: m?.conciliacion_id ?? null,
+      ec_fecha: m?.fecha ?? null,
+      ec_referencia: m?.referencia ?? null,
+      ec_descripcion: m?.descripcion ?? null,
+      ec_debito: m ? Number(m.debito) : null,
+      ec_credito: m ? Number(m.credito) : null,
+    };
+  });
+}

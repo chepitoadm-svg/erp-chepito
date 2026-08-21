@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { obtenerGasto } from "@/lib/data/gastos";
+import { obtenerGasto, bancoDeAsiento } from "@/lib/data/gastos";
 import { confirmarGasto } from "../actions";
 import AnularGasto from "@/components/AnularGasto";
 
@@ -23,6 +23,7 @@ export default async function GastoDetallePage({
   const { id } = await params;
   const g = await obtenerGasto(id);
   if (!g) notFound();
+  const banco = g.asiento_id ? await bancoDeAsiento(g.asiento_id) : [];
 
   return (
     <div>
@@ -116,6 +117,39 @@ export default async function GastoDetallePage({
         <p className="mt-3 max-w-md rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Deuda por pagar a <b>{g.proveedor_nombre}</b>. Saldala en <b>Compras → Pagos</b>.
         </p>
+      )}
+
+      {/* Movimiento en banco: de dónde salió la plata y si ya se concilió */}
+      {banco.length > 0 && (
+        <div className="mt-6 max-w-md">
+          <h2 className="mb-2 text-sm font-medium text-neutral-700">Movimiento en banco</h2>
+          <div className="space-y-2">
+            {banco.map((b, i) => (
+              <div key={i} className="rounded-lg border border-neutral-200 bg-white p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-600">
+                    {b.credito > 0 ? "Salió de" : "Entró a"} {b.cuenta_nombre}
+                  </span>
+                  <span className="font-medium tabular-nums text-neutral-900">
+                    {fmt(b.credito > 0 ? b.credito : b.debito)}
+                  </span>
+                </div>
+                {b.conciliacion_id ? (
+                  <div className="mt-2 rounded-md bg-green-50 px-2 py-1.5 text-xs text-green-800">
+                    ✓ Conciliado con el estado de cuenta: <b>{b.ec_fecha}</b>
+                    {b.ec_referencia ? ` · ${b.ec_referencia}` : ""}
+                    {b.ec_descripcion ? ` · ${b.ec_descripcion}` : ""}{" "}
+                    <Link href={`/tesoreria/conciliaciones/${b.conciliacion_id}`} className="underline hover:no-underline">
+                      ver conciliación
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-neutral-400">Aún no conciliado con el estado de cuenta del banco.</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {g.estado === "borrador" && (
