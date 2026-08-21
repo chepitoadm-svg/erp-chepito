@@ -260,6 +260,15 @@ export default function ConciliadorPanel({
 
   const bancosSel = pendientes.filter((l) => selBancos.has(l.id));
   const libro = movimientos.find((m) => m.id === selLibro) ?? null;
+
+  // Pantalla de origen del movimiento de libros, para abrirlo y modificarlo.
+  const hrefOrigen = (m: MovimientoLibro) => {
+    if (m.origen_id) {
+      if (m.origen_tipo === "gasto") return `/gastos/${m.origen_id}`;
+      if (m.origen_tipo === "factura_compra") return `/compras/facturas/${m.origen_id}`;
+    }
+    return `/asientos/${m.asiento_id}`;
+  };
   const toggleBanco = (id: string) =>
     setSelBancos((prev) => {
       const s = new Set(prev);
@@ -505,8 +514,17 @@ export default function ConciliadorPanel({
                         >
                           <td className="whitespace-nowrap px-2 py-1 text-neutral-600">{m.fecha}</td>
                           <td className="px-2 py-1 text-neutral-700">
-                            <span className="text-neutral-500">{m.numero ? `#${m.numero}` : m.tipo}</span>
-                            {m.glosa ? ` · ${m.glosa}` : ""}
+                            <a
+                              href={hrefOrigen(m)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="underline decoration-dotted underline-offset-2 hover:text-neutral-900"
+                              title="Abrir el origen (gasto/factura) en otra pestaña para modificarlo"
+                            >
+                              <span className="text-neutral-500">{m.numero ? `#${m.numero}` : m.tipo}</span>
+                              {m.glosa ? ` · ${m.glosa}` : ""}
+                            </a>
                           </td>
                           <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-neutral-700">{m.debito ? money(m.debito) : ""}</td>
                           <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-neutral-700">{m.credito ? money(m.credito) : ""}</td>

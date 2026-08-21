@@ -82,6 +82,8 @@ export interface MovimientoLibro {
   glosa: string | null;
   debito: number;
   credito: number;
+  origen_tipo: string | null; // ej. 'gasto', 'factura_compra' — para abrir la pantalla de origen
+  origen_id: string | null;
 }
 
 export interface ConciliacionDetalle {
@@ -167,7 +169,7 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
   // se ve el valor corregido; si se eliminó, no se ve nada.
   const { data: movsData } = await supabase
     .from("asientos_lineas")
-    .select("id, debito, credito, asiento:asientos!inner(id, fecha, numero, tipo, glosa, estado)")
+    .select("id, debito, credito, asiento:asientos!inner(id, fecha, numero, tipo, glosa, estado, origen_tipo, origen_id)")
     .eq("cuenta_id", c.cuenta_id)
     .eq("asiento.estado", "confirmado")
     .neq("asiento.tipo", "reversion")
@@ -176,7 +178,15 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
     id: string;
     debito: number;
     credito: number;
-    asiento: { id: string; fecha: string; numero: number | null; tipo: string; glosa: string | null };
+    asiento: {
+      id: string;
+      fecha: string;
+      numero: number | null;
+      tipo: string;
+      glosa: string | null;
+      origen_tipo: string | null;
+      origen_id: string | null;
+    };
   }[];
 
   const { data: matchedData } = await supabase
@@ -196,6 +206,8 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
       glosa: m.asiento.glosa,
       debito: Number(m.debito),
       credito: Number(m.credito),
+      origen_tipo: m.asiento.origen_tipo,
+      origen_id: m.asiento.origen_id,
     }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
