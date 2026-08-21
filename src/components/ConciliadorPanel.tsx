@@ -86,6 +86,8 @@ export default function ConciliadorPanel({
   const [modoRegistrar, setModoRegistrar] = useState(false);
   const [sortLibros, setSortLibros] = useState<SortState>({ key: null, dir: "asc" });
   const [sortBanco, setSortBanco] = useState<SortState>({ key: null, dir: "asc" });
+  const [filtroLibros, setFiltroLibros] = useState("");
+  const [filtroBanco, setFiltroBanco] = useState("");
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
 
   const pendientes = lineas.filter((l) => l.estado === "pendiente");
@@ -128,10 +130,21 @@ export default function ConciliadorPanel({
     [libro, pendientes],
   );
 
-  const totLibrosDebito = movimientos.reduce((s, m) => s + m.debito, 0);
-  const totLibrosCredito = movimientos.reduce((s, m) => s + m.credito, 0);
-  const totBancoDebito = pendientes.reduce((s, l) => s + l.debito, 0);
-  const totBancoCredito = pendientes.reduce((s, l) => s + l.credito, 0);
+  // Filtro "empieza con" (case-insensitive) por texto o por número de documento.
+  const empiezaCon = (texto: string, f: string) => texto.toLowerCase().startsWith(f.trim().toLowerCase());
+  const movimientosVis = filtroLibros.trim()
+    ? movimientosOrd.filter(
+        (m) => empiezaCon(m.glosa ?? "", filtroLibros) || empiezaCon(m.numero != null ? String(m.numero) : "", filtroLibros),
+      )
+    : movimientosOrd;
+  const pendientesVis = filtroBanco.trim()
+    ? pendientesOrd.filter((l) => empiezaCon(l.descripcion ?? "", filtroBanco) || empiezaCon(l.referencia ?? "", filtroBanco))
+    : pendientesOrd;
+
+  const totLibrosDebito = movimientosVis.reduce((s, m) => s + m.debito, 0);
+  const totLibrosCredito = movimientosVis.reduce((s, m) => s + m.credito, 0);
+  const totBancoDebito = pendientesVis.reduce((s, l) => s + l.debito, 0);
+  const totBancoCredito = pendientesVis.reduce((s, l) => s + l.credito, 0);
 
   return (
     <div>
@@ -271,8 +284,15 @@ export default function ConciliadorPanel({
           <div className="grid gap-3 lg:grid-cols-2">
             {/* LIBROS */}
             <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-              <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-600">
-                Movimientos en libros ({movimientos.length})
+              <div className="flex items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Movimientos en libros</span>
+                <input
+                  type="search"
+                  value={filtroLibros}
+                  onChange={(e) => setFiltroLibros(e.target.value)}
+                  placeholder="Filtrar (empieza con…)"
+                  className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
+                />
               </div>
               <div className="max-h-[520px] overflow-y-auto">
                 <table className="w-full text-xs">
@@ -285,14 +305,14 @@ export default function ConciliadorPanel({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
-                    {movimientos.length === 0 && (
+                    {movimientosVis.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-6 text-center text-neutral-400">
-                          No hay movimientos de libros sin conciliar.
+                          {movimientos.length === 0 ? "No hay movimientos de libros sin conciliar." : "Nada coincide con el filtro."}
                         </td>
                       </tr>
                     )}
-                    {movimientosOrd.map((m) => {
+                    {movimientosVis.map((m) => {
                       const sel = m.id === selLibro;
                       const sug = librosSugeridos.has(m.id);
                       return (
@@ -315,7 +335,8 @@ export default function ConciliadorPanel({
                   <tfoot className="sticky bottom-0 border-t border-neutral-200 bg-neutral-50 text-[11px] font-medium text-neutral-600">
                     <tr>
                       <td className="px-2 py-1" colSpan={2}>
-                        {movimientos.length} mov.
+                        {movimientosVis.length}
+                        {filtroLibros.trim() ? ` de ${movimientos.length}` : ""} mov.
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums">{money(totLibrosDebito)}</td>
                       <td className="px-2 py-1 text-right tabular-nums">{money(totLibrosCredito)}</td>
@@ -327,8 +348,15 @@ export default function ConciliadorPanel({
 
             {/* BANCO */}
             <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-              <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-600">
-                Movimientos en bancos ({pendientes.length})
+              <div className="flex items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Movimientos en bancos</span>
+                <input
+                  type="search"
+                  value={filtroBanco}
+                  onChange={(e) => setFiltroBanco(e.target.value)}
+                  placeholder="Filtrar (empieza con…)"
+                  className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
+                />
               </div>
               <div className="max-h-[520px] overflow-y-auto">
                 <table className="w-full text-xs">
@@ -341,14 +369,14 @@ export default function ConciliadorPanel({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
-                    {pendientes.length === 0 && (
+                    {pendientesVis.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-6 text-center text-neutral-400">
-                          Todas las líneas del banco están conciliadas.
+                          {pendientes.length === 0 ? "Todas las líneas del banco están conciliadas." : "Nada coincide con el filtro."}
                         </td>
                       </tr>
                     )}
-                    {pendientesOrd.map((l) => {
+                    {pendientesVis.map((l) => {
                       const sel = l.id === selBanco;
                       const sug = bancosSugeridos.has(l.id);
                       return (
@@ -371,7 +399,8 @@ export default function ConciliadorPanel({
                   <tfoot className="sticky bottom-0 border-t border-neutral-200 bg-neutral-50 text-[11px] font-medium text-neutral-600">
                     <tr>
                       <td className="px-2 py-1" colSpan={2}>
-                        {pendientes.length} líneas
+                        {pendientesVis.length}
+                        {filtroBanco.trim() ? ` de ${pendientes.length}` : ""} líneas
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums">{money(totBancoDebito)}</td>
                       <td className="px-2 py-1 text-right tabular-nums">{money(totBancoCredito)}</td>
