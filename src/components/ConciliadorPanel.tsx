@@ -85,6 +85,7 @@ function FiltroColumna({
   const [busca, setBusca] = useState("");
   const [draft, setDraft] = useState<Set<string>>(new Set());
   const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const distintos = useMemo(
     () => Array.from(new Set(valores.map((v) => v || "(vacío)"))).sort((a, b) => a.localeCompare(b, "es")),
@@ -101,12 +102,18 @@ function FiltroColumna({
   };
   useEffect(() => {
     if (!abierto) return;
-    const cerrar = () => setAbierto(false);
-    window.addEventListener("scroll", cerrar, true);
-    window.addEventListener("resize", cerrar);
+    // Cerrar al hacer scroll de la página, PERO no cuando el scroll ocurre
+    // dentro del propio panel (si no, no se puede desplazar la lista).
+    const onScroll = (e: Event) => {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
+      setAbierto(false);
+    };
+    const onResize = () => setAbierto(false);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
-      window.removeEventListener("scroll", cerrar, true);
-      window.removeEventListener("resize", cerrar);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
   }, [abierto]);
 
@@ -135,10 +142,12 @@ function FiltroColumna({
         ref={btnRef}
         type="button"
         onClick={() => (abierto ? setAbierto(false) : abrir())}
-        className={`rounded px-1 text-[11px] leading-none ${activo ? "bg-blue-100 text-blue-700" : "text-neutral-400 hover:text-neutral-700"}`}
+        className={`rounded p-0.5 leading-none ${activo ? "bg-blue-100 text-blue-700" : "text-neutral-400 hover:text-neutral-700"}`}
         title="Filtrar valores"
       >
-        ▼
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
+          <path d="M1.5 2.5h13a.5.5 0 0 1 .38.82L10 9.2v4.05a.5.5 0 0 1-.72.45l-2.5-1.25a.5.5 0 0 1-.28-.45V9.2L1.12 3.32a.5.5 0 0 1 .38-.82Z" />
+        </svg>
       </button>
       {abierto &&
         pos &&
@@ -146,6 +155,7 @@ function FiltroColumna({
           <>
             <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
             <div
+              ref={panelRef}
               className="fixed z-50 w-72 rounded-md border border-neutral-300 bg-white shadow-lg"
               style={{ top: pos.top, left: pos.left }}
             >
