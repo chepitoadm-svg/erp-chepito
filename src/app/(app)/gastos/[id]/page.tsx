@@ -134,12 +134,28 @@ export default async function GastoDetallePage({
                     {fmt(b.credito > 0 ? b.credito : b.debito)}
                   </span>
                 </div>
-                {b.conciliacion_id ? (
-                  <div className="mt-2 rounded-md bg-green-50 px-2 py-1.5 text-xs text-green-800">
-                    ✓ Conciliado con el estado de cuenta: <b>{b.ec_fecha}</b>
-                    {b.ec_referencia ? ` · ${b.ec_referencia}` : ""}
-                    {b.ec_descripcion ? ` · ${b.ec_descripcion}` : ""}{" "}
-                    <Link href={`/tesoreria/conciliaciones/${b.conciliacion_id}`} className="underline hover:no-underline">
+                {b.lineas.length > 0 ? (
+                  <div className="mt-2 rounded-md bg-green-50 px-3 py-2 text-xs text-green-900">
+                    <div className="mb-1 font-medium">
+                      ✓ Conciliado con {b.lineas.length} línea{b.lineas.length !== 1 ? "s" : ""} del estado de cuenta:
+                    </div>
+                    <ul className="space-y-0.5">
+                      {b.lineas.map((e, j) => (
+                        <li key={j} className="flex items-start gap-2">
+                          <span className="mt-0.5 text-green-600">•</span>
+                          <span className="flex-1">
+                            <b>{e.fecha}</b>
+                            {e.referencia ? ` · ${e.referencia}` : ""}
+                            {e.descripcion ? ` · ${e.descripcion}` : ""}
+                          </span>
+                          <span className="tabular-nums">{fmt(e.debito > 0 ? e.debito : e.credito)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Link
+                      href={`/tesoreria/conciliaciones/${b.lineas[0].conciliacion_id}`}
+                      className="mt-1 inline-block underline hover:no-underline"
+                    >
                       ver conciliación
                     </Link>
                   </div>

@@ -202,23 +202,28 @@ export async function obtenerGasto(id: string): Promise<GastoDetalle | null> {
   };
 }
 
+export interface LineaEstadoCuenta {
+  fecha: string;
+  referencia: string | null;
+  descripcion: string | null;
+  debito: number;
+  credito: number;
+  conciliacion_id: string;
+}
+
 export interface MovimientoBancoDeAsiento {
   cuenta_codigo: string;
   cuenta_nombre: string;
   debito: number; // entró al banco
   credito: number; // salió del banco
-  // Si la línea del banco ya se concilió con el estado de cuenta real:
-  conciliacion_id: string | null;
-  ec_fecha: string | null;
-  ec_referencia: string | null;
-  ec_descripcion: string | null;
-  ec_debito: number | null;
-  ec_credito: number | null;
+  // Todas las líneas del estado de cuenta real con las que casó esta línea del
+  // banco (puede ser N: un gasto cubierto por varias partidas del banco).
+  lineas: LineaEstadoCuenta[];
 }
 
-// Movimiento(s) en cuentas de banco/caja del asiento de un gasto, con la línea
-// del estado de cuenta conciliada si ya se casó. Permite, desde el gasto, ver
-// "cuál fue ese gasto en el banco".
+// Movimiento(s) en cuentas de banco/caja del asiento de un gasto, con TODAS las
+// líneas del estado de cuenta conciliadas (en orden). Permite, desde el gasto,
+// ver "cuál fue ese gasto en el banco" y desglosar cada partida.
 export async function bancoDeAsiento(asientoId: string): Promise<MovimientoBancoDeAsiento[]> {
   const supabase = await createClient();
   const { data: lineas } = await supabase
@@ -236,36 +241,40 @@ export async function bancoDeAsiento(asientoId: string): Promise<MovimientoBanco
 
   const { data: matches } = await supabase
     .from("estado_cuenta_lineas")
-    .select("asiento_linea_id, fecha, referencia, descripcion, debito, credito, conciliacion_id")
+    .select("asiento_linea_id, orden, fecha, referencia, descripcion, debito, credito, conciliacion_id")
     .in(
       "asiento_linea_id",
       banco.map((l) => l.id),
-    );
-  const porLinea = new Map(
-    ((matches ?? []) as unknown as {
-      asiento_linea_id: string;
-      fecha: string;
-      referencia: string | null;
-      descripcion: string | null;
-      debito: number;
-      credito: number;
-      conciliacion_id: string;
-    }[]).map((m) => [m.asiento_linea_id, m]),
-  );
+    )
+    .order("fecha")
+    .order("orden");
+  const porLinea = new Map<string, LineaEstadoCuenta[]>();
+  for (const m of (matches ?? []) as unknown as {
+    asiento_linea_id: string;
+    fecha: string;
+    referencia: string | null;
+    descripcion: string | null;
+    debito: number;
+    credito: number;
+    conciliacion_id: string;
+  }[]) {
+    const arr = porLinea.get(m.asiento_linea_id) ?? [];
+    arr.push({
+      fecha: m.fecha,
+      referencia: m.referencia,
+      descripcion: m.descripcion,
+      debito: Number(m.debito),
+      credito: Number(m.credito),
+      conciliacion_id: m.conciliacion_id,
+    });
+    porLinea.set(m.asiento_linea_id, arr);
+  }
 
-  return banco.map((l) => {
-    const m = porLinea.get(l.id);
-    return {
-      cuenta_codigo: l.cuenta.codigo,
-      cuenta_nombre: l.cuenta.nombre,
-      debito: Number(l.debito),
-      credito: Number(l.credito),
-      conciliacion_id: m?.conciliacion_id ?? null,
-      ec_fecha: m?.fecha ?? null,
-      ec_referencia: m?.referencia ?? null,
-      ec_descripcion: m?.descripcion ?? null,
-      ec_debito: m ? Number(m.debito) : null,
-      ec_credito: m ? Number(m.credito) : null,
-    };
-  });
+  return banco.map((l) => ({
+    cuenta_codigo: l.cuenta.codigo,
+    cuenta_nombre: l.cuenta.nombre,
+    debito: Number(l.debito),
+    credito: Number(l.credito),
+    lineas: porLinea.get(l.id) ?? [],
+  }));
 }
