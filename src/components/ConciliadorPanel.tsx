@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   conciliarGrupo,
   desconciliarLinea,
@@ -232,6 +233,8 @@ export default function ConciliadorPanel({
   const [selLibros, setSelLibros] = useState<Set<string> | null>(null);
   const [selBancoDoc, setSelBancoDoc] = useState<Set<string> | null>(null);
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
+  const router = useRouter();
+  const [refrescando, startRefresh] = useTransition();
 
   const pendientes = lineas.filter((l) => l.estado === "pendiente");
   const conciliadas = lineas.filter((l) => l.estado === "conciliada");
@@ -351,6 +354,15 @@ export default function ConciliadorPanel({
                   Conciliar automático
                 </button>
               </form>
+              <button
+                type="button"
+                onClick={() => startRefresh(() => router.refresh())}
+                disabled={refrescando}
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
+                title="Traer movimientos nuevos sin perder lo seleccionado"
+              >
+                {refrescando ? "Refrescando…" : "↻ Refrescar"}
+              </button>
               <button
                 type="button"
                 disabled={bancosSel.length !== 1}
