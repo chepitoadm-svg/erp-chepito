@@ -25,9 +25,10 @@ async function autoEmparejar(supabase: Awaited<ReturnType<typeof createClient>>,
     .eq("estado", "pendiente");
   const { data: movs } = await supabase
     .from("asientos_lineas")
-    .select("id, debito, credito, asiento:asientos!inner(fecha, estado)")
+    .select("id, debito, credito, asiento:asientos!inner(fecha, estado, tipo)")
     .eq("cuenta_id", cuenta)
-    .eq("asiento.estado", "confirmado");
+    .eq("asiento.estado", "confirmado")
+    .neq("asiento.tipo", "reversion");
   const { data: yaMatch } = await supabase
     .from("estado_cuenta_lineas")
     .select("asiento_linea_id")

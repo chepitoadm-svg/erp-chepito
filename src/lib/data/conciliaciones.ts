@@ -158,11 +158,19 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
 
   // Movimientos de libros de la cuenta (confirmados, hasta la fecha de corte)
   // que todavía no casaron con ninguna línea del banco.
+  //
+  // Se EXCLUYEN las reversiones (tipo='reversion', las "ANULACIÓN de asiento…"):
+  // corregir o eliminar un gasto anula el asiento original (queda 'anulado', ya
+  // excluido) y postea una reversión. Mostrar la reversión sin su original
+  // ensucia la conciliación e infla el saldo en libros. Al excluir ambos, la
+  // conciliación refleja solo el asiento neto vigente: si el gasto se corrigió,
+  // se ve el valor corregido; si se eliminó, no se ve nada.
   const { data: movsData } = await supabase
     .from("asientos_lineas")
     .select("id, debito, credito, asiento:asientos!inner(id, fecha, numero, tipo, glosa, estado)")
     .eq("cuenta_id", c.cuenta_id)
     .eq("asiento.estado", "confirmado")
+    .neq("asiento.tipo", "reversion")
     .lte("asiento.fecha", c.fecha_corte);
   const movs = (movsData ?? []) as unknown as {
     id: string;
