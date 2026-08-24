@@ -61,15 +61,19 @@ export default function SelectBuscable({
     setOpen(true);
   };
 
-  // Cerrar al hacer scroll/resize (la posición fija quedaría desalineada).
+  // Al hacer scroll/resize, REPOSICIONAR el desplegable para que siga al input
+  // (antes se cerraba, y desaparecía apenas el usuario movía la rueda).
   useEffect(() => {
     if (!open) return;
-    const cerrar = () => setOpen(false);
-    window.addEventListener("scroll", cerrar, true);
-    window.addEventListener("resize", cerrar);
+    const reposicionar = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (r) setRect({ top: r.bottom, left: r.left, width: r.width });
+    };
+    window.addEventListener("scroll", reposicionar, true);
+    window.addEventListener("resize", reposicionar);
     return () => {
-      window.removeEventListener("scroll", cerrar, true);
-      window.removeEventListener("resize", cerrar);
+      window.removeEventListener("scroll", reposicionar, true);
+      window.removeEventListener("resize", reposicionar);
     };
   }, [open]);
 
@@ -108,6 +112,7 @@ export default function SelectBuscable({
           <ul
             style={{ position: "fixed", top: rect.top, left: rect.left, width: rect.width, zIndex: 60 }}
             className="mt-1 max-h-72 overflow-auto rounded-md border border-neutral-200 bg-white shadow-lg"
+            onMouseDown={(e) => e.preventDefault()}
           >
             {filtradas.length === 0 && (
               <li className="px-3 py-2 text-sm text-neutral-400">Sin resultados</li>
