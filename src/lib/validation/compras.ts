@@ -111,7 +111,8 @@ export type CrearRecepcionInput = z.infer<typeof crearRecepcionSchema>;
 // === Pago a proveedor ======================================================
 export const pagoLineaSchema = z.object({
   cxp_id: z.string().uuid(),
-  monto: z.number().positive(),
+  // Positivo para facturas, negativo para notas de crédito. Nunca cero.
+  monto: z.number().refine((n) => n !== 0, { message: "El monto no puede ser cero." }),
 });
 
 export const crearPagoSchema = z.object({

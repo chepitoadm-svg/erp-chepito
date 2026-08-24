@@ -440,6 +440,7 @@ export interface CxPFila {
   monto_original: number;
   saldo: number;
   estado: string;
+  tipo: "factura" | "credito";
   centro_codigo: string | null;
   pagos: { id: string }[]; // pagos confirmados aplicados a esta CxP
 }
@@ -451,6 +452,7 @@ interface CxPRowEmbebido {
   monto_original: number;
   saldo: number;
   estado: string;
+  tipo: "factura" | "credito";
   factura_id: string | null;
   proveedor_id: string | null;
   proveedor: { nombre: string } | null;
@@ -487,7 +489,7 @@ export async function listarCxP(filtro: CxPFiltro = {}): Promise<CxPFila[]> {
   let q = supabase
     .from("cuentas_por_pagar")
     .select(
-      "id, fecha, fecha_vencimiento, monto_original, saldo, estado, factura_id, proveedor_id, " +
+      "id, fecha, fecha_vencimiento, monto_original, saldo, estado, tipo, factura_id, proveedor_id, " +
         "proveedor:proveedores(nombre), factura:facturas_compra(clave, centro_costo_id, centro:centros_costo(codigo)), " +
         "aplicaciones:pagos_proveedor_lineas(pago:pagos_proveedor(id, estado))",
     );
@@ -516,6 +518,7 @@ export async function listarCxP(filtro: CxPFiltro = {}): Promise<CxPFila[]> {
     monto_original: Number(r.monto_original),
     saldo: Number(r.saldo),
     estado: r.estado,
+    tipo: r.tipo,
   }));
 
   // El centro viene de la factura; se filtra acá (join embebido).
@@ -594,6 +597,7 @@ export interface CxPPendiente {
   fecha: string;
   fecha_vencimiento: string | null;
   factura_clave: string | null;
+  tipo: "factura" | "credito";
   monto_original: number;
   saldo: number;
 }
@@ -603,10 +607,11 @@ export async function listarCxPPendientes(proveedorId: string): Promise<CxPPendi
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("cuentas_por_pagar")
-    .select("id, fecha, fecha_vencimiento, monto_original, saldo, factura:facturas_compra(clave)")
+    .select("id, fecha, fecha_vencimiento, monto_original, saldo, tipo, factura:facturas_compra(clave)")
     .eq("proveedor_id", proveedorId)
     .eq("estado", "pendiente")
-    .gt("saldo", 0)
+    .neq("saldo", 0)
+    .order("tipo", { ascending: true }) // facturas primero, créditos después
     .order("fecha_vencimiento", { ascending: true });
   if (error) throw new Error(`No se pudieron cargar las facturas pendientes: ${error.message}`);
   return ((data ?? []) as unknown as {
@@ -615,12 +620,14 @@ export async function listarCxPPendientes(proveedorId: string): Promise<CxPPendi
     fecha_vencimiento: string | null;
     monto_original: number;
     saldo: number;
+    tipo: "factura" | "credito";
     factura: { clave: string | null } | null;
   }[]).map((q) => ({
     id: q.id,
     fecha: q.fecha,
     fecha_vencimiento: q.fecha_vencimiento,
     factura_clave: q.factura?.clave ?? null,
+    tipo: q.tipo,
     monto_original: Number(q.monto_original),
     saldo: Number(q.saldo),
   }));

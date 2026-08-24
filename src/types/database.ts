@@ -773,6 +773,8 @@ export interface Database {
           monto_original: number;
           saldo: number;
           estado: string;
+          tipo: "factura" | "credito";
+          devolucion_id: string | null;
           creado_en: string;
         };
         Insert: never;

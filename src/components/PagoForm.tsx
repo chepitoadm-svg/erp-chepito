@@ -10,6 +10,7 @@ interface CxP {
   id: string;
   fecha_vencimiento: string | null;
   factura_clave: string | null;
+  tipo: "factura" | "credito";
   saldo: number;
 }
 interface Cuenta {
@@ -45,10 +46,11 @@ export default function PagoForm({ proveedorId, proveedorNombre, cxp, cuentas }:
   const lineas = cxp
     .filter((q) => sel[q.id])
     .map((q) => ({ cxp_id: q.id, monto: parseFloat(monto[q.id] ?? "0") || 0 }))
-    .filter((l) => l.monto > 0);
-  const total = lineas.reduce((s, l) => s + l.monto, 0);
+    .filter((l) => l.monto !== 0);
+  const total = lineas.reduce((s, l) => s + l.monto, 0); // neto (facturas − créditos)
   const lineasJSON = JSON.stringify(lineas);
-  const listo = cuenta && lineas.length > 0;
+  const listo = cuenta && lineas.length > 0 && total > 0;
+  const hayCredito = cxp.some((q) => q.tipo === "credito");
 
   const inputCls =
     "mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -100,62 +102,74 @@ export default function PagoForm({ proveedorId, proveedorNombre, cxp, cuentas }:
 
       <div>
         <div className="mb-1 text-sm font-medium text-neutral-700">
-          Facturas pendientes de {proveedorNombre}
+          Facturas y notas de crédito de {proveedorNombre}
         </div>
         <div className="overflow-x-auto rounded-lg border border-neutral-200">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
               <tr>
                 <th className="px-3 py-2 font-medium" />
-                <th className="px-3 py-2 font-medium">Factura</th>
+                <th className="px-3 py-2 font-medium">Factura / Nota</th>
                 <th className="px-3 py-2 font-medium">Vence</th>
                 <th className="px-3 py-2 text-right font-medium">Saldo</th>
-                <th className="px-3 py-2 text-right font-medium">A pagar</th>
+                <th className="px-3 py-2 text-right font-medium">A aplicar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {cxp.map((q) => (
-                <tr key={q.id} className={sel[q.id] ? "bg-neutral-50/60" : ""}>
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={!!sel[q.id]}
-                      onChange={(e) => setSel((p) => ({ ...p, [q.id]: e.target.checked }))}
-                      className="h-4 w-4"
-                    />
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-600">
-                    {numeroFactura(q.factura_clave) ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-neutral-600">{q.fecha_vencimiento ?? "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-neutral-700">
-                    {money(q.saldo)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      max={q.saldo}
-                      value={monto[q.id] ?? ""}
-                      disabled={!sel[q.id]}
-                      onChange={(e) => setMonto((p) => ({ ...p, [q.id]: e.target.value }))}
-                      className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-right outline-none focus:border-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400"
-                    />
-                  </td>
-                </tr>
-              ))}
+              {cxp.map((q) => {
+                const credito = q.tipo === "credito";
+                return (
+                  <tr key={q.id} className={credito ? "bg-green-50/40" : sel[q.id] ? "bg-neutral-50/60" : ""}>
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={!!sel[q.id]}
+                        onChange={(e) => setSel((p) => ({ ...p, [q.id]: e.target.checked }))}
+                        className="h-4 w-4"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {credito ? (
+                        <span className="rounded bg-green-100 px-1.5 py-0.5 font-medium text-green-800">Nota de crédito</span>
+                      ) : (
+                        <span className="font-mono text-neutral-600">{numeroFactura(q.factura_clave) ?? "—"}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-neutral-600">{q.fecha_vencimiento ?? "—"}</td>
+                    <td className={`px-3 py-2 text-right tabular-nums ${credito ? "text-green-700" : "text-neutral-700"}`}>
+                      {money(q.saldo)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        type="number"
+                        step="any"
+                        min={credito ? q.saldo : 0}
+                        max={credito ? 0 : q.saldo}
+                        value={monto[q.id] ?? ""}
+                        disabled={!sel[q.id]}
+                        onChange={(e) => setMonto((p) => ({ ...p, [q.id]: e.target.value }))}
+                        className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-right outline-none focus:border-neutral-900 disabled:bg-neutral-50 disabled:text-neutral-400"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot className="bg-neutral-50">
               <tr className="font-medium">
                 <td colSpan={4} className="px-3 py-2 text-right text-neutral-600">
-                  Total a pagar
+                  {hayCredito ? "Total a pagar (neto)" : "Total a pagar"}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-neutral-900">{money(total)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
+        {hayCredito && (
+          <p className="mt-1 text-xs text-neutral-500">
+            Las notas de crédito restan del total. Marcá las facturas y el crédito; pagás el neto.
+          </p>
+        )}
       </div>
 
       <div>

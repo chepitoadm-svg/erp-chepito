@@ -196,7 +196,9 @@ export default async function CxPPage({ searchParams }: { searchParams: Promise<
                   </td>
                   <td className="px-4 py-3 text-neutral-900">{q.proveedor_nombre}</td>
                   <td className="px-4 py-3">
-                    {q.factura_id ? (
+                    {q.tipo === "credito" ? (
+                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800">Nota de crédito</span>
+                    ) : q.factura_id ? (
                       <Link
                         href={`/compras/facturas/${q.factura_id}`}
                         className="font-mono text-xs text-neutral-600 underline hover:text-neutral-900"
@@ -211,7 +213,9 @@ export default async function CxPPage({ searchParams }: { searchParams: Promise<
                     {q.centro_codigo ?? <span className="text-neutral-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{fmt(q.monto_original)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-neutral-900">{fmt(q.saldo)}</td>
+                  <td className={`px-4 py-3 text-right tabular-nums ${q.saldo < 0 ? "text-green-700" : "text-neutral-900"}`}>
+                    {fmt(q.saldo)}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[q.estado] ?? "bg-neutral-100 text-neutral-600"}`}>
                       {q.estado}
