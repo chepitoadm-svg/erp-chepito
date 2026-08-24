@@ -135,6 +135,19 @@ export async function conciliarGrupo(formData: FormData): Promise<void> {
   revalidatePath(`/tesoreria/conciliaciones`);
 }
 
+// Concilia una línea del banco con un movimiento de libros que difiere por pocos
+// colones, mandando la diferencia a la cuenta de redondeo.
+export async function conciliarRedondeo(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const linea = String(formData.get("linea_id") ?? "");
+  const mov = String(formData.get("asiento_linea_id") ?? "");
+  if (!linea || !mov) throw new Error("Elegí un movimiento de libros y una línea del banco.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_conciliar_redondeo", { p_linea: linea, p_asiento_linea: mov });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/tesoreria/conciliaciones`);
+}
+
 export async function desconciliarLinea(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const linea = String(formData.get("linea_id") ?? "");

@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   conciliarGrupo,
+  conciliarRedondeo,
   desconciliarLinea,
   conciliarAutomatico,
   registrarAsientoBanco,
@@ -284,6 +285,13 @@ export default function ConciliadorPanel({
   const grupoCalza =
     !!libro && bancosSel.length > 0 && c2(sumBancoCredito) === c2(libro.debito) && c2(sumBancoDebito) === c2(libro.credito);
 
+  // Redondeo: 1 libro + 1 banco que difieren por pocos colones (≤ ₡100).
+  const TOL_REDONDEO = 100;
+  const bancoUnico = bancosSel.length === 1 ? bancosSel[0] : null;
+  const residuo =
+    libro && bancoUnico ? Math.round(((libro.credito - bancoUnico.debito) - (libro.debito - bancoUnico.credito)) * 100) / 100 : 0;
+  const puedeRedondear = !!libro && !!bancoUnico && !grupoCalza && residuo !== 0 && Math.abs(residuo) <= TOL_REDONDEO;
+
   // Sugerencias: al elegir un movimiento de libros, resaltar las líneas del
   // banco que calzan una a una (atajo para el caso 1:1).
   const compatible = (l: LineaBanco, m: MovimientoLibro) =>
@@ -354,6 +362,19 @@ export default function ConciliadorPanel({
                   Conciliar seleccionados
                 </button>
               </form>
+              {puedeRedondear && (
+                <form action={conciliarRedondeo}>
+                  <input type="hidden" name="asiento_linea_id" value={selLibro ?? ""} />
+                  <input type="hidden" name="linea_id" value={bancoUnico?.id ?? ""} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                    title="Casar aceptando la diferencia como redondeo"
+                  >
+                    Conciliar con redondeo (dif ₡{money(Math.abs(residuo))})
+                  </button>
+                </form>
+              )}
               <form action={conciliarAutomatico}>
                 <input type="hidden" name="id" value={conciliacionId} />
                 <button
