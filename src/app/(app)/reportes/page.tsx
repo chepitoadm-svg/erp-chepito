@@ -4,6 +4,11 @@ import { tienePermiso } from "@/lib/auth/permisos";
 
 const REPORTES = [
   {
+    href: "/reportes/flujo",
+    titulo: "Flujo de caja",
+    desc: "De dónde entra y en qué se va la plata de caja y bancos, mes a mes.",
+  },
+  {
     href: "/reportes/resultados",
     titulo: "Estado de Resultados",
     desc: "Rentabilidad por canal, antes y después de prorrateo.",

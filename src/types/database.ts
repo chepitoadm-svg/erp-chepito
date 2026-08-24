@@ -1129,6 +1129,20 @@ export interface Database {
           monto: number;
         }[];
       };
+      fn_saldo_caja: {
+        Args: { p_fecha: string };
+        Returns: number;
+      };
+      fn_flujo_caja: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: {
+          categoria: string;
+          tipo: "entrada" | "salida";
+          cuenta_codigo: string;
+          cuenta_nombre: string;
+          monto: number;
+        }[];
+      };
       app_mayor_cuenta: {
         Args: { p_cuenta_id: string; p_desde?: string | null; p_hasta?: string | null; p_excluir_prorrateo?: boolean };
         Returns: {

@@ -31,6 +31,74 @@ export async function estadoResultados(desde: string, hasta: string, incluirPror
   return data ?? [];
 }
 
+export interface FlujoLinea {
+  cuenta_codigo: string;
+  cuenta_nombre: string;
+  monto: number;
+}
+export interface FlujoCategoria {
+  categoria: string;
+  total: number;
+  lineas: FlujoLinea[];
+}
+export interface FlujoCaja {
+  saldo_inicial: number;
+  saldo_final: number;
+  total_entradas: number;
+  total_salidas: number; // positivo (magnitud)
+  entradas: FlujoCategoria[];
+  salidas: FlujoCategoria[];
+}
+
+// Flujo de caja del periodo (método directo). Agrupa por categoría; entradas y
+// salidas separadas y ordenadas por magnitud (dónde se va la plata primero).
+export async function flujoCaja(desde: string, hasta: string): Promise<FlujoCaja> {
+  const supabase = await createClient();
+  const diaAntes = new Date(desde + "T00:00:00");
+  diaAntes.setDate(diaAntes.getDate() - 1);
+  const antes = diaAntes.toISOString().slice(0, 10);
+
+  const [ini, fin, mov] = await Promise.all([
+    supabase.rpc("fn_saldo_caja", { p_fecha: antes }),
+    supabase.rpc("fn_saldo_caja", { p_fecha: hasta }),
+    supabase.rpc("fn_flujo_caja", { p_desde: desde, p_hasta: hasta }),
+  ]);
+  if (mov.error) throw new Error(`No se pudo cargar el flujo de caja: ${mov.error.message}`);
+
+  const filas = (mov.data ?? []) as {
+    categoria: string;
+    tipo: "entrada" | "salida";
+    cuenta_codigo: string;
+    cuenta_nombre: string;
+    monto: number;
+  }[];
+
+  const agrupar = (tipo: "entrada" | "salida"): FlujoCategoria[] => {
+    const m = new Map<string, FlujoCategoria>();
+    for (const f of filas.filter((x) => x.tipo === tipo)) {
+      const e = m.get(f.categoria) ?? { categoria: f.categoria, total: 0, lineas: [] };
+      const monto = Math.abs(Number(f.monto));
+      e.total += monto;
+      e.lineas.push({ cuenta_codigo: f.cuenta_codigo, cuenta_nombre: f.cuenta_nombre, monto });
+      m.set(f.categoria, e);
+    }
+    const cats = [...m.values()].sort((a, b) => b.total - a.total);
+    cats.forEach((c) => c.lineas.sort((a, b) => b.monto - a.monto));
+    return cats;
+  };
+
+  const entradas = agrupar("entrada");
+  const salidas = agrupar("salida");
+  return {
+    saldo_inicial: Number(ini.data ?? 0),
+    saldo_final: Number(fin.data ?? 0),
+    total_entradas: entradas.reduce((s, c) => s + c.total, 0),
+    total_salidas: salidas.reduce((s, c) => s + c.total, 0),
+    entradas,
+    salidas,
+  };
+}
+
 export async function mayorCuenta(cuentaId: string, desde?: string, hasta?: string, excluirProrrateo = false) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("app_mayor_cuenta", {
