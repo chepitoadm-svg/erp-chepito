@@ -70,14 +70,22 @@ export default async function CxPPage({ searchParams }: { searchParams: Promise<
           <h1 className="text-lg font-semibold text-neutral-900">Cuentas por pagar</h1>
           <p className="text-sm text-neutral-500">Saldos con proveedores, por vencimiento.</p>
         </div>
-        {puedePagar && (
+        <div className="flex gap-2">
           <Link
-            href="/compras/pagos/nuevo"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            href="/compras/notas-credito/nueva"
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
-            Registrar pago
+            + Nota de crédito
           </Link>
-        )}
+          {puedePagar && (
+            <Link
+              href="/compras/pagos/nuevo"
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            >
+              Registrar pago
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}

@@ -1296,6 +1296,20 @@ export interface Database {
       };
       fn_conciliar_linea: { Args: { p_linea: string; p_asiento_linea: string }; Returns: undefined };
       fn_conciliar_grupo: { Args: { p_asiento_linea: string; p_lineas: string[] }; Returns: undefined };
+      fn_crear_nota_credito: {
+        Args: {
+          p_proveedor: string;
+          p_fecha?: string | null;
+          p_cuenta: string;
+          p_centro?: string | null;
+          p_subtotal: number;
+          p_iva?: number;
+          p_referencia?: string | null;
+          p_glosa?: string | null;
+        };
+        Returns: string;
+      };
+      fn_anular_nota_credito: { Args: { p_nc: string; p_motivo: string }; Returns: undefined };
       fn_conciliar_redondeo: { Args: { p_linea: string; p_asiento_linea: string; p_tolerancia?: number }; Returns: undefined };
       fn_desconciliar_linea: { Args: { p_linea: string }; Returns: undefined };
       fn_marcar_conciliada: { Args: { p_conciliacion: string }; Returns: undefined };

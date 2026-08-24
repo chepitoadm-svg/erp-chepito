@@ -889,3 +889,34 @@ export async function anularDevolucion(
   revalidatePath("/compras/cxp");
   return { ok: "Devolución anulada." };
 }
+
+// === NOTA DE CRÉDITO DIRECTA ===============================================
+export async function crearNotaCredito(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const proveedor = String(formData.get("proveedor_id") ?? "");
+  const fecha = String(formData.get("fecha") ?? "");
+  const cuenta = String(formData.get("cuenta_id") ?? "");
+  const centro = String(formData.get("centro_costo_id") ?? "").trim();
+  const subtotal = Number(formData.get("subtotal") ?? 0);
+  const iva = Number(formData.get("iva") ?? 0);
+  const referencia = String(formData.get("referencia") ?? "").trim();
+  const glosa = String(formData.get("glosa") ?? "").trim();
+  if (!proveedor) return { error: "Elegí el proveedor." };
+  if (!cuenta) return { error: "Elegí la cuenta de la nota de crédito." };
+  if (!(subtotal > 0)) return { error: "El monto debe ser mayor que cero." };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_crear_nota_credito", {
+    p_proveedor: proveedor,
+    p_fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : null,
+    p_cuenta: cuenta,
+    p_centro: centro || null,
+    p_subtotal: subtotal,
+    p_iva: iva || 0,
+    p_referencia: referencia || null,
+    p_glosa: glosa || null,
+  });
+  if (error || !id) return { error: limpiar(error?.message ?? "No se pudo crear la nota de crédito.") };
+  revalidatePath("/compras/cxp");
+  redirect("/compras/cxp");
+}
