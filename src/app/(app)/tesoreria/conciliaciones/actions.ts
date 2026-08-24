@@ -45,7 +45,11 @@ async function autoEmparejar(supabase: Awaited<ReturnType<typeof createClient>>,
   const diasEntre = (a: string, b: string) =>
     Math.abs((new Date(a).getTime() - new Date(b).getTime()) / 86400000);
 
-  for (const l of (lineas ?? []) as { id: string; fecha: string; debito: number; credito: number }[]) {
+  const pendientes = (lineas ?? []) as { id: string; fecha: string; debito: number; credito: number }[];
+  const casadas = new Set<string>();
+
+  // Pasada 1: calce EXACTO (banco débito ↔ Haber libros, banco crédito ↔ Debe).
+  for (const l of pendientes) {
     const idx = disponibles.findIndex(
       (m) =>
         Math.round(Number(m.credito) * 100) === Math.round(Number(l.debito) * 100) &&
@@ -55,7 +59,37 @@ async function autoEmparejar(supabase: Awaited<ReturnType<typeof createClient>>,
     if (idx >= 0) {
       const m = disponibles[idx];
       const { error } = await supabase.rpc("fn_conciliar_linea", { p_linea: l.id, p_asiento_linea: m.id });
-      if (!error) disponibles.splice(idx, 1);
+      if (!error) {
+        disponibles.splice(idx, 1);
+        casadas.add(l.id);
+      }
+    }
+  }
+
+  // Pasada 2: diferencias chicas (redondeo). Se acepta hasta AUTO_TOL colones y
+  // se elige el movimiento con la MENOR diferencia, para no casar montos que en
+  // realidad son distintos. La diferencia se manda a la cuenta de redondeo.
+  const AUTO_TOL = 5;
+  for (const l of pendientes) {
+    if (casadas.has(l.id)) continue;
+    let mejor: { id: string; res: number } | null = null;
+    for (const m of disponibles) {
+      if (diasEntre(m.asiento.fecha, l.fecha) > 5) continue;
+      const res = Math.round(((Number(m.credito) - Number(l.debito)) - (Number(m.debito) - Number(l.credito))) * 100) / 100;
+      if (res === 0 || Math.abs(res) > AUTO_TOL) continue;
+      if (!mejor || Math.abs(res) < Math.abs(mejor.res)) mejor = { id: m.id, res };
+    }
+    if (mejor) {
+      const { error } = await supabase.rpc("fn_conciliar_redondeo", {
+        p_linea: l.id,
+        p_asiento_linea: mejor.id,
+        p_tolerancia: AUTO_TOL,
+      });
+      if (!error) {
+        const i = disponibles.findIndex((m) => m.id === mejor!.id);
+        if (i >= 0) disponibles.splice(i, 1);
+        casadas.add(l.id);
+      }
     }
   }
 }
