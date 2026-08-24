@@ -1143,6 +1143,10 @@ export interface Database {
           monto: number;
         }[];
       };
+      fn_compromisos: {
+        Args: { p_fecha: string };
+        Returns: { categoria: string; cuenta_codigo: string; cuenta_nombre: string; saldo: number }[];
+      };
       app_mayor_cuenta: {
         Args: { p_cuenta_id: string; p_desde?: string | null; p_hasta?: string | null; p_excluir_prorrateo?: boolean };
         Returns: {

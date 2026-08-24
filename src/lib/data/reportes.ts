@@ -99,6 +99,42 @@ export async function flujoCaja(desde: string, hasta: string): Promise<FlujoCaja
   };
 }
 
+export interface CompromisoCategoria {
+  categoria: string;
+  total: number;
+  lineas: { cuenta_codigo: string; cuenta_nombre: string; saldo: number }[];
+}
+export interface Compromisos {
+  disponible: number; // caja + banco a la fecha
+  total_debo: number; // total pasivos
+  neto: number; // disponible - total_debo (lo que quedaría al pagar todo)
+  categorias: CompromisoCategoria[];
+}
+
+// Lo que se debe a una fecha (pasivos) vs lo disponible en caja+banco.
+export async function compromisos(fecha: string): Promise<Compromisos> {
+  const supabase = await createClient();
+  const [caja, deb] = await Promise.all([
+    supabase.rpc("fn_saldo_caja", { p_fecha: fecha }),
+    supabase.rpc("fn_compromisos", { p_fecha: fecha }),
+  ]);
+  if (deb.error) throw new Error(`No se pudieron cargar los compromisos: ${deb.error.message}`);
+  const filas = (deb.data ?? []) as { categoria: string; cuenta_codigo: string; cuenta_nombre: string; saldo: number }[];
+
+  const m = new Map<string, CompromisoCategoria>();
+  for (const f of filas) {
+    const e = m.get(f.categoria) ?? { categoria: f.categoria, total: 0, lineas: [] };
+    e.total += Number(f.saldo);
+    e.lineas.push({ cuenta_codigo: f.cuenta_codigo, cuenta_nombre: f.cuenta_nombre, saldo: Number(f.saldo) });
+    m.set(f.categoria, e);
+  }
+  const categorias = [...m.values()].sort((a, b) => b.total - a.total);
+  categorias.forEach((c) => c.lineas.sort((a, b) => b.saldo - a.saldo));
+  const disponible = Number(caja.data ?? 0);
+  const total_debo = categorias.reduce((s, c) => s + c.total, 0);
+  return { disponible, total_debo, neto: disponible - total_debo, categorias };
+}
+
 export async function mayorCuenta(cuentaId: string, desde?: string, hasta?: string, excluirProrrateo = false) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("app_mayor_cuenta", {

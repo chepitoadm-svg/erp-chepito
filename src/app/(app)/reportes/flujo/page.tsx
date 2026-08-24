@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { flujoCaja, type FlujoCategoria } from "@/lib/data/reportes";
+import { flujoCaja, compromisos, type FlujoCategoria } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 
 const money = (n: number) =>
@@ -33,11 +33,21 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
   const mes = /^\d{4}-\d{2}$/.test(sp.mes ?? "") ? (sp.mes as string) : "2026-07";
   const { desde, hasta } = rango(mes);
 
-  const [flujo, cuentas] = await Promise.all([flujoCaja(desde, hasta), listarCuentasPosteables()]);
+  const [flujo, comp, cuentas] = await Promise.all([
+    flujoCaja(desde, hasta),
+    compromisos(hasta),
+    listarCuentasPosteables(),
+  ]);
   const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
   const hrefMayor = (cod: string) => {
     const id = codToId.get(cod);
     return id ? `/reportes/mayor?cuenta=${id}&desde=${desde}&hasta=${hasta}` : null;
+  };
+  // Para saldos acumulados (compromisos): sin fecha desde, para que el saldo del
+  // Mayor termine en el mismo saldo que muestra el compromiso.
+  const hrefMayorSaldo = (cod: string) => {
+    const id = codToId.get(cod);
+    return id ? `/reportes/mayor?cuenta=${id}&hasta=${hasta}` : null;
   };
 
   const neto = flujo.total_entradas - flujo.total_salidas;
@@ -136,6 +146,64 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
             {neto < 0 ? "▼" : "▲"} {money(Math.abs(neto))} en el mes
           </div>
         </div>
+      </div>
+
+      {/* ¿Cuánto me queda de verdad? — disponible vs lo que se debe al cierre */}
+      <div className="mb-5 overflow-hidden rounded-lg border border-neutral-300 bg-white">
+        <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-800">
+          ¿Cuánto me queda de verdad? — al {hasta}
+        </div>
+        <div className="grid gap-3 p-4 sm:grid-cols-3">
+          <div>
+            <div className="text-xs text-neutral-500">Tengo (caja + bancos)</div>
+            <div className="text-lg font-semibold tabular-nums text-neutral-900">{money(comp.disponible)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-neutral-500">Debo (compromisos)</div>
+            <div className="text-lg font-semibold tabular-nums text-red-700">{money(comp.total_debo)}</div>
+          </div>
+          <div className={`rounded-md p-2 ${comp.neto < 0 ? "bg-red-50" : "bg-green-50"}`}>
+            <div className="text-xs text-neutral-500">Me quedaría si pago todo</div>
+            <div className={`text-lg font-semibold tabular-nums ${comp.neto < 0 ? "text-red-700" : "text-green-800"}`}>
+              {money(comp.neto)}
+            </div>
+          </div>
+        </div>
+        {comp.categorias.length > 0 && (
+          <table className="w-full border-t border-neutral-100 text-sm">
+            <tbody className="divide-y divide-neutral-100">
+              {comp.categorias.map((c) => (
+                <Fragment key={c.categoria}>
+                  <tr className="bg-neutral-50/60">
+                    <td className="px-4 py-1.5 font-medium text-neutral-800">{c.categoria}</td>
+                    <td className="px-4 py-1.5 text-right font-medium tabular-nums text-neutral-800">{money(c.total)}</td>
+                  </tr>
+                  {c.lineas.map((l) => {
+                    const href = hrefMayorSaldo(l.cuenta_codigo);
+                    return (
+                      <tr key={c.categoria + l.cuenta_codigo}>
+                        <td className="py-1 pl-8 pr-4 text-neutral-600">
+                          {href ? (
+                            <Link href={href} className="underline decoration-dotted underline-offset-2 hover:text-neutral-900">
+                              {l.cuenta_nombre}
+                            </Link>
+                          ) : (
+                            l.cuenta_nombre
+                          )}
+                        </td>
+                        <td className="px-4 py-1 text-right tabular-nums text-neutral-500">{money(l.saldo)}</td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="border-t border-neutral-100 px-4 py-2 text-xs text-neutral-500">
+          El banco puede verse lleno, pero esto es lo que <b>de verdad</b> te queda después de pagar proveedores e
+          impuestos. {comp.neto < 0 && <b className="text-red-700">Cuidado: no alcanza para cubrir lo que debés.</b>}
+        </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
