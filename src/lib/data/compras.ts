@@ -441,6 +441,7 @@ export interface CxPFila {
   saldo: number;
   estado: string;
   tipo: "factura" | "credito";
+  nota_credito_id: string | null;
   centro_codigo: string | null;
   pagos: { id: string }[]; // pagos confirmados aplicados a esta CxP
 }
@@ -453,6 +454,7 @@ interface CxPRowEmbebido {
   saldo: number;
   estado: string;
   tipo: "factura" | "credito";
+  nota_credito_id: string | null;
   factura_id: string | null;
   proveedor_id: string | null;
   proveedor: { nombre: string } | null;
@@ -489,7 +491,7 @@ export async function listarCxP(filtro: CxPFiltro = {}): Promise<CxPFila[]> {
   let q = supabase
     .from("cuentas_por_pagar")
     .select(
-      "id, fecha, fecha_vencimiento, monto_original, saldo, estado, tipo, factura_id, proveedor_id, " +
+      "id, fecha, fecha_vencimiento, monto_original, saldo, estado, tipo, nota_credito_id, factura_id, proveedor_id, " +
         "proveedor:proveedores(nombre), factura:facturas_compra(clave, centro_costo_id, centro:centros_costo(codigo)), " +
         "aplicaciones:pagos_proveedor_lineas(pago:pagos_proveedor(id, estado))",
     );
@@ -519,6 +521,7 @@ export async function listarCxP(filtro: CxPFiltro = {}): Promise<CxPFila[]> {
     saldo: Number(r.saldo),
     estado: r.estado,
     tipo: r.tipo,
+    nota_credito_id: r.nota_credito_id ?? null,
   }));
 
   // El centro viene de la factura; se filtra acá (join embebido).
@@ -1264,5 +1267,124 @@ export async function obtenerDevolucion(id: string): Promise<DevolucionDetalle |
         iva_monto: Number(l.iva_monto),
         detalle: l.detalle,
       })),
+  };
+}
+
+// === NOTAS DE CRÉDITO ======================================================
+export interface NotaCreditoDetalle {
+  id: string;
+  fecha: string;
+  proveedor_nombre: string;
+  cuenta_codigo: string | null;
+  cuenta_nombre: string | null;
+  centro_codigo: string | null;
+  subtotal: number;
+  iva: number;
+  total: number;
+  referencia: string | null;
+  glosa: string | null;
+  estado: string;
+  asiento_id: string | null;
+  asiento_numero: number | null;
+  aplicada: boolean; // el crédito ya se usó en un pago (no editable/anulable)
+}
+
+export async function obtenerNotaCredito(id: string): Promise<NotaCreditoDetalle | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("notas_credito_compra")
+    .select(
+      "id, fecha, subtotal, iva, total, referencia, glosa, estado, asiento_id, " +
+        "proveedor:proveedores(nombre), cuenta:cuentas(codigo, nombre), centro:centros_costo(codigo), " +
+        "asiento:asientos(numero)",
+    )
+    .eq("id", id)
+    .single();
+  if (!data) return null;
+  const n = data as unknown as {
+    id: string;
+    fecha: string;
+    subtotal: number;
+    iva: number;
+    total: number;
+    referencia: string | null;
+    glosa: string | null;
+    estado: string;
+    asiento_id: string | null;
+    proveedor: { nombre: string } | null;
+    cuenta: { codigo: string; nombre: string } | null;
+    centro: { codigo: string } | null;
+    asiento: { numero: number | null } | null;
+  };
+  const { data: cxp } = await supabase
+    .from("cuentas_por_pagar")
+    .select("saldo, monto_original")
+    .eq("nota_credito_id", id)
+    .eq("tipo", "credito")
+    .maybeSingle();
+  const aplicada = !!cxp && Math.round(Number(cxp.saldo) * 100) !== Math.round(Number(cxp.monto_original) * 100);
+  return {
+    id: n.id,
+    fecha: n.fecha,
+    proveedor_nombre: n.proveedor?.nombre ?? "",
+    cuenta_codigo: n.cuenta?.codigo ?? null,
+    cuenta_nombre: n.cuenta?.nombre ?? null,
+    centro_codigo: n.centro?.codigo ?? null,
+    subtotal: Number(n.subtotal),
+    iva: Number(n.iva),
+    total: Number(n.total),
+    referencia: n.referencia,
+    glosa: n.glosa,
+    estado: n.estado,
+    asiento_id: n.asiento_id,
+    asiento_numero: n.asiento?.numero ?? null,
+    aplicada,
+  };
+}
+
+export interface NotaCreditoEditable {
+  id: string;
+  proveedor_id: string;
+  proveedor_nombre: string;
+  fecha: string;
+  cuenta_id: string;
+  centro_costo_id: string | null;
+  subtotal: number;
+  iva: number;
+  referencia: string | null;
+  glosa: string | null;
+}
+
+export async function obtenerNotaCreditoEditable(id: string): Promise<NotaCreditoEditable | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("notas_credito_compra")
+    .select("id, proveedor_id, fecha, cuenta_id, centro_costo_id, subtotal, iva, referencia, glosa, proveedor:proveedores(nombre)")
+    .eq("id", id)
+    .single();
+  if (!data) return null;
+  const n = data as unknown as {
+    id: string;
+    proveedor_id: string;
+    fecha: string;
+    cuenta_id: string;
+    centro_costo_id: string | null;
+    subtotal: number;
+    iva: number;
+    referencia: string | null;
+    glosa: string | null;
+    proveedor: { nombre: string } | null;
+  };
+  return {
+    id: n.id,
+    proveedor_id: n.proveedor_id,
+    proveedor_nombre: n.proveedor?.nombre ?? "",
+    fecha: n.fecha,
+    cuenta_id: n.cuenta_id,
+    centro_costo_id: n.centro_costo_id,
+    subtotal: Number(n.subtotal),
+    iva: Number(n.iva),
+    referencia: n.referencia,
+    glosa: n.glosa,
   };
 }

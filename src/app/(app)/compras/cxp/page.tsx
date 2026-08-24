@@ -205,7 +205,16 @@ export default async function CxPPage({ searchParams }: { searchParams: Promise<
                   <td className="px-4 py-3 text-neutral-900">{q.proveedor_nombre}</td>
                   <td className="px-4 py-3">
                     {q.tipo === "credito" ? (
-                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800">Nota de crédito</span>
+                      q.nota_credito_id ? (
+                        <Link
+                          href={`/compras/notas-credito/${q.nota_credito_id}`}
+                          className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800 hover:bg-green-200"
+                        >
+                          Nota de crédito
+                        </Link>
+                      ) : (
+                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800">Nota de crédito</span>
+                      )
                     ) : q.factura_id ? (
                       <Link
                         href={`/compras/facturas/${q.factura_id}`}

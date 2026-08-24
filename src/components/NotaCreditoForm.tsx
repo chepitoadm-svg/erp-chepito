@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { crearNotaCredito, type FormState } from "@/app/(app)/compras/actions";
+import { type FormState } from "@/app/(app)/compras/actions";
 import SelectBuscable, { type OpcionBuscable } from "@/components/SelectBuscable";
 
 interface Centro {
@@ -10,25 +10,38 @@ interface Centro {
   codigo: string;
   nombre: string;
 }
+export interface NotaCreditoInicial {
+  proveedor_id: string;
+  fecha: string;
+  cuenta_id: string;
+  centro_costo_id: string | null;
+  subtotal: number;
+  iva: number;
+  referencia: string | null;
+  glosa: string | null;
+}
 interface Props {
+  action: (prev: FormState, formData: FormData) => Promise<FormState>;
   proveedores: OpcionBuscable[];
   cuentas: OpcionBuscable[];
   centros: Centro[];
   cuentaDefault?: string;
+  notaCreditoId?: string; // si viene, es edición
+  inicial?: NotaCreditoInicial;
 }
 
 const hoy = () => new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const money = (n: number) => n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const inicial: FormState = {};
+const estadoInicial: FormState = {};
 
-export default function NotaCreditoForm({ proveedores, cuentas, centros, cuentaDefault }: Props) {
-  const [state, formAction, pending] = useActionState(crearNotaCredito, inicial);
-  const [proveedor, setProveedor] = useState("");
-  const [cuenta, setCuenta] = useState(cuentaDefault ?? "");
-  const [fecha, setFecha] = useState(hoy());
-  const [centro, setCentro] = useState("");
-  const [subtotal, setSubtotal] = useState("");
-  const [iva, setIva] = useState("");
+export default function NotaCreditoForm({ action, proveedores, cuentas, centros, cuentaDefault, notaCreditoId, inicial }: Props) {
+  const [state, formAction, pending] = useActionState(action, estadoInicial);
+  const [proveedor, setProveedor] = useState(inicial?.proveedor_id ?? "");
+  const [cuenta, setCuenta] = useState(inicial?.cuenta_id ?? cuentaDefault ?? "");
+  const [fecha, setFecha] = useState(inicial?.fecha ?? hoy());
+  const [centro, setCentro] = useState(inicial?.centro_costo_id ?? "");
+  const [subtotal, setSubtotal] = useState(inicial ? String(inicial.subtotal) : "");
+  const [iva, setIva] = useState(inicial ? String(inicial.iva) : "");
 
   const total = (parseFloat(subtotal) || 0) + (parseFloat(iva) || 0);
   const listo = proveedor && cuenta && (parseFloat(subtotal) || 0) > 0;
@@ -37,6 +50,7 @@ export default function NotaCreditoForm({ proveedores, cuentas, centros, cuentaD
 
   return (
     <form action={formAction} className="max-w-2xl space-y-5">
+      {notaCreditoId && <input type="hidden" name="nc_id" value={notaCreditoId} />}
       <input type="hidden" name="proveedor_id" value={proveedor} />
       <input type="hidden" name="cuenta_id" value={cuenta} />
       <input type="hidden" name="fecha" value={fecha} />
@@ -47,7 +61,7 @@ export default function NotaCreditoForm({ proveedores, cuentas, centros, cuentaD
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-neutral-700">Proveedor</label>
-          <SelectBuscable value={proveedor} onChange={setProveedor} placeholder="Buscá el proveedor…" options={proveedores} className={inputCls} />
+          <SelectBuscable value={proveedor} onChange={setProveedor} placeholder="Buscá el proveedor…" options={proveedores} disabled={!!notaCreditoId} className={inputCls} />
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-700">Fecha</label>
@@ -94,11 +108,11 @@ export default function NotaCreditoForm({ proveedores, cuentas, centros, cuentaD
 
       <div>
         <label className="block text-sm font-medium text-neutral-700">N.º de nota / referencia</label>
-        <input name="referencia" placeholder="Ej: NC-12345" className={inputCls + " max-w-sm"} />
+        <input name="referencia" defaultValue={inicial?.referencia ?? ""} placeholder="Ej: NC-12345" className={inputCls + " max-w-sm"} />
       </div>
       <div>
         <label className="block text-sm font-medium text-neutral-700">Glosa (opcional)</label>
-        <input name="glosa" placeholder="Motivo del crédito" className={inputCls + " max-w-lg"} />
+        <input name="glosa" defaultValue={inicial?.glosa ?? ""} placeholder="Motivo del crédito" className={inputCls + " max-w-lg"} />
       </div>
 
       <p className="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-700">
@@ -114,7 +128,7 @@ export default function NotaCreditoForm({ proveedores, cuentas, centros, cuentaD
           disabled={pending || !listo}
           className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
         >
-          {pending ? "Guardando…" : "Crear nota de crédito"}
+          {pending ? "Guardando…" : notaCreditoId ? "Guardar cambios" : "Crear nota de crédito"}
         </button>
         <Link href="/compras/cxp" className="text-sm text-neutral-600 hover:text-neutral-900">
           Cancelar

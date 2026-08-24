@@ -920,3 +920,46 @@ export async function crearNotaCredito(_prev: FormState, formData: FormData): Pr
   revalidatePath("/compras/cxp");
   redirect("/compras/cxp");
 }
+
+export async function editarNotaCredito(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const nc = String(formData.get("nc_id") ?? "");
+  const fecha = String(formData.get("fecha") ?? "");
+  const cuenta = String(formData.get("cuenta_id") ?? "");
+  const centro = String(formData.get("centro_costo_id") ?? "").trim();
+  const subtotal = Number(formData.get("subtotal") ?? 0);
+  const iva = Number(formData.get("iva") ?? 0);
+  const referencia = String(formData.get("referencia") ?? "").trim();
+  const glosa = String(formData.get("glosa") ?? "").trim();
+  if (!nc) return { error: "Nota de crédito inválida." };
+  if (!cuenta) return { error: "Elegí la cuenta de la nota de crédito." };
+  if (!(subtotal > 0)) return { error: "El monto debe ser mayor que cero." };
+
+  const supabase = await createClient();
+  const { data: id, error } = await supabase.rpc("fn_editar_nota_credito", {
+    p_nc: nc,
+    p_fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : null,
+    p_cuenta: cuenta,
+    p_centro: centro || null,
+    p_subtotal: subtotal,
+    p_iva: iva || 0,
+    p_referencia: referencia || null,
+    p_glosa: glosa || null,
+  });
+  if (error || !id) return { error: limpiar(error?.message ?? "No se pudo editar la nota de crédito.") };
+  revalidatePath("/compras/cxp");
+  redirect(`/compras/notas-credito/${id}`);
+}
+
+export async function anularNotaCredito(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (motivo.length < 3) return { error: "La anulación exige un motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_anular_nota_credito", { p_nc: id, p_motivo: motivo });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath("/compras/cxp");
+  revalidatePath(`/compras/notas-credito/${id}`);
+  return { ok: "Nota de crédito anulada." };
+}

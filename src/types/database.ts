@@ -775,6 +775,27 @@ export interface Database {
           estado: string;
           tipo: "factura" | "credito";
           devolucion_id: string | null;
+          nota_credito_id: string | null;
+          creado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      notas_credito_compra: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          fecha: string;
+          cuenta_id: string;
+          centro_costo_id: string | null;
+          referencia: string | null;
+          subtotal: number;
+          iva: number;
+          total: number;
+          glosa: string | null;
+          estado: "confirmada" | "anulada";
+          asiento_id: string | null;
           creado_en: string;
         };
         Insert: never;
@@ -1310,6 +1331,19 @@ export interface Database {
         Returns: string;
       };
       fn_anular_nota_credito: { Args: { p_nc: string; p_motivo: string }; Returns: undefined };
+      fn_editar_nota_credito: {
+        Args: {
+          p_nc: string;
+          p_fecha?: string | null;
+          p_cuenta: string;
+          p_centro?: string | null;
+          p_subtotal: number;
+          p_iva?: number;
+          p_referencia?: string | null;
+          p_glosa?: string | null;
+        };
+        Returns: string;
+      };
       fn_conciliar_redondeo: { Args: { p_linea: string; p_asiento_linea: string; p_tolerancia?: number }; Returns: undefined };
       fn_desconciliar_linea: { Args: { p_linea: string }; Returns: undefined };
       fn_marcar_conciliada: { Args: { p_conciliacion: string }; Returns: undefined };

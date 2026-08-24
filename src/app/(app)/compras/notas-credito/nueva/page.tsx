@@ -5,6 +5,7 @@ import { listarProveedoresActivos } from "@/lib/data/compras";
 import { listarCuentasPosteables, listarCentrosCosto } from "@/lib/data/asientos";
 
 import NotaCreditoForm from "@/components/NotaCreditoForm";
+import { crearNotaCredito } from "@/app/(app)/compras/actions";
 
 export default async function NuevaNotaCreditoPage() {
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras");
@@ -26,6 +27,7 @@ export default async function NuevaNotaCreditoPage() {
         pagar sus facturas.
       </p>
       <NotaCreditoForm
+        action={crearNotaCredito}
         proveedores={proveedores.map((p: { id: string; nombre: string }) => ({ value: p.id, label: p.nombre }))}
         cuentas={cuentas.map((c: { id: string; codigo: string; nombre: string }) => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
         centros={centros}
