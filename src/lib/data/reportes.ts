@@ -135,13 +135,20 @@ export async function compromisos(fecha: string): Promise<Compromisos> {
   return { disponible, total_debo, neto: disponible - total_debo, categorias };
 }
 
-export async function mayorCuenta(cuentaId: string, desde?: string, hasta?: string, excluirProrrateo = false) {
+export async function mayorCuenta(
+  cuentaId: string,
+  desde?: string,
+  hasta?: string,
+  excluirProrrateo = false,
+  excluirAnulados = false,
+) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("app_mayor_cuenta", {
     p_cuenta_id: cuentaId,
     p_desde: desde ?? null,
     p_hasta: hasta ?? null,
     p_excluir_prorrateo: excluirProrrateo,
+    p_excluir_anulados: excluirAnulados,
   });
   if (error) throw new Error(`No se pudo cargar el mayor: ${error.message}`);
   return data ?? [];

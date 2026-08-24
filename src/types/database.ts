@@ -1148,7 +1148,13 @@ export interface Database {
         Returns: { categoria: string; cuenta_codigo: string; cuenta_nombre: string; saldo: number }[];
       };
       app_mayor_cuenta: {
-        Args: { p_cuenta_id: string; p_desde?: string | null; p_hasta?: string | null; p_excluir_prorrateo?: boolean };
+        Args: {
+          p_cuenta_id: string;
+          p_desde?: string | null;
+          p_hasta?: string | null;
+          p_excluir_prorrateo?: boolean;
+          p_excluir_anulados?: boolean;
+        };
         Returns: {
           fecha: string;
           asiento_id: string;

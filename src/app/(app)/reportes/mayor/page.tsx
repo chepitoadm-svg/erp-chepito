@@ -36,7 +36,7 @@ function hrefOrigen(m: MayorRow): string {
 export default async function MayorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuenta?: string; desde?: string; hasta?: string; centro?: string; prorrateo?: string }>;
+  searchParams: Promise<{ cuenta?: string; desde?: string; hasta?: string; centro?: string; prorrateo?: string; anulados?: string }>;
 }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
 
@@ -48,10 +48,15 @@ export default async function MayorPage({
   const hasta = sp.hasta || "";
   const centro = sp.centro || "";
   const sinProrrateo = sp.prorrateo === "no";
+  // Por defecto se ocultan los asientos anulados y sus reversiones (netean a
+  // cero y confunden el saldo corrido). Se muestran con ?anulados=ver.
+  const verAnulados = sp.anulados === "ver";
 
   // El prorrateo (y sus reversiones) se excluye en el servidor cuando sinProrrateo,
   // igual que en el Estado de Resultados, para que el detalle cuadre con la celda.
-  const crudos = (cuentaId ? await mayorCuenta(cuentaId, desde || undefined, hasta || undefined, sinProrrateo) : []) as MayorRow[];
+  const crudos = (cuentaId
+    ? await mayorCuenta(cuentaId, desde || undefined, hasta || undefined, sinProrrateo, !verAnulados)
+    : []) as MayorRow[];
   const filtrados = centro ? crudos.filter((m) => m.centro_codigo === centro) : crudos;
   // Al filtrar por centro el saldo acumulado del RPC ya no aplica: se recalcula.
   const hayFiltro = !!centro;
@@ -95,6 +100,7 @@ export default async function MayorPage({
         {/* Conserva los filtros de drill-down al reenviar el form */}
         {centro && <input type="hidden" name="centro" value={centro} />}
         {sinProrrateo && <input type="hidden" name="prorrateo" value="no" />}
+        {verAnulados && <input type="hidden" name="anulados" value="ver" />}
         <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-800">
           Ver
         </button>
@@ -122,6 +128,20 @@ export default async function MayorPage({
             {sinProrrateo && (
               <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">sin prorrateo</span>
             )}
+            <Link
+              href={(() => {
+                const p = new URLSearchParams({ cuenta: cuentaId });
+                if (desde) p.set("desde", desde);
+                if (hasta) p.set("hasta", hasta);
+                if (centro) p.set("centro", centro);
+                if (sinProrrateo) p.set("prorrateo", "no");
+                if (!verAnulados) p.set("anulados", "ver");
+                return `/reportes/mayor?${p.toString()}`;
+              })()}
+              className="ml-auto rounded-full border border-neutral-200 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-50"
+            >
+              {verAnulados ? "ocultar anulados" : "ver anulados"}
+            </Link>
           </div>
           <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full min-w-[680px] text-sm">
