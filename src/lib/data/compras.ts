@@ -440,6 +440,7 @@ export interface CxPFila {
   monto_original: number;
   saldo: number;
   estado: string;
+  centro_codigo: string | null;
   pagos: { id: string }[]; // pagos confirmados aplicados a esta CxP
 }
 
@@ -451,39 +452,90 @@ interface CxPRowEmbebido {
   saldo: number;
   estado: string;
   factura_id: string | null;
+  proveedor_id: string | null;
   proveedor: { nombre: string } | null;
-  factura: { clave: string | null } | null;
+  factura: { clave: string | null; centro_costo_id: string | null; centro: { codigo: string } | null } | null;
   aplicaciones: { pago: { id: string; estado: string } | null }[];
 }
 
-/** Cuentas por pagar con saldo, para el listado de antigüedad. */
-export async function listarCxP(): Promise<CxPFila[]> {
+export type CxPOrden = "venc_asc" | "venc_desc" | "monto_asc" | "monto_desc";
+
+export interface CxPFiltro {
+  proveedorId?: string;
+  desde?: string; // fecha_vencimiento >=
+  hasta?: string; // fecha_vencimiento <=
+  centroId?: string;
+  estado?: string;
+  orden?: CxPOrden;
+}
+
+/** Proveedores que aparecen en cuentas por pagar, para el filtro. */
+export async function listarProveedoresDeCxP(): Promise<{ id: string; nombre: string }[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data, error } = await supabase.from("cuentas_por_pagar").select("proveedor_id, proveedor:proveedores(nombre)");
+  if (error) throw new Error(`No se pudieron cargar los proveedores: ${error.message}`);
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as unknown as { proveedor_id: string; proveedor: { nombre: string } | null }[]) {
+    if (r.proveedor_id) map.set(r.proveedor_id, r.proveedor?.nombre ?? "");
+  }
+  return [...map.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+/** Cuentas por pagar con saldo, para el listado de antigüedad. */
+export async function listarCxP(filtro: CxPFiltro = {}): Promise<CxPFila[]> {
+  const supabase = await createClient();
+  let q = supabase
     .from("cuentas_por_pagar")
     .select(
-      "id, fecha, fecha_vencimiento, monto_original, saldo, estado, factura_id, " +
-        "proveedor:proveedores(nombre), factura:facturas_compra(clave), " +
+      "id, fecha, fecha_vencimiento, monto_original, saldo, estado, factura_id, proveedor_id, " +
+        "proveedor:proveedores(nombre), factura:facturas_compra(clave, centro_costo_id, centro:centros_costo(codigo)), " +
         "aplicaciones:pagos_proveedor_lineas(pago:pagos_proveedor(id, estado))",
-    )
-    .order("fecha_vencimiento", { ascending: true });
+    );
+
+  if (filtro.proveedorId) q = q.eq("proveedor_id", filtro.proveedorId);
+  if (filtro.estado) q = q.eq("estado", filtro.estado);
+  if (filtro.desde) q = q.gte("fecha_vencimiento", filtro.desde);
+  if (filtro.hasta) q = q.lte("fecha_vencimiento", filtro.hasta);
+
+  const { data, error } = await q;
   if (error) throw new Error(`No se pudieron cargar las cuentas por pagar: ${error.message}`);
 
-  return ((data ?? []) as unknown as CxPRowEmbebido[]).map((q) => ({
-    id: q.id,
-    fecha: q.fecha,
-    fecha_vencimiento: q.fecha_vencimiento,
-    proveedor_nombre: q.proveedor?.nombre ?? "",
-    factura_clave: q.factura?.clave ?? null,
-    factura_id: q.factura_id,
-    pagos: (q.aplicaciones ?? [])
+  let filas = ((data ?? []) as unknown as CxPRowEmbebido[]).map((r) => ({
+    id: r.id,
+    fecha: r.fecha,
+    fecha_vencimiento: r.fecha_vencimiento,
+    proveedor_nombre: r.proveedor?.nombre ?? "",
+    factura_clave: r.factura?.clave ?? null,
+    factura_id: r.factura_id,
+    centro_costo_id: r.factura?.centro_costo_id ?? null,
+    centro_codigo: r.factura?.centro?.codigo ?? null,
+    pagos: (r.aplicaciones ?? [])
       .map((a) => a.pago)
       .filter((p): p is { id: string; estado: string } => !!p && p.estado === "confirmado")
       .map((p) => ({ id: p.id })),
-    monto_original: Number(q.monto_original),
-    saldo: Number(q.saldo),
-    estado: q.estado,
+    monto_original: Number(r.monto_original),
+    saldo: Number(r.saldo),
+    estado: r.estado,
   }));
+
+  // El centro viene de la factura; se filtra acá (join embebido).
+  if (filtro.centroId) filas = filas.filter((f) => f.centro_costo_id === filtro.centroId);
+
+  const orden = filtro.orden ?? "venc_asc";
+  const cmpFecha = (a: string | null, b: string | null) => (a ?? "9999").localeCompare(b ?? "9999");
+  filas.sort((a, b) => {
+    switch (orden) {
+      case "venc_desc":
+        return cmpFecha(b.fecha_vencimiento, a.fecha_vencimiento);
+      case "monto_asc":
+        return a.saldo - b.saldo;
+      case "monto_desc":
+        return b.saldo - a.saldo;
+      default:
+        return cmpFecha(a.fecha_vencimiento, b.fecha_vencimiento);
+    }
+  });
+  return filas.map(({ centro_costo_id: _c, ...rest }) => rest);
 }
 
 // === PAGOS A PROVEEDORES ===================================================
