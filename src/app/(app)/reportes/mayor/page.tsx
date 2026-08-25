@@ -68,6 +68,25 @@ export default async function MayorPage({
   const totDeb = movs.reduce((s, m) => s + Number(m.debito), 0);
   const totCred = movs.reduce((s, m) => s + Number(m.credito), 0);
 
+  // Resumen por centro de costo: cuánto suma cada uno en lo que se ve.
+  const porCentroMap = new Map<string, number>();
+  for (const m of movs) {
+    const k = m.centro_codigo ?? "(sin centro)";
+    porCentroMap.set(k, (porCentroMap.get(k) ?? 0) + (Number(m.debito) - Number(m.credito)));
+  }
+  const porCentro = [...porCentroMap.entries()]
+    .map(([codigo, neto]) => ({ codigo, neto }))
+    .sort((a, b) => Math.abs(b.neto) - Math.abs(a.neto));
+  const netoTotal = totDeb - totCred;
+  const hrefCentro = (cod: string) => {
+    const p = new URLSearchParams({ cuenta: cuentaId });
+    if (desde) p.set("desde", desde);
+    if (hasta) p.set("hasta", hasta);
+    if (sinProrrateo) p.set("prorrateo", "no");
+    if (cod !== "(sin centro)") p.set("centro", cod);
+    return `/reportes/mayor?${p.toString()}`;
+  };
+
   const sinCentro = new URLSearchParams({ cuenta: cuentaId });
   if (desde) sinCentro.set("desde", desde);
   if (hasta) sinCentro.set("hasta", hasta);
@@ -143,6 +162,36 @@ export default async function MayorPage({
               {verAnulados ? "ocultar anulados" : "ver anulados"}
             </Link>
           </div>
+
+          {/* Resumen por centro de costo (cuánto suma cada uno) */}
+          {movs.length > 0 && !centro && porCentro.length > 1 && (
+            <div className="mb-3 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+              <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-600">
+                Por centro de costo
+              </div>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-neutral-100">
+                  {porCentro.map((c) => (
+                    <tr key={c.codigo}>
+                      <td className="px-3 py-1.5 text-neutral-700">
+                        <Link href={hrefCentro(c.codigo)} className="underline decoration-dotted underline-offset-2 hover:text-neutral-900">
+                          {c.codigo}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-neutral-800">{money(c.neto)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm font-semibold">
+                  <tr>
+                    <td className="px-3 py-1.5 text-neutral-800">Total</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-neutral-900">{money(netoTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
           <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full min-w-[680px] text-sm">
               <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
