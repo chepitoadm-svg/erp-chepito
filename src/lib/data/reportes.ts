@@ -135,6 +135,61 @@ export async function compromisos(fecha: string): Promise<Compromisos> {
   return { disponible, total_debo, neto: disponible - total_debo, categorias };
 }
 
+export interface DetalleBancarioLinea {
+  fecha: string;
+  referencia: string | null;
+  descripcion: string | null;
+  monto: number;
+  conciliado: boolean;
+  origen_tipo: string | null;
+  origen_id: string | null;
+  asiento_id: string;
+}
+export interface DetalleBancarioCentro {
+  centro: string;
+  total: number;
+  lineas: DetalleBancarioLinea[];
+}
+// Detalle bancario de una cuenta agrupado por centro de costo: las líneas reales
+// del estado de cuenta (o el movimiento si no está conciliado).
+export async function detalleBancarioCuenta(cuentaId: string, desde: string, hasta: string): Promise<DetalleBancarioCentro[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_detalle_bancario_cuenta", {
+    p_cuenta: cuentaId,
+    p_desde: desde,
+    p_hasta: hasta,
+  });
+  if (error) throw new Error(`No se pudo cargar el detalle bancario: ${error.message}`);
+  const filas = (data ?? []) as {
+    centro_codigo: string;
+    fecha: string;
+    referencia: string | null;
+    descripcion: string | null;
+    monto: number;
+    conciliado: boolean;
+    origen_tipo: string | null;
+    origen_id: string | null;
+    asiento_id: string;
+  }[];
+  const m = new Map<string, DetalleBancarioCentro>();
+  for (const f of filas) {
+    const e = m.get(f.centro_codigo) ?? { centro: f.centro_codigo, total: 0, lineas: [] };
+    e.total += Number(f.monto);
+    e.lineas.push({
+      fecha: f.fecha,
+      referencia: f.referencia,
+      descripcion: f.descripcion,
+      monto: Number(f.monto),
+      conciliado: f.conciliado,
+      origen_tipo: f.origen_tipo,
+      origen_id: f.origen_id,
+      asiento_id: f.asiento_id,
+    });
+    m.set(f.centro_codigo, e);
+  }
+  return [...m.values()].sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+}
+
 export async function mayorCuenta(
   cuentaId: string,
   desde?: string,

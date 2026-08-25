@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { mayorCuenta } from "@/lib/data/reportes";
+import { mayorCuenta, detalleBancarioCuenta } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 import SelectBuscable from "@/components/SelectBuscable";
 import BotonVolver from "@/components/BotonVolver";
@@ -36,13 +36,14 @@ function hrefOrigen(m: MayorRow): string {
 export default async function MayorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuenta?: string; desde?: string; hasta?: string; centro?: string; prorrateo?: string; anulados?: string }>;
+  searchParams: Promise<{ cuenta?: string; desde?: string; hasta?: string; centro?: string; prorrateo?: string; anulados?: string; detalle?: string }>;
 }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
 
   const sp = await searchParams;
   const cuentas = await listarCuentasPosteables();
   const cuentaId = sp.cuenta || "";
+  const detalleBanco = sp.detalle === "banco";
   const cuentaSel = cuentas.find((c) => c.id === cuentaId);
   const desde = sp.desde || "";
   const hasta = sp.hasta || "";
@@ -86,6 +87,17 @@ export default async function MayorPage({
     neto: c.neto,
     items: movs.filter((m) => (m.centro_codigo ?? "(sin centro)") === c.codigo),
   }));
+
+  // Detalle bancario (líneas reales del estado de cuenta) agrupado por centro.
+  const bancoGrupos =
+    detalleBanco && cuentaId && desde && hasta ? await detalleBancarioCuenta(cuentaId, desde, hasta) : [];
+  const bancoTotal = bancoGrupos.reduce((s, g) => s + g.total, 0);
+  const hrefOrigenDet = (l: { origen_tipo: string | null; origen_id: string | null; asiento_id: string }) =>
+    l.origen_tipo === "gasto" && l.origen_id
+      ? `/gastos/${l.origen_id}`
+      : l.origen_tipo === "factura_compra" && l.origen_id
+        ? `/compras/facturas/${l.origen_id}`
+        : `/asientos/${l.asiento_id}`;
   const hrefCentro = (cod: string) => {
     const p = new URLSearchParams({ cuenta: cuentaId });
     if (desde) p.set("desde", desde);
@@ -171,7 +183,48 @@ export default async function MayorPage({
             </Link>
           </div>
 
-          {agrupar ? (
+          {detalleBanco ? (
+            /* Detalle bancario real (líneas del estado de cuenta) por centro. */
+            <div className="space-y-3">
+              {bancoGrupos.length === 0 && (
+                <p className="rounded-lg border border-neutral-200 bg-white px-3 py-6 text-center text-sm text-neutral-400">
+                  Sin movimientos en el rango.
+                </p>
+              )}
+              {bancoGrupos.map((g) => (
+                <div key={g.centro} className="overflow-hidden rounded-lg border border-green-200 bg-green-50/40">
+                  <div className="flex items-center justify-between border-b border-green-200 bg-green-50 px-3 py-2">
+                    <span className="text-sm font-semibold text-green-800">{g.centro}</span>
+                    <span className="text-sm font-semibold tabular-nums text-green-800">{money(g.total)}</span>
+                  </div>
+                  <ul className="divide-y divide-green-100">
+                    {g.lineas.map((l, i) => (
+                      <li key={i} className="flex items-start gap-2 px-3 py-1.5 text-sm text-neutral-700">
+                        <span className="mt-0.5 text-green-600">•</span>
+                        <span className="w-24 shrink-0 text-neutral-500">{l.fecha}</span>
+                        <span className="flex-1">
+                          {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
+                          {l.descripcion}
+                          {!l.conciliado && (
+                            <Link href={hrefOrigenDet(l)} className="ml-1 rounded bg-amber-50 px-1 text-[10px] text-amber-700 underline hover:no-underline">
+                              sin conciliar — ver
+                            </Link>
+                          )}
+                        </span>
+                        <span className="shrink-0 tabular-nums">{money(l.monto)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {bancoGrupos.length > 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900">
+                  <span>Total</span>
+                  <span className="tabular-nums">{money(bancoTotal)}</span>
+                </div>
+              )}
+            </div>
+          ) : agrupar ? (
             /* Vista agrupada por centro de costo (verde), con subtotal de cada uno. */
             <div className="space-y-3">
               {grupos.map((g) => (

@@ -1156,6 +1156,20 @@ export interface Database {
         Args: { p_fecha: string };
         Returns: number;
       };
+      fn_detalle_bancario_cuenta: {
+        Args: { p_cuenta: string; p_desde: string; p_hasta: string };
+        Returns: {
+          centro_codigo: string;
+          fecha: string;
+          referencia: string | null;
+          descripcion: string | null;
+          monto: number;
+          conciliado: boolean;
+          origen_tipo: string | null;
+          origen_id: string | null;
+          asiento_id: string;
+        }[];
+      };
       fn_flujo_caja: {
         Args: { p_desde: string; p_hasta: string };
         Returns: {

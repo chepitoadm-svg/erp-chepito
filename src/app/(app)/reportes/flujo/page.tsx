@@ -41,7 +41,7 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
   const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
   const hrefMayor = (cod: string) => {
     const id = codToId.get(cod);
-    return id ? `/reportes/mayor?cuenta=${id}&desde=${desde}&hasta=${hasta}` : null;
+    return id ? `/reportes/mayor?cuenta=${id}&desde=${desde}&hasta=${hasta}&detalle=banco` : null;
   };
   // Para saldos acumulados (compromisos): sin fecha desde, para que el saldo del
   // Mayor termine en el mismo saldo que muestra el compromiso.
