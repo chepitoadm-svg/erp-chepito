@@ -78,6 +78,14 @@ export default async function MayorPage({
     .map(([codigo, neto]) => ({ codigo, neto }))
     .sort((a, b) => Math.abs(b.neto) - Math.abs(a.neto));
   const netoTotal = totDeb - totCred;
+  // Vista agrupada por centro (para el drill-down): cada centro con su detalle
+  // y subtotal. Solo cuando hay más de un centro y no se filtró por centro.
+  const agrupar = movs.length > 0 && !centro && porCentro.length > 1;
+  const grupos = porCentro.map((c) => ({
+    centro: c.codigo,
+    neto: c.neto,
+    items: movs.filter((m) => (m.centro_codigo ?? "(sin centro)") === c.codigo),
+  }));
   const hrefCentro = (cod: string) => {
     const p = new URLSearchParams({ cuenta: cuentaId });
     if (desde) p.set("desde", desde);
@@ -163,35 +171,45 @@ export default async function MayorPage({
             </Link>
           </div>
 
-          {/* Resumen por centro de costo (cuánto suma cada uno) */}
-          {movs.length > 0 && !centro && porCentro.length > 1 && (
-            <div className="mb-3 overflow-hidden rounded-lg border border-neutral-200 bg-white">
-              <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-600">
-                Por centro de costo
+          {agrupar ? (
+            /* Vista agrupada por centro de costo (verde), con subtotal de cada uno. */
+            <div className="space-y-3">
+              {grupos.map((g) => (
+                <div key={g.centro} className="overflow-hidden rounded-lg border border-green-200 bg-green-50/40">
+                  <div className="flex items-center justify-between border-b border-green-200 bg-green-50 px-3 py-2">
+                    <Link href={hrefCentro(g.centro)} className="text-sm font-semibold text-green-800 underline decoration-dotted underline-offset-2 hover:no-underline">
+                      {g.centro}
+                    </Link>
+                    <span className="text-sm font-semibold tabular-nums text-green-800">{money(g.neto)}</span>
+                  </div>
+                  <ul className="divide-y divide-green-100">
+                    {g.items.map((m, i) => {
+                      const anulado = m.asiento_estado === "anulado";
+                      const monto = Number(m.debito) - Number(m.credito);
+                      return (
+                        <li key={i} className={`flex items-start gap-2 px-3 py-1.5 text-sm ${anulado ? "text-neutral-400" : "text-neutral-700"}`}>
+                          <span className="mt-0.5 text-green-600">•</span>
+                          <span className="w-24 shrink-0 text-neutral-500">{m.fecha}</span>
+                          <Link href={hrefOrigen(m)} className="shrink-0 underline decoration-dotted underline-offset-2 hover:text-neutral-900" title="Abrir el origen">
+                            {m.asiento_numero ? `${m.asiento_tipo.slice(0, 3).toUpperCase()}-${m.asiento_numero}` : m.asiento_tipo}
+                          </Link>
+                          <span className="flex-1 truncate">
+                            {m.glosa}
+                            {anulado && <span className="ml-1 rounded bg-red-50 px-1 text-[10px] text-red-600">anulado</span>}
+                          </span>
+                          <span className="shrink-0 tabular-nums">{money(monto)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900">
+                <span>Total ({movs.length} movimiento{movs.length !== 1 ? "s" : ""})</span>
+                <span className="tabular-nums">{money(netoTotal)}</span>
               </div>
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-neutral-100">
-                  {porCentro.map((c) => (
-                    <tr key={c.codigo}>
-                      <td className="px-3 py-1.5 text-neutral-700">
-                        <Link href={hrefCentro(c.codigo)} className="underline decoration-dotted underline-offset-2 hover:text-neutral-900">
-                          {c.codigo}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums text-neutral-800">{money(c.neto)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm font-semibold">
-                  <tr>
-                    <td className="px-3 py-1.5 text-neutral-800">Total</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-neutral-900">{money(netoTotal)}</td>
-                  </tr>
-                </tfoot>
-              </table>
             </div>
-          )}
-
+          ) : (
           <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full min-w-[680px] text-sm">
               <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
@@ -258,6 +276,7 @@ export default async function MayorPage({
               )}
             </table>
           </div>
+          )}
         </>
       )}
     </div>
