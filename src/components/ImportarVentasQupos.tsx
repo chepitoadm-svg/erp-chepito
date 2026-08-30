@@ -36,6 +36,11 @@ function FilaDia({ dia, centro }: { dia: DiaVentaQupos; centro: Centro }) {
       <td className="px-4 py-3 text-right tabular-nums font-medium text-neutral-900">
         {fmt(dia.total)}
       </td>
+      <td className="bg-emerald-50/40 px-4 py-3 text-right tabular-nums font-medium text-emerald-800">
+        {fmt(dia.tarjeta)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{fmt(dia.efectivo)}</td>
+      <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{fmt(dia.sinpe)}</td>
       <td className="px-4 py-3 text-center text-xs text-neutral-500">
         {dia.tickets}t · {dia.lineas}l
       </td>
@@ -46,6 +51,9 @@ function FilaDia({ dia, centro }: { dia: DiaVentaQupos; centro: Centro }) {
           <input type="hidden" name="gravado" value={dia.gravado} />
           <input type="hidden" name="exento" value={dia.exento} />
           <input type="hidden" name="iva" value={dia.iva} />
+          <input type="hidden" name="efectivo" value={dia.efectivo} />
+          <input type="hidden" name="tarjeta" value={dia.tarjeta} />
+          <input type="hidden" name="sinpe" value={dia.sinpe} />
           <input type="hidden" name="glosa" value={glosa} />
           <button
             type="submit"
@@ -138,6 +146,9 @@ export default function ImportarVentasQupos({ centros }: { centros: Centro[] }) 
                       exento: d.exento,
                       iva: d.iva,
                       tickets: d.tickets,
+                      efectivo: d.efectivo,
+                      tarjeta: d.tarjeta,
+                      sinpe: d.sinpe,
                     })),
                   )}
                 />
@@ -177,6 +188,9 @@ export default function ImportarVentasQupos({ centros }: { centros: Centro[] }) 
                   <th className="px-4 py-3 text-right font-medium">Exento</th>
                   <th className="px-4 py-3 text-right font-medium">IVA</th>
                   <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="bg-emerald-50/60 px-4 py-3 text-right font-medium text-emerald-800">💳 Tarjeta</th>
+                  <th className="px-4 py-3 text-right font-medium">💵 Efectivo</th>
+                  <th className="px-4 py-3 text-right font-medium">📲 Sinpe</th>
                   <th className="px-4 py-3 text-center font-medium">Detalle</th>
                   <th className="px-4 py-3 text-right" />
                 </tr>

@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerConciliacion } from "@/lib/data/conciliaciones";
 import { listarCuentasPosteables, listarCentrosCosto } from "@/lib/data/asientos";
-import { marcarConciliada } from "../actions";
+import { listarProveedoresActivos } from "@/lib/data/compras";
+import { marcarConciliada, reabrirConciliacion } from "../actions";
 import ConciliadorPanel from "@/components/ConciliadorPanel";
 import AnularConciliacion from "@/components/AnularConciliacion";
 
@@ -19,12 +20,17 @@ const ESTADO_CLS: Record<string, string> = {
 export default async function ConciliacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await tienePermiso("tesoreria.conciliar"))) redirect("/");
   const { id } = await params;
-  const [c, cuentasRaw, centros] = await Promise.all([
+  const [c, cuentasRaw, centros, proveedoresRaw] = await Promise.all([
     obtenerConciliacion(id),
     listarCuentasPosteables(),
     listarCentrosCosto(),
+    listarProveedoresActivos(),
   ]);
   if (!c) notFound();
+  const proveedores = (proveedoresRaw as { id: string; nombre: string }[]).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+  }));
 
   const cuentas = cuentasRaw.map((x: { id: string; codigo: string; nombre: string }) => ({
     value: x.id,
@@ -89,6 +95,7 @@ export default async function ConciliacionDetallePage({ params }: { params: Prom
         cuentas={cuentas}
         centros={centros}
         editable={editable}
+        proveedores={proveedores}
       />
 
       {editable && (
@@ -106,7 +113,16 @@ export default async function ConciliacionDetallePage({ params }: { params: Prom
         </div>
       )}
       {c.estado === "conciliada" && (
-        <div className="mt-6">
+        <div className="mt-6 flex items-center gap-3">
+          <form action={reabrirConciliacion}>
+            <input type="hidden" name="id" value={c.id} />
+            <button
+              type="submit"
+              className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              Reabrir para editar
+            </button>
+          </form>
           <AnularConciliacion id={c.id} />
         </div>
       )}

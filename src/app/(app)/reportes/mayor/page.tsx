@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { mayorCuenta, detalleBancarioCuenta } from "@/lib/data/reportes";
+import { mayorCuenta, flujoDetalle, type FlujoDetalleLinea } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 import SelectBuscable from "@/components/SelectBuscable";
 import BotonVolver from "@/components/BotonVolver";
@@ -33,10 +33,29 @@ function hrefOrigen(m: MayorRow): string {
   return `/asientos/${m.asiento_id}`;
 }
 
+function FilaFlujo({ l, href }: { l: FlujoDetalleLinea; href: string }) {
+  return (
+    <tr>
+      <td className="whitespace-nowrap px-3 py-2 text-neutral-600">{l.fecha}</td>
+      <td className="px-3 py-2 text-neutral-700">
+        <Link href={href} className="underline decoration-dotted underline-offset-2 hover:text-neutral-900">
+          {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
+          {l.descripcion || "—"}
+        </Link>
+      </td>
+      <td className="px-3 py-2 text-neutral-800">{l.proveedor_nombre ?? <span className="text-neutral-300">—</span>}</td>
+      <td className="px-3 py-2">
+        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">{l.tipo_label}</span>
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums font-medium text-neutral-900">{money(Math.abs(l.monto))}</td>
+    </tr>
+  );
+}
+
 export default async function MayorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuenta?: string; desde?: string; hasta?: string; centro?: string; prorrateo?: string; anulados?: string; detalle?: string }>;
+  searchParams: Promise<{ cuenta?: string; desde?: string; hasta?: string; centro?: string; prorrateo?: string; anulados?: string; detalle?: string; agrupar?: string }>;
 }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
 
@@ -88,16 +107,38 @@ export default async function MayorPage({
     items: movs.filter((m) => (m.centro_codigo ?? "(sin centro)") === c.codigo),
   }));
 
-  // Detalle bancario (líneas reales del estado de cuenta) agrupado por centro.
-  const bancoGrupos =
-    detalleBanco && cuentaId && desde && hasta ? await detalleBancarioCuenta(cuentaId, desde, hasta) : [];
-  const bancoTotal = bancoGrupos.reduce((s, g) => s + g.total, 0);
+  // Detalle del flujo: SOLO lo que tocó banco (los que suman el número del flujo),
+  // con proveedor y tipo, agrupable por proveedor / tipo / centro.
+  const agruparDet =
+    sp.agrupar === "proveedor" || sp.agrupar === "tipo" || sp.agrupar === "centro" ? sp.agrupar : "";
+  const flujoRows: FlujoDetalleLinea[] =
+    detalleBanco && cuentaId && desde && hasta ? await flujoDetalle(cuentaId, desde, hasta) : [];
+  const flujoNeto = flujoRows.reduce((s, r) => s + r.monto, 0);
   const hrefOrigenDet = (l: { origen_tipo: string | null; origen_id: string | null; asiento_id: string }) =>
     l.origen_tipo === "gasto" && l.origen_id
       ? `/gastos/${l.origen_id}`
       : l.origen_tipo === "factura_compra" && l.origen_id
         ? `/compras/facturas/${l.origen_id}`
         : `/asientos/${l.asiento_id}`;
+  const claveDet = (l: FlujoDetalleLinea): string =>
+    agruparDet === "proveedor"
+      ? l.proveedor_nombre ?? "(sin proveedor)"
+      : agruparDet === "tipo"
+        ? l.tipo_label
+        : l.centro_codigo ?? "(sin centro)";
+  const gruposDet = new Map<string, FlujoDetalleLinea[]>();
+  if (agruparDet) for (const l of flujoRows) (gruposDet.get(claveDet(l)) ?? gruposDet.set(claveDet(l), []).get(claveDet(l))!).push(l);
+  const gruposDetOrd = [...gruposDet.entries()]
+    .map(([k, filas]) => ({ clave: k, filas, sub: filas.reduce((s, r) => s + r.monto, 0) }))
+    .sort((a, b) => Math.abs(b.sub) - Math.abs(a.sub));
+  // Enlace que conserva cuenta/fechas/detalle y cambia el agrupador.
+  const hrefAgrupar = (val: string) => {
+    const p = new URLSearchParams({ cuenta: cuentaId, detalle: "banco" });
+    if (desde) p.set("desde", desde);
+    if (hasta) p.set("hasta", hasta);
+    if (val) p.set("agrupar", val);
+    return `/reportes/mayor?${p.toString()}`;
+  };
   const hrefCentro = (cod: string) => {
     const p = new URLSearchParams({ cuenta: cuentaId });
     if (desde) p.set("desde", desde);
@@ -184,43 +225,70 @@ export default async function MayorPage({
           </div>
 
           {detalleBanco ? (
-            /* Detalle bancario real (líneas del estado de cuenta) por centro. */
-            <div className="space-y-3">
-              {bancoGrupos.length === 0 && (
+            /* Detalle del flujo: solo lo que tocó banco, con proveedor y tipo. */
+            <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-neutral-500">Agrupar por:</span>
+                {[
+                  { v: "", t: "Ninguno" },
+                  { v: "proveedor", t: "Proveedor" },
+                  { v: "tipo", t: "Tipo" },
+                  { v: "centro", t: "Centro" },
+                ].map((o) => (
+                  <Link
+                    key={o.v}
+                    href={hrefAgrupar(o.v)}
+                    className={`rounded-full px-2.5 py-1 ${agruparDet === o.v ? "bg-neutral-900 text-white" : "border border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+                  >
+                    {o.t}
+                  </Link>
+                ))}
+                <span className="ml-auto rounded-md bg-neutral-100 px-3 py-1 font-semibold text-neutral-900">
+                  Total: {money(Math.abs(flujoNeto))}{" "}
+                  <span className="font-normal text-neutral-400">({flujoRows.length})</span>
+                </span>
+              </div>
+
+              {flujoRows.length === 0 ? (
                 <p className="rounded-lg border border-neutral-200 bg-white px-3 py-6 text-center text-sm text-neutral-400">
-                  Sin movimientos en el rango.
+                  Sin movimientos que hayan tocado el banco en el rango.
                 </p>
-              )}
-              {bancoGrupos.map((g) => (
-                <div key={g.centro} className="overflow-hidden rounded-lg border border-green-200 bg-green-50/40">
-                  <div className="flex items-center justify-between border-b border-green-200 bg-green-50 px-3 py-2">
-                    <span className="text-sm font-semibold text-green-800">{g.centro}</span>
-                    <span className="text-sm font-semibold tabular-nums text-green-800">{money(g.total)}</span>
-                  </div>
-                  <ul className="divide-y divide-green-100">
-                    {g.lineas.map((l, i) => (
-                      <li key={i} className="flex items-start gap-2 px-3 py-1.5 text-sm text-neutral-700">
-                        <span className="mt-0.5 text-green-600">•</span>
-                        <span className="w-24 shrink-0 text-neutral-500">{l.fecha}</span>
-                        <span className="flex-1">
-                          {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
-                          {l.descripcion}
-                          {!l.conciliado && (
-                            <Link href={hrefOrigenDet(l)} className="ml-1 rounded bg-amber-50 px-1 text-[10px] text-amber-700 underline hover:no-underline">
-                              sin conciliar — ver
-                            </Link>
-                          )}
-                        </span>
-                        <span className="shrink-0 tabular-nums">{money(l.monto)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-              {bancoGrupos.length > 0 && (
-                <div className="flex items-center justify-between rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900">
-                  <span>Total</span>
-                  <span className="tabular-nums">{money(bancoTotal)}</span>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Fecha</th>
+                        <th className="px-3 py-2 font-medium">Detalle (banco)</th>
+                        <th className="px-3 py-2 font-medium">Proveedor</th>
+                        <th className="px-3 py-2 font-medium">Tipo</th>
+                        <th className="px-3 py-2 text-right font-medium">Monto</th>
+                      </tr>
+                    </thead>
+                    {agruparDet ? (
+                      gruposDetOrd.map((g) => (
+                        <tbody key={g.clave} className="divide-y divide-neutral-100 border-t border-neutral-200">
+                          <tr className="bg-neutral-50/70">
+                            <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-neutral-800">
+                              {g.clave} <span className="font-normal text-neutral-400">({g.filas.length})</span>
+                            </td>
+                            <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums text-neutral-900">
+                              {money(Math.abs(g.sub))}
+                            </td>
+                          </tr>
+                          {g.filas.map((l, i) => (
+                            <FilaFlujo key={i} l={l} href={hrefOrigenDet(l)} />
+                          ))}
+                        </tbody>
+                      ))
+                    ) : (
+                      <tbody className="divide-y divide-neutral-100">
+                        {flujoRows.map((l, i) => (
+                          <FilaFlujo key={i} l={l} href={hrefOrigenDet(l)} />
+                        ))}
+                      </tbody>
+                    )}
+                  </table>
                 </div>
               )}
             </div>

@@ -17,9 +17,26 @@ export interface DiaVentaQupos {
   exento: number; // total de las líneas sin IVA
   iva: number;
   total: number; // gravado + exento + iva (lo que entra a caja)
+  efectivo: number; // cobrado en Colones/efectivo (→ caja)
+  tarjeta: number; // cobrado con Tarjeta (→ datafono)
+  sinpe: number; // cobrado por Sinpe/PE/Transferencia (→ sinpes)
   tickets: number;
   lineas: number;
   sin_descripcion: number; // líneas sin nombre de producto (para avisar sobre el costo)
+}
+
+// Clasifica el "Tipo pago" de QuPOS en el balde contable. Efectivo es el default
+// (Mixto y cualquier otro caen a efectivo/caja).
+type Balde = "efectivo" | "tarjeta" | "sinpe";
+function baldePago(tipo: string): Balde {
+  const t = tipo
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+  if (t.includes("tarjeta")) return "tarjeta";
+  if (t === "pe" || t.includes("sinpe") || t.includes("electr") || t.includes("transfer")) return "sinpe";
+  return "efectivo"; // Colones, Mixto, vacío, otros
 }
 
 export interface ResumenVentasQupos {
@@ -148,6 +165,7 @@ export function resumenVentasQupos(buffer: Uint8Array): ResumenVentasQupos {
   const cTotal = buscar((c) => c === "total + iva" || (c.includes("total") && c.includes("iva")));
   const cDoc = buscar((c) => c.includes("documento"));
   const cFecha = buscar((c) => c.includes("fecha"));
+  const cPago = buscar((c) => c.includes("tipo pago") || c === "pago" || c.includes("forma pago"));
   if (cIva < 0 || cTotal < 0 || cFecha < 0) {
     throw new Error("Faltan columnas de QuPOS (Impuesto total / Total + IVA / Fecha documento).");
   }
@@ -157,6 +175,9 @@ export function resumenVentasQupos(buffer: Uint8Array): ResumenVentasQupos {
     exentoC: number;
     ivaC: number;
     totalC: number;
+    efectivoC: number;
+    tarjetaC: number;
+    sinpeC: number;
     tickets: Set<string>;
     lineas: number;
     sinDesc: number;
@@ -185,13 +206,18 @@ export function resumenVentasQupos(buffer: Uint8Array): ResumenVentasQupos {
 
     let acc = porDia.get(fecha);
     if (!acc) {
-      acc = { gravadoC: 0, exentoC: 0, ivaC: 0, totalC: 0, tickets: new Set(), lineas: 0, sinDesc: 0 };
+      acc = { gravadoC: 0, exentoC: 0, ivaC: 0, totalC: 0, efectivoC: 0, tarjetaC: 0, sinpeC: 0, tickets: new Set(), lineas: 0, sinDesc: 0 };
       porDia.set(fecha, acc);
     }
     acc.totalC += totalC;
     acc.ivaC += ivaC;
     if (ivaC > 0) acc.gravadoC += totalC - ivaC;
     else acc.exentoC += totalC;
+    // Reparto por medio de pago (cada línea cae en un balde; la suma = total).
+    const balde = cPago >= 0 ? baldePago(f[cPago] ?? "") : "efectivo";
+    if (balde === "tarjeta") acc.tarjetaC += totalC;
+    else if (balde === "sinpe") acc.sinpeC += totalC;
+    else acc.efectivoC += totalC;
     acc.lineas++;
     if (cDoc >= 0 && f[cDoc]) acc.tickets.add(f[cDoc]);
     if (cDesc >= 0 && !(f[cDesc] ?? "").trim()) acc.sinDesc++;
@@ -205,6 +231,9 @@ export function resumenVentasQupos(buffer: Uint8Array): ResumenVentasQupos {
       exento: a.exentoC / 100,
       iva: a.ivaC / 100,
       total: a.totalC / 100,
+      efectivo: a.efectivoC / 100,
+      tarjeta: a.tarjetaC / 100,
+      sinpe: a.sinpeC / 100,
       tickets: a.tickets.size,
       lineas: a.lineas,
       sin_descripcion: a.sinDesc,

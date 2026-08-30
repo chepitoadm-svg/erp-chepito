@@ -2,6 +2,8 @@
 // con RLS. Todas las funciones subyacentes ya filtran estado = 'confirmado'.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { detectarProveedor } from "@/lib/bancoAlias";
+import { obtenerMapaAlias } from "@/lib/data/proveedorAlias";
 
 export async function balanza(hasta: string, incluirProrrateo = true) {
   const supabase = await createClient();
@@ -45,9 +47,13 @@ export interface FlujoCaja {
   saldo_inicial: number;
   saldo_final: number;
   total_entradas: number;
-  total_salidas: number; // positivo (magnitud)
+  total_salidas: number; // positivo (magnitud), SIN el datafono
   entradas: FlujoCategoria[];
   salidas: FlujoCategoria[];
+  // Movimiento del datafono en el mes (tarjetas cobradas − depósitos recibidos).
+  // Negativo = tarjetas que aún NO están en el banco (pendientes de depósito).
+  // Se muestra aparte porque no es un gasto: es plata en camino.
+  tarjetas_neto: number;
 }
 
 // Flujo de caja del periodo (método directo). Agrupa por categoría; entradas y
@@ -73,9 +79,17 @@ export async function flujoCaja(desde: string, hasta: string): Promise<FlujoCaja
     monto: number;
   }[];
 
+  // El datafono (tarjetas por cobrar, 11-30-02%) se saca del flujo normal: no es
+  // ni entrada de caja ni gasto, es plata que el banco aún no deposita. Se
+  // reporta aparte. `monto` viene firmado (crédito−débito): venta con tarjeta =
+  // débito (negativo, pendiente); depósito del banco = crédito (positivo, cobrado).
+  const esDatafono = (cod: string) => cod.startsWith("11-30-02");
+  const tarjetasNeto = filas.filter((f) => esDatafono(f.cuenta_codigo)).reduce((s, f) => s + Number(f.monto), 0);
+  const filasSinDatafono = filas.filter((f) => !esDatafono(f.cuenta_codigo));
+
   const agrupar = (tipo: "entrada" | "salida"): FlujoCategoria[] => {
     const m = new Map<string, FlujoCategoria>();
-    for (const f of filas.filter((x) => x.tipo === tipo)) {
+    for (const f of filasSinDatafono.filter((x) => x.tipo === tipo)) {
       const e = m.get(f.categoria) ?? { categoria: f.categoria, total: 0, lineas: [] };
       const monto = Math.abs(Number(f.monto));
       e.total += monto;
@@ -96,6 +110,7 @@ export async function flujoCaja(desde: string, hasta: string): Promise<FlujoCaja
     total_salidas: salidas.reduce((s, c) => s + c.total, 0),
     entradas,
     salidas,
+    tarjetas_neto: Math.round(tarjetasNeto * 100) / 100,
   };
 }
 
@@ -133,6 +148,85 @@ export async function compromisos(fecha: string): Promise<Compromisos> {
   const disponible = Number(caja.data ?? 0);
   const total_debo = categorias.reduce((s, c) => s + c.total, 0);
   return { disponible, total_debo, neto: disponible - total_debo, categorias };
+}
+
+// --- Cuadre: auxiliar de Gastos vs Mayor -------------------------------------
+export interface CuadreGastoFila {
+  cuenta_codigo: string;
+  cuenta_nombre: string;
+  cuenta_id: string;
+  auxiliar: number;
+  mayor: number;
+  diferencia: number;
+}
+
+export async function cuadreGastos(desde: string, hasta: string): Promise<CuadreGastoFila[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_cuadre_gastos", { p_desde: desde, p_hasta: hasta });
+  if (error) throw new Error(`No se pudo cargar el cuadre: ${error.message}`);
+  return ((data ?? []) as CuadreGastoFila[]).map((f) => ({
+    cuenta_codigo: f.cuenta_codigo,
+    cuenta_nombre: f.cuenta_nombre,
+    cuenta_id: f.cuenta_id,
+    auxiliar: Number(f.auxiliar),
+    mayor: Number(f.mayor),
+    diferencia: Number(f.diferencia),
+  }));
+}
+
+// --- Detalle del flujo de caja por cuenta (solo lo que tocó banco) -----------
+const TIPO_LABEL: Record<string, string> = {
+  factura_compra: "Factura de compra",
+  pago_proveedor: "Pago a proveedor",
+  gasto: "Gasto",
+  nota_credito_compra: "Nota de crédito",
+  venta_dia: "Venta",
+  conciliacion_redondeo: "Redondeo",
+};
+
+export interface FlujoDetalleLinea {
+  fecha: string;
+  referencia: string | null;
+  descripcion: string | null;
+  monto: number; // firmado (crédito − débito); la pantalla muestra el valor absoluto
+  proveedor_nombre: string | null;
+  origen_tipo: string | null;
+  tipo_label: string;
+  centro_codigo: string | null;
+  asiento_id: string;
+  origen_id: string | null;
+}
+
+// Devuelve SOLO los movimientos de la cuenta que tocaron caja/banco — los que
+// suman el número del flujo — con proveedor (del origen o del alias bancario).
+export async function flujoDetalle(cuentaId: string, desde: string, hasta: string): Promise<FlujoDetalleLinea[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_flujo_detalle", { p_cuenta: cuentaId, p_desde: desde, p_hasta: hasta });
+  if (error) throw new Error(`No se pudo cargar el detalle del flujo: ${error.message}`);
+  const filas = (data ?? []) as {
+    fecha: string;
+    referencia: string | null;
+    descripcion: string | null;
+    monto: number;
+    proveedor_nombre: string | null;
+    origen_tipo: string | null;
+    centro_codigo: string | null;
+    asiento_id: string;
+    origen_id: string | null;
+  }[];
+  const aliases = await obtenerMapaAlias();
+  return filas.map((f) => ({
+    fecha: f.fecha,
+    referencia: f.referencia,
+    descripcion: f.descripcion,
+    monto: Number(f.monto),
+    proveedor_nombre: f.proveedor_nombre ?? detectarProveedor(f.referencia, f.descripcion, aliases),
+    origen_tipo: f.origen_tipo,
+    tipo_label: f.origen_tipo ? (TIPO_LABEL[f.origen_tipo] ?? "Asiento") : "Asiento",
+    centro_codigo: f.centro_codigo,
+    asiento_id: f.asiento_id,
+    origen_id: f.origen_id,
+  }));
 }
 
 export interface DetalleBancarioLinea {

@@ -26,12 +26,17 @@ export default async function CostosPage() {
             de costo de ventas en el Estado de Resultados.
           </p>
         </div>
-        <Link
-          href="/costos/nuevo"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          + Calcular mes
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/costos/desecho" className="text-sm text-neutral-500 hover:text-neutral-900">
+            🗑️ Desecho
+          </Link>
+          <Link
+            href="/costos/nuevo"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            + Calcular mes
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">

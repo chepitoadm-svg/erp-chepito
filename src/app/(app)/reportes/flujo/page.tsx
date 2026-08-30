@@ -50,7 +50,10 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
     return id ? `/reportes/mayor?cuenta=${id}&hasta=${hasta}` : null;
   };
 
-  const neto = flujo.total_entradas - flujo.total_salidas;
+  const neto = flujo.total_entradas - flujo.total_salidas + flujo.tarjetas_neto;
+  // Negativo = tarjetas cobradas que el banco aún no deposita (pendientes).
+  const tarjetasPendientes = flujo.tarjetas_neto < 0 ? -flujo.tarjetas_neto : 0;
+  const tarjetasCobradas = flujo.tarjetas_neto > 0 ? flujo.tarjetas_neto : 0;
 
   const Seccion = ({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[]; signo: "+" | "-" }) => (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -211,10 +214,42 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
         <Seccion titulo="Salidas (en qué se va)" cats={flujo.salidas} signo="-" />
       </div>
 
+      {/* Tarjetas por depositar: ni entrada ni gasto, plata en camino. */}
+      {flujo.tarjetas_neto !== 0 && (
+        <div className="mt-4 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
+          <div className="flex items-center justify-between px-4 py-2 text-sm font-semibold text-amber-800">
+            <span>💳 Tarjetas por depositar</span>
+            <span className="tabular-nums">
+              {tarjetasPendientes > 0 ? `− ${money(tarjetasPendientes)}` : `+ ${money(tarjetasCobradas)}`}
+            </span>
+          </div>
+          <p className="border-t border-amber-100 px-4 py-2 text-xs text-amber-800/80">
+            {tarjetasPendientes > 0 ? (
+              <>
+                Ventas con tarjeta del mes que el banco <b>aún no deposita</b>. No es un gasto: es plata en camino que
+                todavía no está en caja, por eso se resta acá. Cuando el banco deposite, entra al flujo.{" "}
+                {hrefMayor("11-30-02-01-00") && (
+                  <Link href={hrefMayor("11-30-02-01-00")!} className="underline hover:no-underline">
+                    Ver detalle
+                  </Link>
+                )}
+              </>
+            ) : (
+              <>Depósitos de tarjetas recibidos del banco en el mes (se cobró lo que estaba pendiente).</>
+            )}
+          </p>
+        </div>
+      )}
+
       <p className="mt-3 text-xs text-neutral-500">
         Saldo inicial {money(flujo.saldo_inicial)} + entradas {money(flujo.total_entradas)} − salidas{" "}
-        {money(flujo.total_salidas)} = saldo final <b>{money(flujo.saldo_final)}</b> (calza con caja+bancos). Tocá una
-        cuenta para ver el detalle en el Mayor. Ojo: las compras a crédito que aún no pagás no salen acá — están en{" "}
+        {money(flujo.total_salidas)}
+        {flujo.tarjetas_neto !== 0 &&
+          (tarjetasPendientes > 0
+            ? ` − tarjetas por depositar ${money(tarjetasPendientes)}`
+            : ` + tarjetas cobradas ${money(tarjetasCobradas)}`)}{" "}
+        = saldo final <b>{money(flujo.saldo_final)}</b> (calza con caja+bancos). Tocá una cuenta para ver el detalle en
+        el Mayor. Ojo: las compras a crédito que aún no pagás no salen acá — están en{" "}
         <Link href="/compras/cxp" className="underline hover:no-underline">
           Cuentas por pagar
         </Link>

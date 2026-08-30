@@ -56,6 +56,9 @@ export async function crearVentaDia(
     p_exento: parsed.data.exento,
     p_iva: parsed.data.iva,
     p_glosa: parsed.data.glosa ?? null,
+    p_efectivo: num(formData.get("efectivo")),
+    p_tarjeta: num(formData.get("tarjeta")),
+    p_sinpe: num(formData.get("sinpe")),
   });
   if (error || !id) {
     const msg = error?.message ?? "No se pudo registrar la venta.";
@@ -123,6 +126,9 @@ export async function registrarVentaImportada(
     p_exento: parsed.data.exento,
     p_iva: parsed.data.iva,
     p_glosa: parsed.data.glosa ?? null,
+    p_efectivo: num(formData.get("efectivo")),
+    p_tarjeta: num(formData.get("tarjeta")),
+    p_sinpe: num(formData.get("sinpe")),
   });
   if (error || !id) {
     const msg = error?.message ?? "No se pudo registrar la venta.";
@@ -144,7 +150,16 @@ export async function registrarTodasImportadas(
   await requerirPermiso("ventas.registrar");
   const centro = String(formData.get("centro_costo_id") ?? "");
   if (!centro) return { error: "Falta el negocio." };
-  let dias: { fecha: string; gravado: number; exento: number; iva: number; tickets: number }[];
+  let dias: {
+    fecha: string;
+    gravado: number;
+    exento: number;
+    iva: number;
+    tickets: number;
+    efectivo?: number;
+    tarjeta?: number;
+    sinpe?: number;
+  }[];
   try {
     dias = JSON.parse(String(formData.get("dias") ?? "[]"));
   } catch {
@@ -166,6 +181,9 @@ export async function registrarTodasImportadas(
       p_exento: d.exento,
       p_iva: d.iva,
       p_glosa: `QuPOS ${d.fecha} · ${d.tickets} tickets`,
+      p_efectivo: d.efectivo ?? 0,
+      p_tarjeta: d.tarjeta ?? 0,
+      p_sinpe: d.sinpe ?? 0,
     });
     if (error || !id) {
       if ((error?.message ?? "").includes("ventas_dia_unica")) duplicadas++;

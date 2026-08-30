@@ -153,9 +153,12 @@ export async function listarProveedoresActivos() {
 
 export type FacturaEstado = "borrador" | "confirmada" | "anulada";
 
+export type FacturaPago = "pagada" | "vencida" | "pendiente" | "na";
+
 export interface FacturaListado {
   id: string;
   fecha_emision: string;
+  fecha_vencimiento: string | null;
   clave: string | null;
   proveedor_nombre: string;
   subtotal: number; // base sin IVA (lo que va a 51-10 / al Estado de Resultados)
@@ -165,11 +168,16 @@ export interface FacturaListado {
   n_lineas: number;
   centro_codigo: string | null;
   centro_nombre: string | null;
+  // Estado de pago (derivado de la cuenta por pagar):
+  pago: FacturaPago; // pagada | vencida | pendiente | na (contado/borrador/anulada)
+  cxp_saldo: number | null;
+  pago_ids: string[]; // pagos confirmados aplicados a esta factura
 }
 
 interface FacturaRowEmbebido {
   id: string;
   fecha_emision: string;
+  fecha_vencimiento: string | null;
   clave: string | null;
   subtotal: number;
   iva_total: number;
@@ -178,6 +186,14 @@ interface FacturaRowEmbebido {
   proveedor: { nombre: string } | null;
   centro: { codigo: string; nombre: string } | null;
   lineas: { count: number }[];
+  // PostgREST devuelve la relación como objeto (to-one) o arreglo según cardinalidad.
+  cxp: CxPEmbebido | CxPEmbebido[] | null;
+}
+
+interface CxPEmbebido {
+  saldo: number;
+  estado: string;
+  aplicaciones: { pago: { id: string; estado: string; fecha: string } | null }[] | null;
 }
 
 export interface FacturasFiltro {
@@ -209,8 +225,9 @@ export async function listarFacturas(filtro: FacturasFiltro = {}): Promise<Factu
   let q = supabase
     .from("facturas_compra")
     .select(
-      "id, fecha_emision, clave, subtotal, iva_total, total, estado, " +
-        "proveedor:proveedores(nombre), centro:centros_costo(codigo, nombre), lineas:facturas_compra_lineas(count)",
+      "id, fecha_emision, fecha_vencimiento, clave, subtotal, iva_total, total, estado, " +
+        "proveedor:proveedores(nombre), centro:centros_costo(codigo, nombre), lineas:facturas_compra_lineas(count), " +
+        "cxp:cuentas_por_pagar(saldo, estado, aplicaciones:pagos_proveedor_lineas(pago:pagos_proveedor(id, estado, fecha)))",
     )
     .order("fecha_emision", { ascending: false })
     .order("creado_en", { ascending: false });
@@ -224,19 +241,43 @@ export async function listarFacturas(filtro: FacturasFiltro = {}): Promise<Factu
   const { data, error } = await q;
   if (error) throw new Error(`No se pudieron cargar las facturas: ${error.message}`);
 
-  return ((data ?? []) as unknown as FacturaRowEmbebido[]).map((f) => ({
-    id: f.id,
-    fecha_emision: f.fecha_emision,
-    clave: f.clave,
-    proveedor_nombre: f.proveedor?.nombre ?? "",
-    subtotal: Number(f.subtotal),
-    iva: Number(f.iva_total),
-    total: Number(f.total),
-    estado: f.estado,
-    n_lineas: f.lineas?.[0]?.count ?? 0,
-    centro_codigo: f.centro?.codigo ?? null,
-    centro_nombre: f.centro?.nombre ?? null,
-  }));
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  return ((data ?? []) as unknown as FacturaRowEmbebido[]).map((f) => {
+    const cxp = Array.isArray(f.cxp) ? f.cxp[0] : f.cxp;
+    // Pagos confirmados aplicados a la factura (para "ver el pago").
+    const pago_ids = [
+      ...new Set(
+        (cxp?.aplicaciones ?? [])
+          .map((a) => a.pago)
+          .filter((p): p is { id: string; estado: string; fecha: string } => !!p && p.estado === "confirmado")
+          .map((p) => p.id),
+      ),
+    ];
+    let pago: FacturaPago = "na";
+    if (f.estado === "confirmada" && cxp && cxp.estado !== "anulada") {
+      if (cxp.estado === "pagada" || Number(cxp.saldo) <= 0) pago = "pagada";
+      else if (f.fecha_vencimiento && f.fecha_vencimiento < hoy) pago = "vencida";
+      else pago = "pendiente";
+    }
+    return {
+      id: f.id,
+      fecha_emision: f.fecha_emision,
+      fecha_vencimiento: f.fecha_vencimiento,
+      clave: f.clave,
+      proveedor_nombre: f.proveedor?.nombre ?? "",
+      subtotal: Number(f.subtotal),
+      iva: Number(f.iva_total),
+      total: Number(f.total),
+      estado: f.estado,
+      n_lineas: f.lineas?.[0]?.count ?? 0,
+      centro_codigo: f.centro?.codigo ?? null,
+      centro_nombre: f.centro?.nombre ?? null,
+      pago,
+      cxp_saldo: cxp ? Number(cxp.saldo) : null,
+      pago_ids,
+    };
+  });
 }
 
 export interface FacturaLineaDetalle {
@@ -314,7 +355,7 @@ interface FacturaDetalleEmbebido {
   cuenta_gasto: { codigo: string; nombre: string } | null;
   centro: { codigo: string; nombre: string } | null;
   asiento: { numero: number | null } | null;
-  cxp: { saldo: number; estado: string }[];
+  cxp: { saldo: number; estado: string } | { saldo: number; estado: string }[] | null;
   lineas: {
     linea: number;
     codigo_comercial: string | null;
@@ -354,7 +395,7 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
   }
 
   const f = data as unknown as FacturaDetalleEmbebido;
-  const cxp = f.cxp?.[0];
+  const cxp = Array.isArray(f.cxp) ? f.cxp[0] : f.cxp;
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
   const lineas: FacturaLineaDetalle[] = (f.lineas ?? [])

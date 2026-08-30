@@ -42,3 +42,6 @@ yarn-error.log*
 
 # === Vercel ===
 .vercel
+
+# logs locales del túnel
+_tunnel.log

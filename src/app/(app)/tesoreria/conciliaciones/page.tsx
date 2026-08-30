@@ -25,12 +25,20 @@ export default async function ConciliacionesPage() {
             Amarra los movimientos de libros contra el estado de cuenta real del banco.
           </p>
         </div>
-        <Link
-          href="/tesoreria/conciliaciones/nueva"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          + Nueva conciliación
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/tesoreria/datafono" className="text-sm text-neutral-500 hover:text-neutral-900">
+            💳 Liquidación datafono
+          </Link>
+          <Link href="/tesoreria/proveedores-banco" className="text-sm text-neutral-500 hover:text-neutral-900">
+            🏷️ Proveedores por cuenta
+          </Link>
+          <Link
+            href="/tesoreria/conciliaciones/nueva"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            + Nueva conciliación
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">

@@ -13,6 +13,7 @@ import {
   type FormState,
 } from "@/app/(app)/tesoreria/conciliaciones/actions";
 import SelectBuscable, { type OpcionBuscable } from "@/components/SelectBuscable";
+import AsignarProveedor from "@/components/AsignarProveedor";
 import type { LineaBanco, MovimientoLibro } from "@/lib/data/conciliaciones";
 
 const money = (n: number) =>
@@ -215,6 +216,7 @@ export default function ConciliadorPanel({
   cuentas,
   centros,
   editable,
+  proveedores,
 }: {
   conciliacionId: string;
   lineas: LineaBanco[];
@@ -222,6 +224,7 @@ export default function ConciliadorPanel({
   cuentas: OpcionBuscable[];
   centros: Centro[];
   editable: boolean;
+  proveedores: { id: string; nombre: string }[];
 }) {
   const [tab, setTab] = useState<"pendientes" | "conciliados">("pendientes");
   const [selBancos, setSelBancos] = useState<Set<string>>(new Set());
@@ -344,7 +347,7 @@ export default function ConciliadorPanel({
       </div>
 
       {tab === "conciliados" ? (
-        <TablaConciliados lineas={conciliadas} editable={editable} />
+        <TablaConciliados lineas={conciliadas} editable={editable} proveedores={proveedores} />
       ) : (
         <>
           {/* Barra de acciones */}
@@ -426,14 +429,20 @@ export default function ConciliadorPanel({
           {editable && modoRegistrar && bancosSel.length === 1 && (
             <form action={formAction} className="mb-4 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
               <input type="hidden" name="linea_id" value={bancosSel[0].id} />
-              <p className="mb-2 text-xs text-neutral-600">
-                Crear el asiento de{" "}
+              <p className="mb-1 text-xs text-neutral-600">
+                Registrar{" "}
                 <span className="font-medium">
                   {bancosSel[0].descripcion} ·{" "}
                   {bancosSel[0].debito > 0 ? `sale ₡${money(bancosSel[0].debito)}` : `entra ₡${money(bancosSel[0].credito)}`}
                 </span>{" "}
                 y conciliarlo.
               </p>
+              {bancosSel[0].debito > 0 && (
+                <p className="mb-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                  Si elegís una <b>cuenta de gasto</b>, se crea un <b>Gasto</b> (aparece en el auxiliar de Gastos), no un
+                  asiento suelto. Para eso elegí también el centro de costo.
+                </p>
+              )}
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <span className="text-[10px] uppercase tracking-wide text-neutral-500">Cuenta de contrapartida</span>
@@ -621,6 +630,13 @@ export default function ConciliadorPanel({
                           <td className="px-2 py-1 text-neutral-700">
                             {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
                             {l.descripcion}
+                            <AsignarProveedor
+                              referencia={l.referencia}
+                              descripcion={l.descripcion}
+                              proveedorNombre={l.proveedor_nombre}
+                              proveedores={proveedores}
+                              editable={editable}
+                            />
                           </td>
                           <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-neutral-700">{l.debito ? money(l.debito) : ""}</td>
                           <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-neutral-700">{l.credito ? money(l.credito) : ""}</td>
@@ -648,7 +664,15 @@ export default function ConciliadorPanel({
   );
 }
 
-function TablaConciliados({ lineas, editable }: { lineas: LineaBanco[]; editable: boolean }) {
+function TablaConciliados({
+  lineas,
+  editable,
+  proveedores,
+}: {
+  lineas: LineaBanco[];
+  editable: boolean;
+  proveedores: { id: string; nombre: string }[];
+}) {
   if (lineas.length === 0) {
     return <p className="rounded-lg border border-neutral-200 bg-white px-3 py-6 text-center text-sm text-neutral-400">Todavía no hay líneas conciliadas.</p>;
   }
@@ -671,6 +695,13 @@ function TablaConciliados({ lineas, editable }: { lineas: LineaBanco[]; editable
               <td className="px-3 py-2 text-neutral-700">
                 {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
                 {l.descripcion}
+                <AsignarProveedor
+                  referencia={l.referencia}
+                  descripcion={l.descripcion}
+                  proveedorNombre={l.proveedor_nombre}
+                  proveedores={proveedores}
+                  editable={editable}
+                />
               </td>
               <td className="px-3 py-2 text-right tabular-nums text-neutral-700">{l.debito ? money(l.debito) : ""}</td>
               <td className="px-3 py-2 text-right tabular-nums text-neutral-700">{l.credito ? money(l.credito) : ""}</td>

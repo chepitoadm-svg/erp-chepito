@@ -458,6 +458,193 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["proveedor_articulos"]["Insert"]>;
         Relationships: [];
       };
+      proveedor_alias_banco: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          alias: string;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          proveedor_id: string;
+          alias: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["proveedor_alias_banco"]["Insert"]>;
+        Relationships: [];
+      };
+      costo_producto_vinculo: {
+        Row: {
+          id: string;
+          codigo: string;
+          producto_id: string;
+          producto_nombre: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: { codigo: string; producto_id: string; producto_nombre?: string | null };
+        Update: Partial<Database["public"]["Tables"]["costo_producto_vinculo"]["Insert"]>;
+        Relationships: [];
+      };
+      desecho_mes: {
+        Row: {
+          id: string;
+          centro_costo_id: string;
+          periodo: string;
+          bodega: string | null;
+          compras_total: number;
+          merma: number;
+          autoconsumo: number;
+          costo_vendido: number;
+          reclasif_id: string | null;
+          posteado: boolean;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          centro_costo_id: string;
+          periodo: string;
+          bodega?: string | null;
+          compras_total?: number;
+          merma?: number;
+          autoconsumo?: number;
+          costo_vendido?: number;
+          reclasif_id?: string | null;
+          posteado?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["desecho_mes"]["Insert"]>;
+        Relationships: [];
+      };
+      desecho_detalle: {
+        Row: {
+          id: string;
+          desecho_mes_id: string;
+          codigo: string;
+          nombre: string | null;
+          tipo_mov: string | null;
+          clase: "merma" | "autoconsumo" | "ignorar";
+          cantidad: number;
+          costo_unitario: number | null;
+          costo_total: number | null;
+          creado_en: string;
+        };
+        Insert: {
+          desecho_mes_id: string;
+          codigo: string;
+          nombre?: string | null;
+          tipo_mov?: string | null;
+          clase?: "merma" | "autoconsumo" | "ignorar";
+          cantidad?: number;
+          costo_unitario?: number | null;
+          costo_total?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["desecho_detalle"]["Insert"]>;
+        Relationships: [];
+      };
+      colaborador_destino: {
+        Row: {
+          clave: string;
+          cedula: string | null;
+          nombre: string | null;
+          destino: "TAL" | "CH1" | "CH2" | "DIV" | "CAS";
+          creado_en: string;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: { clave: string; cedula?: string | null; nombre?: string | null; destino: "TAL" | "CH1" | "CH2" | "DIV" | "CAS" };
+        Update: Partial<Database["public"]["Tables"]["colaborador_destino"]["Insert"]>;
+        Relationships: [];
+      };
+      planilla: {
+        Row: {
+          id: string;
+          titulo: string | null;
+          fecha: string;
+          quincena: number | null;
+          reparto_ch1: number;
+          estado: "borrador" | "confirmada" | "anulada" | "descartada";
+          asiento_id: string | null;
+          pago_asiento_id: string | null;
+          pago_fecha: string | null;
+          pago_cuenta_id: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          confirmado_en: string | null;
+          confirmado_por: string | null;
+          anulado_en: string | null;
+          anulado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+          adelanto_asiento_id: string | null;
+        };
+        Insert: {
+          titulo?: string | null;
+          fecha: string;
+          quincena?: number | null;
+          reparto_ch1?: number;
+          estado?: "borrador" | "confirmada" | "anulada";
+        };
+        Update: Partial<Database["public"]["Tables"]["planilla"]["Insert"]>;
+        Relationships: [];
+      };
+      planilla_lineas: {
+        Row: {
+          id: string;
+          planilla_id: string;
+          clave: string | null;
+          cedula: string | null;
+          nombre: string | null;
+          puesto: string | null;
+          tiene_ccss: boolean;
+          destino: "TAL" | "CH1" | "CH2" | "DIV" | "CAS";
+          salario_base: number;
+          ccss_obrero: number;
+          cargas_patronal: number;
+          pago_adicional: number;
+          adelanto: number;
+          creado_en: string;
+        };
+        Insert: {
+          planilla_id: string;
+          clave?: string | null;
+          cedula?: string | null;
+          nombre?: string | null;
+          puesto?: string | null;
+          tiene_ccss?: boolean;
+          destino?: "TAL" | "CH1" | "CH2" | "DIV" | "CAS";
+          salario_base?: number;
+          ccss_obrero?: number;
+          cargas_patronal?: number;
+          pago_adicional?: number;
+          adelanto?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["planilla_lineas"]["Insert"]>;
+        Relationships: [];
+      };
+      planilla_pagos: {
+        Row: {
+          id: string;
+          planilla_id: string;
+          fecha: string;
+          cuenta_id: string;
+          monto: number;
+          asiento_id: string | null;
+          estado: "confirmado" | "anulado";
+          creado_en: string;
+          creado_por: string | null;
+          anulado_en: string | null;
+          anulado_por: string | null;
+        };
+        Insert: { planilla_id: string; fecha: string; cuenta_id: string; monto: number };
+        Update: Partial<Database["public"]["Tables"]["planilla_pagos"]["Insert"]>;
+        Relationships: [];
+      };
       ajustes_inventario: {
         Row: {
           id: string;
@@ -658,6 +845,9 @@ export interface Database {
           exento: number;
           iva: number;
           total: number;
+          efectivo: number;
+          tarjeta: number;
+          sinpe: number;
           estado: "borrador" | "confirmado" | "anulado";
           asiento_id: string | null;
           glosa: string | null;
@@ -1042,6 +1232,85 @@ export interface Database {
       };
     };
     Functions: {
+      fn_registrar_liquidacion_datafono: {
+        Args: {
+          p_centro: string;
+          p_periodo: string;
+          p_comision: number;
+          p_servicios: number;
+          p_ret_iva: number;
+          p_ret_renta: number;
+          p_neto_banco: number;
+          p_pos_tarjeta: number;
+          p_facturacion: number;
+        };
+        Returns: string;
+      };
+      fn_anular_liquidacion_datafono: { Args: { p_liq: string; p_motivo: string }; Returns: undefined };
+      fn_cuadre_gastos: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: {
+          cuenta_codigo: string;
+          cuenta_nombre: string;
+          cuenta_id: string;
+          auxiliar: number;
+          mayor: number;
+          diferencia: number;
+        }[];
+      };
+      fn_flujo_detalle: {
+        Args: { p_cuenta: string; p_desde: string; p_hasta: string };
+        Returns: {
+          fecha: string;
+          referencia: string | null;
+          descripcion: string | null;
+          monto: number;
+          proveedor_nombre: string | null;
+          origen_tipo: string | null;
+          centro_codigo: string | null;
+          asiento_id: string;
+          origen_id: string | null;
+        }[];
+      };
+      fn_postear_reclasificacion_costo: {
+        Args: { p_centro: string; p_periodo: string; p_merma: number; p_autoconsumo: number };
+        Returns: string;
+      };
+      fn_anular_reclasificacion_costo: { Args: { p_id: string; p_motivo: string }; Returns: undefined };
+      fn_guardar_desecho: {
+        Args: {
+          p_centro: string;
+          p_periodo: string;
+          p_bodega: string | null;
+          p_compras: number;
+          p_merma: number;
+          p_auto: number;
+          p_vendido: number;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
+      fn_guardar_planilla: {
+        Args: {
+          p_id: string | null;
+          p_titulo: string | null;
+          p_fecha: string;
+          p_quincena: number | null;
+          p_reparto_ch1: number;
+          p_lineas: unknown;
+        };
+        Returns: string;
+      };
+      fn_postear_planilla: { Args: { p_planilla: string }; Returns: string };
+      fn_pagar_planilla: { Args: { p_planilla: string; p_cuenta: string; p_fecha: string; p_monto: number }; Returns: string };
+      fn_anular_pago_planilla: { Args: { p_pago: string; p_motivo: string }; Returns: undefined };
+      fn_planilla_neto: { Args: { p_planilla: string }; Returns: number };
+      fn_anular_planilla: { Args: { p_planilla: string; p_motivo: string }; Returns: undefined };
+      fn_descartar_planilla: { Args: { p_id: string }; Returns: undefined };
+      fn_ligar_costo_producto: { Args: { p_codigo: string; p_producto_id: string; p_nombre: string }; Returns: undefined };
+      fn_desligar_costo_producto: { Args: { p_codigo: string }; Returns: undefined };
+      fn_asignar_alias_proveedor: { Args: { p_proveedor: string; p_alias: string }; Returns: string };
+      fn_borrar_alias_proveedor: { Args: { p_id: string }; Returns: undefined };
       mis_sucursales: { Args: Record<string, never>; Returns: string[] };
       soy_administrador: { Args: Record<string, never>; Returns: boolean };
       tengo_permiso: { Args: { p_codigo: string }; Returns: boolean };
@@ -1304,6 +1573,9 @@ export interface Database {
           p_exento: number;
           p_iva: number;
           p_glosa: string | null;
+          p_efectivo?: number;
+          p_tarjeta?: number;
+          p_sinpe?: number;
         };
         Returns: string;
       };
@@ -1361,6 +1633,7 @@ export interface Database {
       fn_conciliar_redondeo: { Args: { p_linea: string; p_asiento_linea: string; p_tolerancia?: number }; Returns: undefined };
       fn_desconciliar_linea: { Args: { p_linea: string }; Returns: undefined };
       fn_marcar_conciliada: { Args: { p_conciliacion: string }; Returns: undefined };
+      fn_reabrir_conciliacion: { Args: { p_conciliacion: string }; Returns: undefined };
       fn_anular_conciliacion: { Args: { p_conciliacion: string; p_motivo: string }; Returns: undefined };
       fn_actualizar_gasto: {
         Args: {

@@ -1,6 +1,8 @@
 // Capa de datos de CONCILIACIONES bancarias. Corre en el servidor.
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { detectarProveedor } from "@/lib/bancoAlias";
+import { obtenerMapaAlias } from "@/lib/data/proveedorAlias";
 
 export type ConciliacionEstado = "borrador" | "conciliada" | "anulada";
 
@@ -71,6 +73,7 @@ export interface LineaBanco {
   asiento_linea_id: string | null;
   asiento_numero: number | null;
   asiento_id: string | null;
+  proveedor_nombre: string | null; // detectado por alias bancario
 }
 
 export interface MovimientoLibro {
@@ -140,6 +143,7 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
     }[];
   };
 
+  const alias = await obtenerMapaAlias();
   const lineas: LineaBanco[] = (c.lineas ?? [])
     .map((l) => ({
       id: l.id,
@@ -155,6 +159,7 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
       asiento_linea_id: l.asiento_linea_id,
       asiento_numero: l.al?.asiento?.numero ?? null,
       asiento_id: l.al?.asiento_id ?? null,
+      proveedor_nombre: detectarProveedor(l.referencia, l.descripcion, alias),
     }))
     .sort((a, b) => a.orden - b.orden);
 

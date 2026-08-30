@@ -14,7 +14,20 @@ const ESTADO_CLS: Record<string, string> = {
   anulada: "bg-red-50 text-red-700",
 };
 
-type SP = { proveedor?: string; desde?: string; hasta?: string; centro?: string; estado?: string };
+const PAGO_CLS: Record<string, string> = {
+  pagada: "bg-green-50 text-green-700",
+  vencida: "bg-red-50 text-red-700",
+  pendiente: "bg-amber-50 text-amber-700",
+  na: "bg-neutral-100 text-neutral-400",
+};
+const PAGO_LBL: Record<string, string> = {
+  pagada: "Pagada",
+  vencida: "Vencida",
+  pendiente: "Pendiente",
+  na: "—",
+};
+
+type SP = { proveedor?: string; desde?: string; hasta?: string; centro?: string; estado?: string; pago?: string };
 
 export default async function FacturasPage({ searchParams }: { searchParams: Promise<SP> }) {
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras");
@@ -27,13 +40,22 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
     centroId: sp.centro || undefined,
     estado: (sp.estado as FacturasFiltro["estado"]) || undefined,
   };
-  const hayFiltro = !!(filtro.proveedorId || filtro.desde || filtro.hasta || filtro.centroId || filtro.estado);
+  const pagoFiltro = sp.pago && ["pagada", "vencida", "pendiente"].includes(sp.pago) ? sp.pago : "";
+  const hayFiltro = !!(
+    filtro.proveedorId ||
+    filtro.desde ||
+    filtro.hasta ||
+    filtro.centroId ||
+    filtro.estado ||
+    pagoFiltro
+  );
 
-  const [facturas, proveedores, centros] = await Promise.all([
+  const [facturasTodas, proveedores, centros] = await Promise.all([
     listarFacturas(filtro),
     listarProveedoresDeFacturas(),
     listarCentrosCosto(),
   ]);
+  const facturas = pagoFiltro ? facturasTodas.filter((f) => f.pago === pagoFiltro) : facturasTodas;
 
   const vivas = facturas.filter((f) => f.estado !== "anulada");
   const totBase = vivas.reduce((s, f) => s + f.subtotal, 0);
@@ -131,6 +153,19 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
             <option value="anulada">Anulada</option>
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+          Pago
+          <select
+            name="pago"
+            defaultValue={sp.pago ?? ""}
+            className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 outline-none focus:border-neutral-500"
+          >
+            <option value="">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="vencida">Vencida</option>
+            <option value="pagada">Pagada</option>
+          </select>
+        </label>
         <div className="flex gap-2">
           <button
             type="submit"
@@ -150,15 +185,17 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
       </form>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-4 py-3 font-medium">Emisión</th>
+              <th className="px-4 py-3 font-medium">Vence</th>
               <th className="px-4 py-3 font-medium">Proveedor</th>
               <th className="px-4 py-3 font-medium">Factura</th>
               <th className="px-4 py-3 font-medium">Centro</th>
               <th className="px-4 py-3 text-right font-medium">Líneas</th>
               <th className="px-4 py-3 text-right font-medium">Total</th>
+              <th className="px-4 py-3 font-medium">Pago</th>
               <th className="px-4 py-3 font-medium">Estado</th>
               <th className="px-4 py-3 text-right" />
             </tr>
@@ -166,7 +203,7 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
           <tbody className="divide-y divide-neutral-100">
             {facturas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={10} className="px-4 py-8 text-center text-neutral-400">
                   {hayFiltro ? "Ninguna factura coincide con los filtros." : "Todavía no hay facturas."}
                 </td>
               </tr>
@@ -174,6 +211,9 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
             {facturas.map((f) => (
               <tr key={f.id}>
                 <td className="px-4 py-3 text-neutral-600">{f.fecha_emision}</td>
+                <td className={`px-4 py-3 ${f.pago === "vencida" ? "font-medium text-red-600" : "text-neutral-500"}`}>
+                  {f.fecha_vencimiento ?? "—"}
+                </td>
                 <td className="px-4 py-3 text-neutral-900">{f.proveedor_nombre}</td>
                 <td className="px-4 py-3 font-mono text-xs text-neutral-500">
                   {numeroFactura(f.clave) ?? "—"}
@@ -187,6 +227,28 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{f.n_lineas}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-900">{fmt(f.total)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className={`w-fit rounded-full px-2 py-0.5 text-xs ${PAGO_CLS[f.pago]}`}>
+                      {PAGO_LBL[f.pago]}
+                    </span>
+                    {f.pago_ids.length > 0 && (
+                      <Link
+                        href={
+                          f.pago_ids.length === 1
+                            ? `/compras/pagos/${f.pago_ids[0]}`
+                            : `/compras/facturas/${f.id}`
+                        }
+                        className="text-xs text-neutral-500 underline hover:text-neutral-900"
+                      >
+                        ver pago{f.pago_ids.length > 1 ? "s" : ""}
+                      </Link>
+                    )}
+                    {f.pago === "vencida" && f.cxp_saldo != null && (
+                      <span className="text-xs text-red-500">debe ₡{fmt(f.cxp_saldo)}</span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[f.estado]}`}>
                     {f.estado}
@@ -205,25 +267,31 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
           </tbody>
           {facturas.length > 0 && (
             <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm text-neutral-700">
-              <tr className="font-medium">
-                <td className="px-4 py-2" colSpan={4}>
+              <tr>
+                <td className="px-4 py-2 text-xs font-normal text-neutral-500" colSpan={10}>
                   {vivas.length} factura{vivas.length !== 1 ? "s" : ""} (sin anuladas)
                 </td>
-                <td className="px-4 py-2 text-right text-xs font-normal text-neutral-500">Base sin IVA</td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmt(totBase)}</td>
-                <td className="px-4 py-2" colSpan={2} />
               </tr>
               <tr>
-                <td className="px-4 py-1" colSpan={4} />
-                <td className="px-4 py-1 text-right text-xs text-neutral-500">IVA</td>
+                <td className="px-4 py-1 text-right text-xs text-neutral-500" colSpan={6}>
+                  Base sin IVA
+                </td>
+                <td className="px-4 py-1 text-right tabular-nums">{fmt(totBase)}</td>
+                <td className="px-4 py-1" colSpan={3} />
+              </tr>
+              <tr>
+                <td className="px-4 py-1 text-right text-xs text-neutral-500" colSpan={6}>
+                  IVA
+                </td>
                 <td className="px-4 py-1 text-right tabular-nums text-neutral-600">{fmt(totIva)}</td>
-                <td className="px-4 py-1" colSpan={2} />
+                <td className="px-4 py-1" colSpan={3} />
               </tr>
               <tr className="border-t border-neutral-200 font-semibold">
-                <td className="px-4 py-2" colSpan={4} />
-                <td className="px-4 py-2 text-right text-xs font-normal text-neutral-500">Total con IVA</td>
+                <td className="px-4 py-2 text-right text-xs font-normal text-neutral-500" colSpan={6}>
+                  Total con IVA
+                </td>
                 <td className="px-4 py-2 text-right tabular-nums">{fmt(total)}</td>
-                <td className="px-4 py-2" colSpan={2} />
+                <td className="px-4 py-2" colSpan={3} />
               </tr>
             </tfoot>
           )}

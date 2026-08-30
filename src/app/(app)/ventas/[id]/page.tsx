@@ -80,6 +80,33 @@ export default async function VentaDetallePage({
         </table>
       </div>
 
+      {/* Cómo se cobró (medios de pago) */}
+      <div className="mt-4 max-w-md overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          Cómo se cobró
+        </div>
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-neutral-100">
+            <tr className="bg-emerald-50/40">
+              <td className="px-4 py-3 text-emerald-800">💳 Tarjeta (datafono)</td>
+              <td className="px-4 py-3 text-right tabular-nums font-medium text-emerald-800">{fmt(v.tarjeta)}</td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-neutral-600">💵 Efectivo (caja)</td>
+              <td className="px-4 py-3 text-right tabular-nums text-neutral-800">{fmt(v.efectivo)}</td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-neutral-600">📲 Sinpe</td>
+              <td className="px-4 py-3 text-right tabular-nums text-neutral-800">{fmt(v.sinpe)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="border-t border-neutral-100 px-4 py-2 text-xs text-neutral-500">
+          La tarjeta entra al <b>datafono</b> (cuenta por cobrar), no a caja: el banco lo deposita después y ahí se
+          concilia.
+        </p>
+      </div>
+
       {v.estado === "borrador" && (
         <div className="mt-6 flex items-center gap-3">
           <form action={confirmarVentaDia}>
@@ -92,7 +119,7 @@ export default async function VentaDetallePage({
             </button>
           </form>
           <span className="text-sm text-neutral-500">
-            Debe Caja / Haber Ventas ({v.centro_codigo}) + IVA cobrado.
+            Debe Datafono/Caja/Sinpes / Haber Ventas ({v.centro_codigo}) + IVA.
           </span>
         </div>
       )}

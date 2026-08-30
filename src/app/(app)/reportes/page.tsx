@@ -28,6 +28,11 @@ const REPORTES = [
     titulo: "Libro Mayor",
     desc: "Movimientos y saldo acumulado de una cuenta.",
   },
+  {
+    href: "/reportes/cuadre-gastos",
+    titulo: "Cuadre de Gastos",
+    desc: "Auxiliar de Gastos vs Mayor: caza gastos metidos por fuera del módulo.",
+  },
 ];
 
 export default async function ReportesPage() {

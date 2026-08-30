@@ -151,7 +151,9 @@ export async function conciliarLinea(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("fn_conciliar_linea", { p_linea: linea, p_asiento_linea: mov });
   if (error) throw new Error(limpiar(error.message));
-  revalidatePath(`/tesoreria/conciliaciones`);
+  // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
+  // no solo el listado, para que la pantalla refleje el cambio de una vez.
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
 }
 
 // Empareja UN movimiento de libros con VARIAS líneas del banco (si la suma calza).
@@ -166,7 +168,9 @@ export async function conciliarGrupo(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
   if (error) throw new Error(limpiar(error.message));
-  revalidatePath(`/tesoreria/conciliaciones`);
+  // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
+  // no solo el listado, para que la pantalla refleje el cambio de una vez.
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
 }
 
 // Concilia una línea del banco con un movimiento de libros que difiere por pocos
@@ -179,7 +183,9 @@ export async function conciliarRedondeo(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("fn_conciliar_redondeo", { p_linea: linea, p_asiento_linea: mov });
   if (error) throw new Error(limpiar(error.message));
-  revalidatePath(`/tesoreria/conciliaciones`);
+  // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
+  // no solo el listado, para que la pantalla refleje el cambio de una vez.
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
 }
 
 export async function desconciliarLinea(formData: FormData): Promise<void> {
@@ -188,7 +194,9 @@ export async function desconciliarLinea(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("fn_desconciliar_linea", { p_linea: linea });
   if (error) throw new Error(limpiar(error.message));
-  revalidatePath(`/tesoreria/conciliaciones`);
+  // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
+  // no solo el listado, para que la pantalla refleje el cambio de una vez.
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
 }
 
 // Registra el asiento de una línea del banco que no estaba en libros (comisión,
@@ -219,6 +227,39 @@ export async function registrarAsientoBanco(_prev: FormState, formData: FormData
   const entra = Number(l.credito) > 0; // crédito del banco = entra plata
   const monto = entra ? Number(l.credito) : Number(l.debito);
 
+  // Si la contrapartida es una CUENTA DE GASTO y sale plata, no creamos un
+  // asiento suelto: lo registramos como un Gasto de verdad, para que aparezca
+  // en el auxiliar de Gastos (y cuadre con flujo/Estado de Resultados). El
+  // asiento directo queda solo para ingresos/ajustes que no tienen auxiliar.
+  const { data: ctaContra } = await supabase.from("cuentas").select("tipo").eq("id", contra).single();
+  if (!entra && (ctaContra as { tipo: string } | null)?.tipo === "gasto") {
+    if (!centro) return { error: "Elegí el centro de costo del gasto." };
+    const { data: gastoId, error: eg } = await supabase.rpc("fn_crear_gasto", {
+      p_centro: centro,
+      p_fecha: l.fecha,
+      p_cuenta_gasto: contra,
+      p_cuenta_pago: banco,
+      p_subtotal: monto,
+      p_iva: 0,
+      p_descripcion: glosa || l.descripcion || "Gasto",
+    });
+    if (eg || !gastoId) return { error: limpiar(eg?.message ?? "No se pudo crear el gasto.") };
+    const { data: asientoGasto, error: ecg } = await supabase.rpc("fn_confirmar_gasto", { p_gasto: gastoId });
+    if (ecg || !asientoGasto) return { error: limpiar(ecg?.message ?? "No se pudo confirmar el gasto.") };
+    const { data: alg } = await supabase
+      .from("asientos_lineas")
+      .select("id")
+      .eq("asiento_id", asientoGasto)
+      .eq("cuenta_id", banco)
+      .single();
+    if (alg?.id) {
+      const { error: e2 } = await supabase.rpc("fn_conciliar_linea", { p_linea: lineaId, p_asiento_linea: alg.id });
+      if (e2) return { error: limpiar(e2.message) };
+    }
+    revalidatePath(`/tesoreria/conciliaciones`, "layout");
+    return { ok: "Gasto registrado y conciliado. Ya aparece en el auxiliar de Gastos." };
+  }
+
   const lineaBanco = entra
     ? { cuenta_id: banco, debito: monto, detalle: "Banco" }
     : { cuenta_id: banco, credito: monto, detalle: "Banco" };
@@ -245,8 +286,31 @@ export async function registrarAsientoBanco(_prev: FormState, formData: FormData
     const { error: e2 } = await supabase.rpc("fn_conciliar_linea", { p_linea: lineaId, p_asiento_linea: al.id });
     if (e2) return { error: limpiar(e2.message) };
   }
-  revalidatePath(`/tesoreria/conciliaciones`);
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
   return { ok: "Asiento registrado y conciliado." };
+}
+
+// Liga un identificador del estado de cuenta con un proveedor (agenda bancaria).
+export async function asignarAliasProveedor(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const proveedor = String(formData.get("proveedor_id") ?? "");
+  const alias = String(formData.get("alias") ?? "");
+  if (!proveedor || !alias.trim()) throw new Error("Elegí un proveedor y el identificador.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_asignar_alias_proveedor", { p_proveedor: proveedor, p_alias: alias });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath("/tesoreria/conciliaciones", "layout");
+  revalidatePath("/tesoreria/proveedores-banco");
+}
+
+export async function borrarAliasProveedor(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_borrar_alias_proveedor", { p_id: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath("/tesoreria/conciliaciones", "layout");
+  revalidatePath("/tesoreria/proveedores-banco");
 }
 
 export async function marcarConciliada(formData: FormData): Promise<void> {
@@ -254,6 +318,18 @@ export async function marcarConciliada(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
   const { error } = await supabase.rpc("fn_marcar_conciliada", { p_conciliacion: id });
+  if (error) throw new Error(limpiar(error.message));
+  revalidatePath(`/tesoreria/conciliaciones/${id}`);
+  revalidatePath("/tesoreria/conciliaciones");
+}
+
+// Reabre una conciliación marcada por error: vuelve a borrador sin deshacer
+// los emparejamientos.
+export async function reabrirConciliacion(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_reabrir_conciliacion", { p_conciliacion: id });
   if (error) throw new Error(limpiar(error.message));
   revalidatePath(`/tesoreria/conciliaciones/${id}`);
   revalidatePath("/tesoreria/conciliaciones");

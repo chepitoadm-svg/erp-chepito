@@ -60,14 +60,64 @@ export interface GastoListado {
   estado: GastoEstado;
 }
 
-export async function listarGastos(): Promise<GastoListado[]> {
+export interface GastoFiltro {
+  centro?: string; // centro_costo_id
+  cuenta?: string; // cuenta_gasto_id
+  estado?: string; // GastoEstado
+  desde?: string;
+  hasta?: string;
+}
+
+export interface OpcionCentroGasto {
+  id: string;
+  codigo: string;
+}
+export interface OpcionCuentaGasto {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
+// Centros que aparecen en los gastos, para el filtro.
+export async function listarCentrosDeGastos(): Promise<OpcionCentroGasto[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data } = await supabase.from("gastos").select("centro:centros_costo(id, codigo)");
+  const map = new Map<string, string>();
+  ((data ?? []) as unknown as { centro: { id: string; codigo: string } | null }[]).forEach((r) => {
+    if (r.centro) map.set(r.centro.id, r.centro.codigo);
+  });
+  return [...map].map(([id, codigo]) => ({ id, codigo })).sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+// Cuentas de gasto que aparecen en los gastos, para el filtro.
+export async function listarCuentasDeGastos(): Promise<OpcionCuentaGasto[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("gastos")
+    .select("cuenta:cuentas!gastos_cuenta_gasto_id_fkey(id, codigo, nombre)");
+  const map = new Map<string, { codigo: string; nombre: string }>();
+  ((data ?? []) as unknown as { cuenta: { id: string; codigo: string; nombre: string } | null }[]).forEach((r) => {
+    if (r.cuenta) map.set(r.cuenta.id, { codigo: r.cuenta.codigo, nombre: r.cuenta.nombre });
+  });
+  return [...map]
+    .map(([id, v]) => ({ id, codigo: v.codigo, nombre: v.nombre }))
+    .sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+export async function listarGastos(filtro: GastoFiltro = {}): Promise<GastoListado[]> {
+  const supabase = await createClient();
+  let query = supabase
     .from("gastos")
     .select(
       "id, fecha, descripcion, total, estado, " +
         "centro:centros_costo(codigo), cuenta:cuentas!gastos_cuenta_gasto_id_fkey(codigo, nombre)",
-    )
+    );
+  if (filtro.centro) query = query.eq("centro_costo_id", filtro.centro);
+  if (filtro.cuenta) query = query.eq("cuenta_gasto_id", filtro.cuenta);
+  if (filtro.estado) query = query.eq("estado", filtro.estado as GastoEstado);
+  if (filtro.desde) query = query.gte("fecha", filtro.desde);
+  if (filtro.hasta) query = query.lte("fecha", filtro.hasta);
+  const { data, error } = await query
     .order("fecha", { ascending: false })
     .order("creado_en", { ascending: false });
   if (error) throw new Error(`No se pudieron cargar los gastos: ${error.message}`);
