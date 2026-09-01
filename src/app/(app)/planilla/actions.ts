@@ -17,6 +17,8 @@ export interface LineaPlanilla {
   cargas_patronal: number;
   pago_adicional: number;
   adelanto: number;
+  rebajos: number;
+  embargo: number;
 }
 
 export interface PlanillaAnalisis {
@@ -115,6 +117,7 @@ export async function analizarPlanilla(_prev: PlanillaAnalisis, formData: FormDa
   const iAdelanto = head.findIndex((h) => h === "adelanto");
   const iAdic = col("pago", "adicional");
   const iCargas = col("cargas");
+  const iRebajos = col("total", "rebajo") >= 0 ? col("total", "rebajo") : col("rebajo");
 
   const out: LineaPlanilla[] = [];
   for (let r = hIdx + 1; r < filas.length; r++) {
@@ -136,6 +139,8 @@ export async function analizarPlanilla(_prev: PlanillaAnalisis, formData: FormDa
       cargas_patronal: cargas,
       pago_adicional: iAdic >= 0 ? parseCRC(f[iAdic]) : 0,
       adelanto: iAdelanto >= 0 ? parseCRC(f[iAdelanto]) : 0,
+      rebajos: iRebajos >= 0 ? parseCRC(f[iRebajos]) : 0,
+      embargo: 0, // el Excel no lo separa; se ingresa a mano en la revisión
     });
   }
   if (out.length === 0) return { error: "No encontré colaboradores en el CSV." };

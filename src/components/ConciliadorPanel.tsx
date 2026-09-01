@@ -673,23 +673,110 @@ function TablaConciliados({
   editable: boolean;
   proveedores: { id: string; nombre: string }[];
 }) {
+  const [busca, setBusca] = useState("");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+  const [sort, setSort] = useState<SortState>({ key: null, dir: "asc" });
+
+  const inputCls = "rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500";
+  const montoDe = (l: LineaBanco) => (l.debito ? l.debito : l.credito);
+
+  const filtradas = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    const mn = montoMin.trim() ? Number(montoMin) : null;
+    const mx = montoMax.trim() ? Number(montoMax) : null;
+    let out = lineas.filter((l) => {
+      if (q && !`${l.referencia ?? ""} ${l.descripcion ?? ""}`.toLowerCase().includes(q)) return false;
+      if (desde && l.fecha < desde) return false;
+      if (hasta && l.fecha > hasta) return false;
+      const m = montoDe(l);
+      if (mn != null && m < mn) return false;
+      if (mx != null && m > mx) return false;
+      return true;
+    });
+    if (sort.key) {
+      const k = sort.key;
+      const val = (l: LineaBanco): string | number =>
+        k === "fecha" ? l.fecha : k === "debito" ? l.debito : k === "credito" ? l.credito : (l.descripcion ?? "").toLowerCase();
+      out = [...out].sort((a, b) => comparar(val(a), val(b), sort.dir));
+    }
+    return out;
+  }, [lineas, busca, desde, hasta, montoMin, montoMax, sort]);
+
+  const totDeb = filtradas.reduce((s, l) => s + l.debito, 0);
+  const totCred = filtradas.reduce((s, l) => s + l.credito, 0);
+  const hayFiltro = !!(busca || desde || hasta || montoMin || montoMax);
+
   if (lineas.length === 0) {
     return <p className="rounded-lg border border-neutral-200 bg-white px-3 py-6 text-center text-sm text-neutral-400">Todavía no hay líneas conciliadas.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+    <div className="space-y-2">
+      {/* Filtros */}
+      <div className="flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 bg-white p-2">
+        <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
+          Buscar
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="proveedor / detalle" className={`${inputCls} w-48`} />
+        </label>
+        <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
+          Desde
+          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={inputCls} />
+        </label>
+        <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
+          Hasta
+          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={inputCls} />
+        </label>
+        <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
+          Monto ≥
+          <input type="number" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} placeholder="0" className={`${inputCls} w-28 tabular-nums`} />
+        </label>
+        <label className="flex flex-col gap-0.5 text-[10px] uppercase tracking-wide text-neutral-500">
+          Monto ≤
+          <input type="number" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} placeholder="∞" className={`${inputCls} w-28 tabular-nums`} />
+        </label>
+        {hayFiltro && (
+          <button
+            type="button"
+            onClick={() => {
+              setBusca("");
+              setDesde("");
+              setHasta("");
+              setMontoMin("");
+              setMontoMax("");
+            }}
+            className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
+          >
+            Limpiar
+          </button>
+        )}
+        <span className="ml-auto text-xs text-neutral-400">
+          {filtradas.length}
+          {hayFiltro ? ` de ${lineas.length}` : ""} líneas
+        </span>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
       <table className="w-full min-w-[720px] text-sm">
         <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
           <tr>
-            <th className="px-3 py-2 font-medium">Fecha</th>
-            <th className="px-3 py-2 font-medium">Documento / detalle</th>
-            <th className="px-3 py-2 text-right font-medium">Débito</th>
-            <th className="px-3 py-2 text-right font-medium">Crédito</th>
+            <Th label="Fecha" k="fecha" sort={sort} setSort={setSort} />
+            <Th label="Documento / detalle" k="doc" sort={sort} setSort={setSort} />
+            <Th label="Débito" k="debito" sort={sort} setSort={setSort} align="right" />
+            <Th label="Crédito" k="credito" sort={sort} setSort={setSort} align="right" />
             <th className="px-3 py-2 text-right font-medium">Asiento</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100">
-          {lineas.map((l) => (
+          {filtradas.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-3 py-6 text-center text-neutral-400">
+                Nada coincide con los filtros.
+              </td>
+            </tr>
+          )}
+          {filtradas.map((l) => (
             <tr key={l.id} className="bg-green-50/30">
               <td className="px-3 py-2 text-neutral-600">{l.fecha}</td>
               <td className="px-3 py-2 text-neutral-700">
@@ -725,7 +812,18 @@ function TablaConciliados({
             </tr>
           ))}
         </tbody>
+        <tfoot className="border-t border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-600">
+          <tr>
+            <td className="px-3 py-2" colSpan={2}>
+              Total {filtradas.length} línea{filtradas.length === 1 ? "" : "s"}
+            </td>
+            <td className="px-3 py-2 text-right tabular-nums">{money(totDeb)}</td>
+            <td className="px-3 py-2 text-right tabular-nums">{money(totCred)}</td>
+            <td />
+          </tr>
+        </tfoot>
       </table>
+      </div>
     </div>
   );
 }

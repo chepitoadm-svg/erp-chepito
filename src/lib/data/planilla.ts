@@ -32,6 +32,8 @@ export interface PlanillaLinea {
   cargas_patronal: number;
   pago_adicional: number;
   adelanto: number;
+  rebajos: number;
+  embargo: number;
 }
 
 export interface PlanillaPago {
@@ -64,8 +66,18 @@ export interface PlanillaDetalle {
   lineas: PlanillaLinea[];
 }
 
-const netoDe = (l: { salario_base: number; pago_adicional: number; ccss_obrero: number; adelanto: number }) =>
-  Number(l.salario_base) + Number(l.pago_adicional) - Number(l.ccss_obrero) - Number(l.adelanto);
+const netoDe = (l: {
+  salario_base: number;
+  pago_adicional: number;
+  ccss_obrero: number;
+  adelanto: number;
+  rebajos?: number;
+}) =>
+  Number(l.salario_base) -
+  Number(l.rebajos ?? 0) +
+  Number(l.pago_adicional) -
+  Number(l.ccss_obrero) -
+  Number(l.adelanto);
 
 export async function listarPlanillas(): Promise<PlanillaListado[]> {
   const supabase = await createClient();
@@ -73,7 +85,7 @@ export async function listarPlanillas(): Promise<PlanillaListado[]> {
     .from("planilla")
     .select(
       "id, titulo, fecha, quincena, estado, asiento_id, " +
-        "lineas:planilla_lineas(salario_base, pago_adicional, ccss_obrero, adelanto), " +
+        "lineas:planilla_lineas(salario_base, pago_adicional, ccss_obrero, adelanto, rebajos, embargo), " +
         "pagos:planilla_pagos(monto, estado)",
     )
     .neq("estado", "descartada")
@@ -87,7 +99,7 @@ export async function listarPlanillas(): Promise<PlanillaListado[]> {
     quincena: number | null;
     estado: PlanillaEstado;
     asiento_id: string | null;
-    lineas: { salario_base: number; pago_adicional: number; ccss_obrero: number; adelanto: number }[];
+    lineas: { salario_base: number; pago_adicional: number; ccss_obrero: number; adelanto: number; rebajos: number; embargo: number }[];
     pagos: { monto: number; estado: string }[];
   }[]).map((p) => {
     const neto = Math.round((p.lineas ?? []).reduce((s, l) => s + netoDe(l), 0) * 100) / 100;
@@ -119,7 +131,7 @@ export async function obtenerPlanilla(id: string): Promise<PlanillaDetalle | nul
       "id, titulo, fecha, quincena, reparto_ch1, estado, asiento_id, adelanto_asiento_id, " +
         "asiento:asientos!planilla_asiento_id_fkey(numero), " +
         "adasiento:asientos!planilla_adelanto_asiento_id_fkey(numero), " +
-        "lineas:planilla_lineas(id, clave, cedula, nombre, puesto, tiene_ccss, destino, salario_base, ccss_obrero, cargas_patronal, pago_adicional, adelanto), " +
+        "lineas:planilla_lineas(id, clave, cedula, nombre, puesto, tiene_ccss, destino, salario_base, ccss_obrero, cargas_patronal, pago_adicional, adelanto, rebajos, embargo), " +
         "pagos:planilla_pagos(id, fecha, monto, estado, asiento_id, cuenta:cuentas(codigo, nombre), asiento:asientos(numero))",
     )
     .eq("id", id)
@@ -156,6 +168,8 @@ export async function obtenerPlanilla(id: string): Promise<PlanillaDetalle | nul
     cargas_patronal: Number(l.cargas_patronal),
     pago_adicional: Number(l.pago_adicional),
     adelanto: Number(l.adelanto),
+    rebajos: Number(l.rebajos ?? 0),
+    embargo: Number(l.embargo ?? 0),
   }));
   const neto_total = Math.round(lineas.reduce((s, l) => s + netoDe(l), 0) * 100) / 100;
   const adelanto_total = Math.round(lineas.reduce((s, l) => s + l.adelanto, 0) * 100) / 100;

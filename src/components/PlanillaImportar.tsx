@@ -53,25 +53,30 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
 
   const setDestino = (i: number, d: Destino) =>
     setLineas((prev) => (prev ? prev.map((l, j) => (j === i ? { ...l, destino: d } : l)) : prev));
+  const setNum = (i: number, campo: "rebajos" | "embargo", v: number) =>
+    setLineas((prev) => (prev ? prev.map((l, j) => (j === i ? { ...l, [campo]: Number.isFinite(v) ? v : 0 } : l)) : prev));
 
   const calc = useMemo(() => {
     if (!lineas) return null;
-    let ded = 0, carg = 0, nod = 0, ret = 0, apo = 0, adel = 0, neto = 0;
+    let ded = 0, carg = 0, nod = 0, ret = 0, apo = 0, adel = 0, emb = 0, neto = 0;
     for (const l of lineas) {
+      // El embargo es parte de los rebajos: el salario devengado = base − (rebajos − embargo).
+      const baseEf = l.salario_base - l.rebajos + l.embargo;
       if (l.tiene_ccss) {
-        ded += l.salario_base;
+        ded += baseEf;
         carg += l.cargas_patronal;
-      } else nod += l.salario_base;
+      } else nod += baseEf;
       nod += l.pago_adicional;
       ret += l.ccss_obrero;
       apo += l.cargas_patronal;
       adel += l.adelanto;
-      neto += l.salario_base + l.pago_adicional - l.ccss_obrero - l.adelanto;
+      emb += l.embargo;
+      neto += l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.adelanto;
     }
     const r2 = (n: number) => Math.round(n * 100) / 100;
     const debe = r2(ded + carg + nod);
-    const haber = r2(ret + apo + adel + neto);
-    return { ded: r2(ded), carg: r2(carg), nod: r2(nod), ret: r2(ret), apo: r2(apo), adel: r2(adel), neto: r2(neto), debe, haber };
+    const haber = r2(ret + apo + emb + adel + neto);
+    return { ded: r2(ded), carg: r2(carg), nod: r2(nod), ret: r2(ret), apo: r2(apo), adel: r2(adel), emb: r2(emb), neto: r2(neto), debe, haber };
   }, [lineas]);
 
   const guardar = () =>
@@ -140,6 +145,10 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
             </label>
             <span className="text-xs text-neutral-400">El resto ({100 - reparto}%) va a CH2.</span>
           </div>
+          <p className="text-xs text-neutral-400">
+            <b>Embargo:</b> si parte de los <i>rebajos</i> de alguien es un embargo, ponelo en la columna Embargo — el
+            sistema lo saca de los rebajos solo (no restés nada) y lo manda a &ldquo;embargos por pagar&rdquo;. El neto no cambia.
+          </p>
 
           {/* Tabla editable */}
           <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
@@ -150,6 +159,8 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
                   <th className="px-3 py-2 font-medium">CCSS</th>
                   <th className="px-3 py-2 font-medium">Destino</th>
                   <th className="px-3 py-2 text-right font-medium">Base</th>
+                  <th className="px-3 py-2 text-right font-medium">Rebajos</th>
+                  <th className="px-3 py-2 text-right font-medium">Embargo</th>
                   <th className="px-3 py-2 text-right font-medium">CCSS obr.</th>
                   <th className="px-3 py-2 text-right font-medium">Cargas pat.</th>
                   <th className="px-3 py-2 text-right font-medium">Adicional</th>
@@ -159,7 +170,7 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {lineas.map((l, i) => {
-                  const neto = l.salario_base + l.pago_adicional - l.ccss_obrero - l.adelanto;
+                  const neto = l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.adelanto;
                   return (
                     <tr key={l.clave + i}>
                       <td className="px-3 py-1.5 text-neutral-800">
@@ -185,6 +196,26 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
                         </select>
                       </td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-neutral-600">{fmt(l.salario_base)}</td>
+                      <td className="px-2 py-1 text-right">
+                        <input
+                          type="number"
+                          min={0}
+                          value={l.rebajos || ""}
+                          onChange={(e) => setNum(i, "rebajos", Number(e.target.value))}
+                          placeholder="0"
+                          className="w-24 rounded border border-neutral-300 px-1.5 py-0.5 text-right text-xs tabular-nums outline-none focus:border-neutral-500"
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        <input
+                          type="number"
+                          min={0}
+                          value={l.embargo || ""}
+                          onChange={(e) => setNum(i, "embargo", Number(e.target.value))}
+                          placeholder="0"
+                          className="w-24 rounded border border-amber-300 px-1.5 py-0.5 text-right text-xs tabular-nums outline-none focus:border-amber-500"
+                        />
+                      </td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-neutral-500">{l.ccss_obrero ? fmt(l.ccss_obrero) : "—"}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-neutral-500">{l.cargas_patronal ? fmt(l.cargas_patronal) : "—"}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-neutral-500">{l.pago_adicional ? fmt(l.pago_adicional) : "—"}</td>
@@ -211,6 +242,7 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
                 <div className="mb-1 text-xs font-semibold uppercase text-neutral-500">Pasivos / neto (Haber)</div>
                 <Row k="Retención obrera" v={calc.ret} />
                 <Row k="Aporte patronal" v={calc.apo} />
+                <Row k="Embargos por pagar" v={calc.emb} />
                 <Row k="Adelantos descontados" v={calc.adel} />
                 <Row k="Salarios por pagar (neto)" v={calc.neto} />
                 <Row k="Total Haber" v={calc.haber} bold />

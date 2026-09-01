@@ -608,6 +608,8 @@ export interface Database {
           cargas_patronal: number;
           pago_adicional: number;
           adelanto: number;
+          rebajos: number;
+          embargo: number;
           creado_en: string;
         };
         Insert: {
@@ -623,6 +625,8 @@ export interface Database {
           cargas_patronal?: number;
           pago_adicional?: number;
           adelanto?: number;
+          rebajos?: number;
+          embargo?: number;
         };
         Update: Partial<Database["public"]["Tables"]["planilla_lineas"]["Insert"]>;
         Relationships: [];

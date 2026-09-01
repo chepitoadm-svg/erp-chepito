@@ -12,7 +12,8 @@ const ESTADO_CLS: Record<string, string> = {
   confirmada: "bg-green-50 text-green-700",
   anulada: "bg-red-50 text-red-700",
 };
-const neto = (l: PlanillaLinea) => l.salario_base + l.pago_adicional - l.ccss_obrero - l.adelanto;
+const neto = (l: PlanillaLinea) =>
+  l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.adelanto;
 
 export default async function PlanillaDetallePage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await tienePermiso("gastos.registrar"))) redirect("/");
@@ -22,6 +23,8 @@ export default async function PlanillaDetallePage({ params }: { params: Promise<
 
   const totNeto = p.lineas.reduce((s, l) => s + neto(l), 0);
   const totBase = p.lineas.reduce((s, l) => s + l.salario_base, 0);
+  const totRebajos = p.lineas.reduce((s, l) => s + l.rebajos, 0);
+  const totEmbargo = p.lineas.reduce((s, l) => s + l.embargo, 0);
 
   return (
     <div>
@@ -146,6 +149,8 @@ export default async function PlanillaDetallePage({ params }: { params: Promise<
               <th className="px-3 py-2 font-medium">CCSS</th>
               <th className="px-3 py-2 font-medium">Destino</th>
               <th className="px-3 py-2 text-right font-medium">Base</th>
+              <th className="px-3 py-2 text-right font-medium">Rebajos</th>
+              <th className="px-3 py-2 text-right font-medium">Embargo</th>
               <th className="px-3 py-2 text-right font-medium">CCSS obr.</th>
               <th className="px-3 py-2 text-right font-medium">Cargas pat.</th>
               <th className="px-3 py-2 text-right font-medium">Adicional</th>
@@ -167,6 +172,8 @@ export default async function PlanillaDetallePage({ params }: { params: Promise<
                 </td>
                 <td className="px-3 py-1.5 text-neutral-600">{DEST_LBL[l.destino]}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-neutral-600">{fmt(l.salario_base)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-red-600">{l.rebajos ? `-${fmt(l.rebajos)}` : "—"}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-amber-700">{l.embargo ? `-${fmt(l.embargo)}` : "—"}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-neutral-500">{l.ccss_obrero ? fmt(l.ccss_obrero) : "—"}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-neutral-500">{l.cargas_patronal ? fmt(l.cargas_patronal) : "—"}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-neutral-500">{l.pago_adicional ? fmt(l.pago_adicional) : "—"}</td>
@@ -181,6 +188,12 @@ export default async function PlanillaDetallePage({ params }: { params: Promise<
                 {p.lineas.length} colaboradores
               </td>
               <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums">{fmt(totBase)}</td>
+              <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums text-red-600">
+                {totRebajos ? `-${fmt(totRebajos)}` : ""}
+              </td>
+              <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums text-amber-700">
+                {totEmbargo ? `-${fmt(totEmbargo)}` : ""}
+              </td>
               <td colSpan={4} />
               <td className="px-3 py-2 text-right text-sm font-bold tabular-nums text-neutral-900">{fmt(totNeto)}</td>
             </tr>

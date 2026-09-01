@@ -29,6 +29,8 @@ export default async function EditarPlanillaPage({ params }: { params: Promise<{
       cargas_patronal: l.cargas_patronal,
       pago_adicional: l.pago_adicional,
       adelanto: l.adelanto,
+      rebajos: l.rebajos,
+      embargo: l.embargo,
     })),
   };
 
