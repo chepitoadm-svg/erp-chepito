@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cerrarSesion } from "./actions";
+import LatidoSesion from "@/components/LatidoSesion";
+import TopNav from "@/components/nav/TopNav";
+import CommandPalette from "@/components/nav/CommandPalette";
 
 export default async function AppLayout({
   children,
@@ -32,87 +34,26 @@ export default async function AppLayout({
     rol = r?.nombre ?? "Sin rol";
   }
 
-  const nombre = perfil?.nombre_completo || user.email;
+  const nombre = perfil?.nombre_completo || user.email || "";
+  // Evitar "Administrador / Administrador": solo mostrar el rol si difiere del nombre.
+  const mostrarRol = rol !== "Sin rol" && rol !== nombre;
 
   return (
     <div className="min-h-screen">
+      <LatidoSesion />
       <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-6">
-            <span className="font-semibold text-neutral-900">ERP Chepito</span>
-            <nav className="flex gap-4 text-sm">
-              <Link
-                href="/asientos"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Asientos
-              </Link>
-              <Link
-                href="/inventario"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Inventario
-              </Link>
-              <Link
-                href="/compras"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Compras
-              </Link>
-              <Link
-                href="/ventas"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Ventas
-              </Link>
-              <Link
-                href="/gastos"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Gastos
-              </Link>
-              <Link
-                href="/planilla"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Planilla
-              </Link>
-              <Link
-                href="/costos"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Costos
-              </Link>
-              <Link
-                href="/tesoreria/conciliaciones"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Tesorería
-              </Link>
-              <Link
-                href="/reportes"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Reportes
-              </Link>
-              <Link
-                href="/admin"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Administración
-              </Link>
-              <Link
-                href="/usuarios"
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Usuarios
-              </Link>
-            </nav>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <span className="whitespace-nowrap font-semibold text-neutral-900">ERP Chepito</span>
+            <CommandPalette />
           </div>
+
+          <TopNav />
+
           <div className="flex items-center gap-4 text-sm">
-            <div className="text-right">
+            <div className="text-right leading-tight">
               <div className="font-medium text-neutral-900">{nombre}</div>
-              <div className="text-xs text-neutral-500">{rol}</div>
+              {mostrarRol && <div className="text-xs text-neutral-500">{rol}</div>}
             </div>
             <form action={cerrarSesion}>
               <button
