@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarTransferencias, inventarioTransito } from "@/lib/data/inventario";
@@ -101,7 +102,7 @@ export default async function TransferenciasPage() {
             )}
             {transferencias.map((t) => (
               <tr key={t.id}>
-                <td className="px-4 py-3 text-neutral-600">{t.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(t.fecha)}</td>
                 <td className="px-4 py-3 text-neutral-800">
                   {t.origen_codigo} → {t.destino_codigo}
                 </td>

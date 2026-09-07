@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarVentasDia, listarCentrosDeVentas, type VentaDiaListado } from "@/lib/data/ventas";
@@ -61,7 +62,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
 
   const Fila = ({ v }: { v: VentaDiaListado }) => (
     <tr>
-      <td className="px-4 py-3 text-neutral-600">{v.fecha}</td>
+      <td className="px-4 py-3 text-neutral-600">{fechaCR(v.fecha)}</td>
       <td className="px-4 py-3 text-neutral-800">{v.centro_codigo ?? "—"}</td>
       <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{fmt(v.gravado)}</td>
       <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{fmt(v.exento)}</td>
@@ -89,6 +90,12 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/ventas/externas"
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+          >
+            Ventas externas
+          </Link>
           <Link
             href="/ventas/importar"
             className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"

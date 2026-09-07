@@ -15,6 +15,30 @@ function limpiar(msg: string): string {
   return msg.replace(/^.*?(?=[A-ZÁÉÍÓÚ])/, "").trim() || msg;
 }
 
+// Paga (total o parcial) la cuenta por pagar de un gasto desde banco/caja.
+export async function pagarGasto(
+  gastoId: string,
+  cuenta: string,
+  fecha: string,
+  monto: number,
+): Promise<{ error?: string; ok?: string }> {
+  await requerirPermiso("gastos.registrar");
+  if (!cuenta) return { error: "Elegí la cuenta de banco o caja." };
+  if (!fecha) return { error: "Poné la fecha del pago." };
+  if (!(monto > 0)) return { error: "El monto debe ser mayor a cero." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_pagar_gasto", {
+    p_gasto: gastoId,
+    p_cuenta: cuenta,
+    p_fecha: fecha,
+    p_monto: monto,
+  });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath("/gastos");
+  revalidatePath(`/gastos/${gastoId}`);
+  return { ok: "Pago registrado." };
+}
+
 function num(raw: FormDataEntryValue | null): number {
   const s = String(raw ?? "").trim().replace(/\s/g, "").replace(",", ".");
   const n = Number(s);

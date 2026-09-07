@@ -49,6 +49,8 @@ export async function listarCuentasPagoGasto(): Promise<CuentasPagoGasto> {
   };
 }
 
+export type GastoPago = "pagada" | "vencida" | "pendiente" | "na";
+
 export interface GastoListado {
   id: string;
   fecha: string;
@@ -58,6 +60,10 @@ export interface GastoListado {
   descripcion: string | null;
   total: number;
   estado: GastoEstado;
+  pago: GastoPago; // pagada | vencida | pendiente | na (borrador/anulado)
+  cxp_saldo: number | null;
+  fecha_vencimiento: string | null;
+  pago_ids: string[];
 }
 
 export interface GastoFiltro {
@@ -110,7 +116,8 @@ export async function listarGastos(filtro: GastoFiltro = {}): Promise<GastoLista
     .from("gastos")
     .select(
       "id, fecha, descripcion, total, estado, " +
-        "centro:centros_costo(codigo), cuenta:cuentas!gastos_cuenta_gasto_id_fkey(codigo, nombre)",
+        "centro:centros_costo(codigo), cuenta:cuentas!gastos_cuenta_gasto_id_fkey(codigo, nombre), " +
+        "cxp:cuentas_por_pagar(saldo, estado, fecha_vencimiento, aplicaciones:pagos_proveedor_lineas(pago:pagos_proveedor(id, estado)))",
     );
   if (filtro.centro) query = query.eq("centro_costo_id", filtro.centro);
   if (filtro.cuenta) query = query.eq("cuenta_gasto_id", filtro.cuenta);
@@ -121,6 +128,13 @@ export async function listarGastos(filtro: GastoFiltro = {}): Promise<GastoLista
     .order("fecha", { ascending: false })
     .order("creado_en", { ascending: false });
   if (error) throw new Error(`No se pudieron cargar los gastos: ${error.message}`);
+  const hoy = new Date().toISOString().slice(0, 10);
+  type CxPEmb = {
+    saldo: number;
+    estado: string;
+    fecha_vencimiento: string | null;
+    aplicaciones: { pago: { id: string; estado: string } | null }[] | null;
+  };
   return ((data ?? []) as unknown as {
     id: string;
     fecha: string;
@@ -129,16 +143,39 @@ export async function listarGastos(filtro: GastoFiltro = {}): Promise<GastoLista
     estado: GastoEstado;
     centro: { codigo: string } | null;
     cuenta: { codigo: string; nombre: string } | null;
-  }[]).map((g) => ({
-    id: g.id,
-    fecha: g.fecha,
-    centro_codigo: g.centro?.codigo ?? null,
-    cuenta_codigo: g.cuenta?.codigo ?? null,
-    cuenta_nombre: g.cuenta?.nombre ?? null,
-    descripcion: g.descripcion,
-    total: Number(g.total),
-    estado: g.estado,
-  }));
+    cxp: CxPEmb | CxPEmb[] | null;
+  }[]).map((g) => {
+    const cxp = Array.isArray(g.cxp) ? g.cxp[0] : g.cxp;
+    const pago_ids = [
+      ...new Set(
+        (cxp?.aplicaciones ?? [])
+          .map((a) => a.pago)
+          .filter((p): p is { id: string; estado: string } => !!p && p.estado === "confirmado")
+          .map((p) => p.id),
+      ),
+    ];
+    let pago: GastoPago = "na";
+    if (g.estado === "confirmado") {
+      if (!cxp || cxp.estado === "anulada") pago = "pagada"; // pagado de una (banco/caja), sin CxP
+      else if (cxp.estado === "pagada" || Number(cxp.saldo) <= 0) pago = "pagada";
+      else if (cxp.fecha_vencimiento && cxp.fecha_vencimiento < hoy) pago = "vencida";
+      else pago = "pendiente";
+    }
+    return {
+      id: g.id,
+      fecha: g.fecha,
+      centro_codigo: g.centro?.codigo ?? null,
+      cuenta_codigo: g.cuenta?.codigo ?? null,
+      cuenta_nombre: g.cuenta?.nombre ?? null,
+      descripcion: g.descripcion,
+      total: Number(g.total),
+      estado: g.estado,
+      pago,
+      cxp_saldo: cxp ? Number(cxp.saldo) : null,
+      fecha_vencimiento: cxp?.fecha_vencimiento ?? null,
+      pago_ids,
+    };
+  });
 }
 
 export interface GastoDetalle {

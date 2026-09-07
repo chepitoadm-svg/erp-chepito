@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarPagos, medioLabel } from "@/lib/data/compras";
@@ -59,7 +60,7 @@ export default async function PagosPage() {
             )}
             {pagos.map((p) => (
               <tr key={p.id}>
-                <td className="px-4 py-3 text-neutral-600">{p.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(p.fecha)}</td>
                 <td className="px-4 py-3 text-neutral-900">{p.proveedor_nombre}</td>
                 <td className="px-4 py-3 text-neutral-600">{medioLabel(p.medio_pago)}</td>
                 <td className="px-4 py-3 font-mono text-xs text-neutral-500">{p.cuenta_codigo}</td>

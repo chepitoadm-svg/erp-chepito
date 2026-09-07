@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerGasto, bancoDeAsiento } from "@/lib/data/gastos";
@@ -33,7 +34,7 @@ export default async function GastoDetallePage({
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">
-            Gasto {g.centro_codigo} — {g.fecha}
+            Gasto {g.centro_codigo} — {fechaCR(g.fecha)}
           </h1>
           <p className="text-sm text-neutral-500">
             {g.cuenta_codigo} · {g.cuenta_nombre}
@@ -89,7 +90,7 @@ export default async function GastoDetallePage({
             {g.proveedor_nombre && (
               <tr>
                 <td className="px-4 py-3 text-neutral-600">Vence</td>
-                <td className="px-4 py-3 text-right text-neutral-800">{g.fecha_vencimiento ?? "—"}</td>
+                <td className="px-4 py-3 text-right text-neutral-800">{fechaCR(g.fecha_vencimiento) || "—"}</td>
               </tr>
             )}
             <tr>
@@ -143,7 +144,7 @@ export default async function GastoDetallePage({
                         <li key={j} className="flex items-start gap-2">
                           <span className="mt-0.5 text-green-600">•</span>
                           <span className="flex-1">
-                            <b>{e.fecha}</b>
+                            <b>{fechaCR(e.fecha)}</b>
                             {e.referencia ? ` · ${e.referencia}` : ""}
                             {e.descripcion ? ` · ${e.descripcion}` : ""}
                           </span>

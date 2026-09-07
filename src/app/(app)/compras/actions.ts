@@ -268,8 +268,9 @@ export async function confirmarFactura(formData: FormData): Promise<void> {
   await requerirPermiso("compras.facturar");
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_confirmar_factura", { p_factura: id });
-  if (error) throw new Error(limpiar(error.message));
+  // No reventamos la pantalla si la base rechaza (ej. ya confirmada / doble clic):
+  // revalidamos para reflejar el estado real.
+  await supabase.rpc("fn_confirmar_factura", { p_factura: id });
   revalidatePath(`/compras/facturas/${id}`);
   revalidatePath("/compras/facturas");
   revalidatePath("/compras/cxp");
@@ -335,8 +336,7 @@ export async function confirmarPago(formData: FormData): Promise<void> {
   await requerirPermiso("compras.pagar");
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_confirmar_pago", { p_pago: id });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_confirmar_pago", { p_pago: id });
   revalidatePath(`/compras/pagos/${id}`);
   revalidatePath("/compras/pagos");
   revalidatePath("/compras/cxp");
@@ -801,8 +801,7 @@ export async function confirmarRecepcion(formData: FormData): Promise<void> {
   await requerirPermiso("compras.recibir");
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_confirmar_recepcion", { p_recep: id });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_confirmar_recepcion", { p_recep: id });
   revalidatePath(`/compras/recepciones/${id}`);
   revalidatePath("/compras/recepciones");
 }
@@ -866,8 +865,7 @@ export async function confirmarDevolucion(formData: FormData): Promise<void> {
   await requerirPermiso("compras.facturar");
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_confirmar_devolucion", { p_dev: id });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_confirmar_devolucion", { p_dev: id });
   revalidatePath(`/compras/devoluciones/${id}`);
   revalidatePath("/compras/devoluciones");
   revalidatePath("/compras/cxp");

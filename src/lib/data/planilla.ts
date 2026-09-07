@@ -72,11 +72,13 @@ const netoDe = (l: {
   ccss_obrero: number;
   adelanto: number;
   rebajos?: number;
+  embargo?: number;
 }) =>
   Number(l.salario_base) -
   Number(l.rebajos ?? 0) +
   Number(l.pago_adicional) -
   Number(l.ccss_obrero) -
+  Number(l.embargo ?? 0) -
   Number(l.adelanto);
 
 export async function listarPlanillas(): Promise<PlanillaListado[]> {

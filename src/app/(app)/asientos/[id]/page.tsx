@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { obtenerAsiento } from "@/lib/data/asientos";
+import { obtenerAsiento, origenAsiento } from "@/lib/data/asientos";
 import { confirmarAsiento, descartarAsiento } from "../actions";
 import AnularAsiento from "@/components/AnularAsiento";
 
@@ -10,14 +11,22 @@ const money = (n: number) =>
 
 export default async function AsientoDetallePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ volver?: string; volverLabel?: string }>;
 }) {
   if (!(await tienePermiso("asientos.ver"))) redirect("/asientos");
 
   const { id } = await params;
-  const [asiento, puedeCrear, puedeConfirmar, puedeAnular] = await Promise.all([
+  const sp = await searchParams;
+  // Volver a la pantalla de origen si vino con ?volver= (solo rutas internas).
+  const volverHref =
+    sp.volver && /^\/(?!\/)/.test(sp.volver) ? sp.volver : "/asientos";
+  const volverLabel = volverHref === "/asientos" ? "Asientos" : sp.volverLabel || "Volver";
+  const [asiento, origen, puedeCrear, puedeConfirmar, puedeAnular] = await Promise.all([
     obtenerAsiento(id),
+    origenAsiento(id),
     tienePermiso("asientos.crear"),
     tienePermiso("asientos.confirmar"),
     tienePermiso("asientos.anular"),
@@ -35,14 +44,24 @@ export default async function AsientoDetallePage({
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <Link href="/asientos" className="text-sm text-neutral-500 hover:text-neutral-900">
-            ← Asientos
+          <Link href={volverHref} className="text-sm text-neutral-500 hover:text-neutral-900">
+            ← {volverLabel}
           </Link>
           <h1 className="mt-1 text-lg font-semibold capitalize text-neutral-900">
-            {asiento.tipo} · {asiento.fecha}
+            {asiento.tipo} · {fechaCR(asiento.fecha)}
           </h1>
           <p className="text-sm text-neutral-500">
             {numero} · periodo {asiento.anio}-{String(asiento.mes).padStart(2, "0")} ({asiento.periodo_estado})
+          </p>
+          <p className="mt-1 text-sm">
+            <span className="text-neutral-500">Origen: </span>
+            {origen.href ? (
+              <Link href={origen.href} className="font-medium text-blue-600 underline hover:text-blue-800">
+                {origen.label} →
+              </Link>
+            ) : (
+              <span className="font-medium text-neutral-700">{origen.label}</span>
+            )}
           </p>
         </div>
         <span

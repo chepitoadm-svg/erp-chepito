@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerVentaDia } from "@/lib/data/ventas";
@@ -39,7 +40,7 @@ export default async function VentaDetallePage({
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">
-            Venta {v.centro_codigo} — {v.fecha}
+            Venta {v.centro_codigo} — {fechaCR(v.fecha)}
           </h1>
           <p className="text-sm text-neutral-500">{v.centro_nombre}</p>
           {v.glosa && <p className="text-xs text-neutral-400">{v.glosa}</p>}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarAjustes } from "@/lib/data/inventario";
@@ -56,7 +57,7 @@ export default async function AjustesPage() {
             )}
             {ajustes.map((a) => (
               <tr key={a.id}>
-                <td className="px-4 py-3 text-neutral-600">{a.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(a.fecha)}</td>
                 <td className="px-4 py-3 text-neutral-700">{a.bodega_codigo}</td>
                 <td className="px-4 py-3 text-neutral-900">{a.motivo}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{a.n_lineas}</td>

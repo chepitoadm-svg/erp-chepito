@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarDesechos, motivoDesechoLabel } from "@/lib/data/inventario";
@@ -61,7 +62,7 @@ export default async function DesechosPage() {
             )}
             {desechos.map((d) => (
               <tr key={d.id}>
-                <td className="px-4 py-3 text-neutral-600">{d.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(d.fecha)}</td>
                 <td className="px-4 py-3 text-neutral-800">{d.centro_codigo ?? "—"}</td>
                 <td className="px-4 py-3 text-neutral-600">{motivoDesechoLabel[d.motivo]}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-900">

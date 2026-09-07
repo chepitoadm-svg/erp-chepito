@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFacturas, listarProveedoresDeFacturas, type FacturasFiltro } from "@/lib/data/compras";
@@ -210,9 +211,9 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
             )}
             {facturas.map((f) => (
               <tr key={f.id}>
-                <td className="px-4 py-3 text-neutral-600">{f.fecha_emision}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(f.fecha_emision)}</td>
                 <td className={`px-4 py-3 ${f.pago === "vencida" ? "font-medium text-red-600" : "text-neutral-500"}`}>
-                  {f.fecha_vencimiento ?? "—"}
+                  {fechaCR(f.fecha_vencimiento) || "—"}
                 </td>
                 <td className="px-4 py-3 text-neutral-900">{f.proveedor_nombre}</td>
                 <td className="px-4 py-3 font-mono text-xs text-neutral-500">

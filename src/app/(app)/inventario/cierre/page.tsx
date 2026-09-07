@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarCierres } from "@/lib/data/inventario";
@@ -62,7 +63,7 @@ export default async function CierresPage() {
             )}
             {cierres.map((c) => (
               <tr key={c.id}>
-                <td className="px-4 py-3 text-neutral-600">{c.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(c.fecha)}</td>
                 <td className="px-4 py-3 text-neutral-800">{c.bodega_codigo}</td>
                 <td className="px-4 py-3 text-neutral-600">{c.centro_codigo ?? "—"}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-900">

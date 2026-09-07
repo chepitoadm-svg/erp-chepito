@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerDevolucion } from "@/lib/data/compras";
@@ -35,7 +36,7 @@ export default async function DevolucionDetallePage({
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">{d.proveedor_nombre}</h1>
           <p className="text-sm text-neutral-500">
-            {d.fecha} · {d.motivo} · sale de {d.bodega_codigo}
+            {fechaCR(d.fecha)} · {d.motivo} · sale de {d.bodega_codigo}
           </p>
           {d.factura_id && (
             <p className="text-xs text-neutral-400">

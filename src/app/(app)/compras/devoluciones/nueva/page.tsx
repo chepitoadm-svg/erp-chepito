@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFacturasConfirmadas, obtenerFactura } from "@/lib/data/compras";
@@ -46,7 +47,7 @@ export default async function NuevaDevolucionPage({
               <tbody className="divide-y divide-neutral-100">
                 {facturas.map((f) => (
                   <tr key={f.id}>
-                    <td className="px-4 py-3 text-neutral-600">{f.fecha_emision}</td>
+                    <td className="px-4 py-3 text-neutral-600">{fechaCR(f.fecha_emision)}</td>
                     <td className="px-4 py-3 text-neutral-900">{f.proveedor_nombre}</td>
                     <td className="px-4 py-3 font-mono text-xs text-neutral-500">{numeroFactura(f.clave) ?? "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-700">
@@ -103,7 +104,7 @@ export default async function NuevaDevolucionPage({
         Devolución — {f.proveedor_nombre}
       </h1>
       <p className="mb-4 text-sm text-neutral-500">
-        Factura {numeroFactura(f.clave) ?? "(sin número)"} · {f.fecha_emision}
+        Factura {numeroFactura(f.clave) ?? "(sin número)"} · {fechaCR(f.fecha_emision)}
       </p>
       <DevolucionForm
         facturaId={f.id}

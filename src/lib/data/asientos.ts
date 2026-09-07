@@ -71,6 +71,75 @@ export async function obtenerAsiento(id: string): Promise<AsientoDetalle | null>
   return data as unknown as AsientoDetalle;
 }
 
+export interface OrigenAsiento {
+  tipo: string | null;
+  label: string;
+  href: string | null;
+}
+
+const ORIGEN_LABEL: Record<string, string> = {
+  gasto: "Gasto",
+  gasto_pago: "Pago de gasto",
+  venta_dia: "Venta del día",
+  factura_compra: "Factura de compra",
+  pago_proveedor: "Pago a proveedor",
+  nota_credito_compra: "Nota de crédito de compra",
+  planilla: "Planilla (provisión)",
+  planilla_pago: "Pago de planilla",
+  planilla_adelanto: "Adelanto de planilla",
+  conciliacion_redondeo: "Conciliación bancaria",
+  liquidacion_datafono: "Liquidación de datáfono",
+  reclasif_costo: "Reclasificación de costo",
+};
+
+/** De qué módulo/operación nació un asiento, con enlace si se puede. */
+export async function origenAsiento(asientoId: string): Promise<OrigenAsiento> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("asientos")
+    .select("origen_tipo, origen_id")
+    .eq("id", asientoId)
+    .single();
+  const tipo = data?.origen_tipo ?? null;
+  const oid = data?.origen_id ?? null;
+  if (!tipo) return { tipo: null, label: "Asiento manual (directo)", href: null };
+
+  const label = ORIGEN_LABEL[tipo] ?? tipo;
+  let href: string | null = null;
+  if (oid) {
+    switch (tipo) {
+      case "gasto":
+        href = `/gastos/${oid}`;
+        break;
+      case "venta_dia":
+        href = `/ventas/${oid}`;
+        break;
+      case "factura_compra":
+        href = `/compras/facturas/${oid}`;
+        break;
+      case "pago_proveedor":
+        href = `/compras/pagos/${oid}`;
+        break;
+      case "planilla":
+      case "planilla_adelanto":
+        href = `/planilla/${oid}`;
+        break;
+      case "planilla_pago": {
+        const { data: pp } = await supabase.from("planilla_pagos").select("planilla_id").eq("id", oid).single();
+        if (pp?.planilla_id) href = `/planilla/${pp.planilla_id}`;
+        break;
+      }
+      case "liquidacion_datafono":
+        href = "/tesoreria/datafono";
+        break;
+      case "conciliacion_redondeo":
+        href = "/tesoreria/conciliaciones";
+        break;
+    }
+  }
+  return { tipo, label, href };
+}
+
 /** Cuentas que aceptan movimiento, para el selector de líneas. */
 export async function listarCuentasPosteables() {
   const supabase = await createClient();

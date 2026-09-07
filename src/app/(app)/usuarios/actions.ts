@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requerirPermiso } from "@/lib/auth/permisos";
+import { createClient } from "@/lib/supabase/server";
+import { requerirPermiso, getUsuario } from "@/lib/auth/permisos";
 import { obtenerUsuario } from "@/lib/data/usuarios";
 import {
   crearUsuarioSchema,
@@ -13,6 +14,57 @@ import {
 
 export interface FormState {
   error?: string;
+}
+
+/** Restablece la contraseña de un usuario (no se puede "ver" la actual: va
+ *  encriptada). Deja rastro en auditoría de quién la cambió y cuándo. */
+export async function restablecerPassword(
+  id: string,
+  nueva: string,
+): Promise<{ error?: string; ok?: string }> {
+  await requerirPermiso("usuarios.editar");
+  if (!nueva || nueva.length < 8) {
+    return { error: "La nueva contraseña debe tener al menos 8 caracteres." };
+  }
+  const visible = await obtenerUsuario(id);
+  if (!visible) return { error: "El usuario no existe o no tenés acceso." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(id, { password: nueva });
+  if (error) return { error: `No se pudo restablecer la contraseña: ${error.message}` };
+
+  // Rastro manual en auditoría (auth.users no tiene trigger propio).
+  const actor = await getUsuario();
+  await admin.from("auditoria").insert({
+    tabla: "auth.users",
+    registro_id: id,
+    accion: "update",
+    usuario_id: actor?.id ?? null,
+    datos_despues: { evento: "contraseña restablecida", usuario: visible.email },
+  });
+
+  revalidatePath(`/usuarios/${id}`);
+  return { ok: "Contraseña restablecida." };
+}
+
+/** Fija los permisos puntuales (concedidos / revocados) de un usuario. */
+export async function guardarPermisosUsuario(
+  id: string,
+  conceder: string[],
+  revocar: string[],
+): Promise<{ error?: string; ok?: string }> {
+  await requerirPermiso("usuarios.editar");
+  const visible = await obtenerUsuario(id);
+  if (!visible) return { error: "El usuario no existe o no tenés acceso." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_set_permisos_usuario", {
+    p_usuario: id,
+    p_conceder: conceder,
+    p_revocar: revocar,
+  });
+  if (error) return { error: `No se pudieron guardar los permisos: ${error.message}` };
+  revalidatePath(`/usuarios/${id}`);
+  return { ok: "Permisos actualizados." };
 }
 
 /** Crea un usuario de Auth + su perfil, le asigna rol y sucursales. */

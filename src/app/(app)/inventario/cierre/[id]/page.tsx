@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerCierre } from "@/lib/data/inventario";
@@ -33,7 +34,7 @@ export default async function CierreDetallePage({
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">
-            Cierre {c.bodega_codigo} — {c.fecha}
+            Cierre {c.bodega_codigo} — {fechaCR(c.fecha)}
           </h1>
           <p className="text-sm text-neutral-500">
             {c.bodega_nombre}

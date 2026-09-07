@@ -130,6 +130,37 @@ export async function importarEstadoCuenta(_prev: FormState, formData: FormData)
   redirect(`/tesoreria/conciliaciones/${id}`);
 }
 
+// Anexa más movimientos del .xls a una conciliación en borrador (subir por partes).
+export async function agregarEstadoCuenta(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("tesoreria.conciliar");
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Falta la conciliación." };
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) return { error: "Subí el estado de cuenta (.xls)." };
+
+  let ec;
+  try {
+    ec = parseEstadoCuentaBAC(new Uint8Array(await archivo.arrayBuffer()));
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo leer el estado de cuenta." };
+  }
+
+  const supabase = await createClient();
+  const { data: agregadas, error } = await supabase.rpc("fn_agregar_lineas_conciliacion", {
+    p_conciliacion: id,
+    p_saldo_final: ec.saldo_final,
+    p_lineas: ec.lineas,
+  });
+  if (error) return { error: limpiar(error.message) };
+
+  const { data: c } = await supabase.from("conciliaciones_banco").select("cuenta_id").eq("id", id).single();
+  if (c?.cuenta_id) await autoEmparejar(supabase, id, c.cuenta_id as string);
+
+  revalidatePath(`/tesoreria/conciliaciones/${id}`);
+  const n = Number(agregadas ?? 0);
+  return { ok: n === 0 ? "No había movimientos nuevos (ya estaban todos)." : `Se agregaron ${n} movimiento(s) nuevo(s).` };
+}
+
 // Vuelve a correr el emparejado automático sobre lo que quede pendiente.
 export async function conciliarAutomatico(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
@@ -149,8 +180,9 @@ export async function conciliarLinea(formData: FormData): Promise<void> {
   const linea = String(formData.get("linea_id") ?? "");
   const mov = String(formData.get("asiento_linea_id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_conciliar_linea", { p_linea: linea, p_asiento_linea: mov });
-  if (error) throw new Error(limpiar(error.message));
+  // Si la base rechaza (ej. la línea ya se concilió en otra pestaña) NO reventamos
+  // la pantalla: revalidamos para reflejar el estado real. El usuario ve el resultado.
+  await supabase.rpc("fn_conciliar_linea", { p_linea: linea, p_asiento_linea: mov });
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
   // no solo el listado, para que la pantalla refleje el cambio de una vez.
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
@@ -164,10 +196,9 @@ export async function conciliarGrupo(formData: FormData): Promise<void> {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!mov || lineas.length === 0) throw new Error("Elegí un movimiento de libros y al menos una línea del banco.");
+  if (!mov || lineas.length === 0) return;
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
   // no solo el listado, para que la pantalla refleje el cambio de una vez.
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
@@ -181,8 +212,7 @@ export async function conciliarRedondeo(formData: FormData): Promise<void> {
   const mov = String(formData.get("asiento_linea_id") ?? "");
   if (!linea || !mov) throw new Error("Elegí un movimiento de libros y una línea del banco.");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_conciliar_redondeo", { p_linea: linea, p_asiento_linea: mov });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_conciliar_redondeo", { p_linea: linea, p_asiento_linea: mov });
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
   // no solo el listado, para que la pantalla refleje el cambio de una vez.
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
@@ -192,8 +222,7 @@ export async function desconciliarLinea(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const linea = String(formData.get("linea_id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_desconciliar_linea", { p_linea: linea });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_desconciliar_linea", { p_linea: linea });
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
   // no solo el listado, para que la pantalla refleje el cambio de una vez.
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
@@ -291,6 +320,92 @@ export async function registrarAsientoBanco(_prev: FormState, formData: FormData
 }
 
 // Liga un identificador del estado de cuenta con un proveedor (agenda bancaria).
+// Genera UN asiento que agrupa VARIAS líneas del banco contra una sola cuenta de
+// libros (ej. varios depósitos de ventas → una cuenta de ventas), y concilia todas.
+export async function registrarAsientoBancoGrupo(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("tesoreria.conciliar");
+  const ids = String(formData.get("lineas") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const contra = String(formData.get("cuenta_contra_id") ?? "");
+  const centro = String(formData.get("centro_costo_id") ?? "").trim();
+  const glosa = String(formData.get("glosa") ?? "").trim();
+  if (ids.length < 2) return { error: "Elegí dos o más líneas del banco." };
+  if (!contra) return { error: "Elegí la cuenta de contrapartida." };
+
+  const supabase = await createClient();
+  const { data: lineasRaw } = await supabase
+    .from("estado_cuenta_lineas")
+    .select("id, fecha, debito, credito, descripcion, referencia, conciliacion:conciliaciones_banco(cuenta_id)")
+    .in("id", ids);
+  const lineas = (lineasRaw ?? []) as unknown as {
+    id: string;
+    fecha: string;
+    debito: number;
+    credito: number;
+    descripcion: string | null;
+    referencia: string | null;
+    conciliacion: { cuenta_id: string };
+  }[];
+  if (lineas.length < 2) return { error: "No se encontraron las líneas del banco." };
+  const cc0 = lineas[0].conciliacion as unknown as { cuenta_id: string } | { cuenta_id: string }[];
+  const banco = Array.isArray(cc0) ? cc0[0]?.cuenta_id : cc0?.cuenta_id;
+  if (!banco) return { error: "No pude identificar la cuenta del banco." };
+  if (contra === banco)
+    return { error: "La contrapartida no puede ser la misma cuenta del banco (se cancelaría solo). Para depósitos de ventas usá Caja general." };
+
+  const { data: ctaContra } = await supabase.from("cuentas").select("tipo").eq("id", contra).single();
+  const tipoContra = (ctaContra as { tipo: string } | null)?.tipo;
+  if ((tipoContra === "ingreso" || tipoContra === "gasto") && !centro)
+    return { error: "Elegí el centro de costo (la cuenta es de resultado)." };
+
+  // Una línea del banco (GL) por cada movimiento; el detalle guarda la referencia.
+  const bancoLineas = lineas.map((l) => {
+    const det = `${l.referencia ? l.referencia + " " : ""}${l.descripcion ?? "Banco"}`.slice(0, 120);
+    return Number(l.credito) > 0
+      ? { cuenta_id: banco, debito: Number(l.credito), detalle: det }
+      : { cuenta_id: banco, credito: Number(l.debito), detalle: det };
+  });
+  const totalCredito = lineas.reduce((s, l) => s + Number(l.credito), 0); // entra plata
+  const totalDebito = lineas.reduce((s, l) => s + Number(l.debito), 0); // sale plata
+  const netEntra = Math.round((totalCredito - totalDebito) * 100) / 100;
+  if (netEntra === 0) return { error: "Las líneas elegidas se cancelan entre sí (neto 0)." };
+  const contraLinea =
+    netEntra > 0
+      ? { cuenta_id: contra, credito: netEntra, centro_costo_id: centro || null, detalle: glosa || "Conciliación (grupo)" }
+      : { cuenta_id: contra, debito: -netEntra, centro_costo_id: centro || null, detalle: glosa || "Conciliación (grupo)" };
+
+  const fecha = lineas.map((l) => l.fecha).sort().slice(-1)[0]; // la más reciente
+  const { data: asientoId, error } = await supabase.rpc("app_crear_asiento", {
+    p_tipo: netEntra > 0 ? "ingreso" : "egreso",
+    p_fecha: fecha,
+    p_glosa: glosa || `Conciliación de ${lineas.length} movimientos del banco`,
+    p_lineas: [...bancoLineas, contraLinea],
+    p_confirmar: true,
+  });
+  if (error || !asientoId) return { error: limpiar(error?.message ?? "No se pudo crear el asiento.") };
+
+  // Emparejar cada línea del banco con su línea GL (por monto, sin repetir).
+  const { data: glRaw } = await supabase
+    .from("asientos_lineas")
+    .select("id, debito, credito")
+    .eq("asiento_id", asientoId)
+    .eq("cuenta_id", banco);
+  const gl = ((glRaw ?? []) as { id: string; debito: number; credito: number }[]).map((g) => ({ ...g, usada: false }));
+  const c2 = (n: number) => Math.round(Number(n) * 100);
+  let ok = 0;
+  for (const l of lineas) {
+    const target = Number(l.credito) > 0 ? { d: c2(l.credito), c: 0 } : { d: 0, c: c2(l.debito) };
+    const g = gl.find((x) => !x.usada && c2(x.debito) === target.d && c2(x.credito) === target.c);
+    if (!g) continue;
+    const { error: e2 } = await supabase.rpc("fn_conciliar_linea", { p_linea: l.id, p_asiento_linea: g.id });
+    if (!e2) {
+      g.usada = true;
+      ok++;
+    }
+  }
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
+  return { ok: `Asiento creado. Se conciliaron ${ok} de ${lineas.length} líneas contra una sola cuenta.` };
+}
+
 export async function asignarAliasProveedor(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const proveedor = String(formData.get("proveedor_id") ?? "");
@@ -317,8 +432,7 @@ export async function marcarConciliada(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_marcar_conciliada", { p_conciliacion: id });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_marcar_conciliada", { p_conciliacion: id });
   revalidatePath(`/tesoreria/conciliaciones/${id}`);
   revalidatePath("/tesoreria/conciliaciones");
 }
@@ -329,8 +443,7 @@ export async function reabrirConciliacion(formData: FormData): Promise<void> {
   await requerirPermiso("tesoreria.conciliar");
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("fn_reabrir_conciliacion", { p_conciliacion: id });
-  if (error) throw new Error(limpiar(error.message));
+  await supabase.rpc("fn_reabrir_conciliacion", { p_conciliacion: id });
   revalidatePath(`/tesoreria/conciliaciones/${id}`);
   revalidatePath("/tesoreria/conciliaciones");
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerFactura, listarPagosDeFactura, medioLabel } from "@/lib/data/compras";
@@ -47,8 +48,8 @@ export default async function FacturaDetallePage({
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">{f.proveedor_nombre}</h1>
           <p className="text-sm text-neutral-500">
-            Emisión {f.fecha_emision}
-            {f.fecha_vencimiento ? ` · vence ${f.fecha_vencimiento}` : ""}
+            Emisión {fechaCR(f.fecha_emision)}
+            {f.fecha_vencimiento ? ` · vence ${fechaCR(f.fecha_vencimiento)}` : ""}
             {f.condicion_venta ? ` · ${COND[f.condicion_venta] ?? f.condicion_venta}` : ""}
           </p>
           <p className="text-xs text-neutral-400">
@@ -269,7 +270,7 @@ export default async function FacturaDetallePage({
                 <tbody className="divide-y divide-neutral-100">
                   {pagos.map((p, i) => (
                     <tr key={`${p.pago_id}-${i}`} className={p.estado === "anulado" ? "opacity-50" : ""}>
-                      <td className="px-4 py-3 text-neutral-700">{p.fecha}</td>
+                      <td className="px-4 py-3 text-neutral-700">{fechaCR(p.fecha)}</td>
                       <td className="px-4 py-3 text-neutral-600">{medioLabel(p.medio_pago)}</td>
                       <td className="px-4 py-3 text-neutral-600">
                         <span className="font-mono text-xs">{p.cuenta_codigo}</span> {p.cuenta_nombre}

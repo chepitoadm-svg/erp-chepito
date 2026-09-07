@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerTransferencia } from "@/lib/data/inventario";
@@ -52,7 +53,7 @@ export default async function TransferenciaDetallePage({
             {t.origen_codigo} → {t.destino_codigo}
           </h1>
           <p className="text-sm text-neutral-500">
-            {t.fecha}
+            {fechaCR(t.fecha)}
             {t.glosa ? ` · ${t.glosa}` : ""}
           </p>
           <p className="text-xs text-neutral-400">

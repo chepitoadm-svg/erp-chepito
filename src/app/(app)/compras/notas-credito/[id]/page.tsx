@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerNotaCredito } from "@/lib/data/compras";
@@ -28,7 +29,7 @@ export default async function NotaCreditoDetallePage({ params }: { params: Promi
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">Nota de crédito — {n.proveedor_nombre}</h1>
           <p className="text-sm text-neutral-500">
-            {n.fecha}
+            {fechaCR(n.fecha)}
             {n.referencia ? ` · ${n.referencia}` : ""}
           </p>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerIngesta } from "@/lib/data/compras";
@@ -68,9 +69,9 @@ export default async function IngestaDetallePage({
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">{c.emisor_nombre ?? "Comprobante"}</h1>
           <p className="text-sm text-neutral-500">
-            {c.fecha_emision ?? "—"}
+            {fechaCR(c.fecha_emision) || "—"}
             {c.condicion_venta ? ` · ${COND[c.condicion_venta] ?? c.condicion_venta}` : ""}
-            {c.plazo_credito ? ` (${c.plazo_credito} d, vence ${c.fecha_vencimiento})` : ""}
+            {c.plazo_credito ? ` (${c.plazo_credito} d, vence ${fechaCR(c.fecha_vencimiento)})` : ""}
           </p>
           <p className="break-all text-xs text-neutral-400">clave {c.clave ?? "—"}</p>
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarIngesta } from "@/lib/data/compras";
@@ -66,7 +67,7 @@ export default async function IngestorPage() {
             )}
             {comprobantes.map((c) => (
               <tr key={c.id}>
-                <td className="px-4 py-3 text-neutral-600">{c.fecha_emision ?? "—"}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(c.fecha_emision) || "—"}</td>
                 <td className="px-4 py-3 text-neutral-900">{c.emisor_nombre ?? "—"}</td>
                 <td className="px-4 py-3 text-neutral-600">
                   {c.proveedor_nombre ?? <span className="text-red-600">sin registrar</span>}

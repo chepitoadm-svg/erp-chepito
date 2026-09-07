@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarConciliaciones } from "@/lib/data/conciliaciones";
@@ -62,7 +63,7 @@ export default async function ConciliacionesPage() {
             )}
             {cs.map((c) => (
               <tr key={c.id}>
-                <td className="px-4 py-3 text-neutral-600">{c.fecha_corte}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(c.fecha_corte)}</td>
                 <td className="px-4 py-3 text-neutral-800">
                   {c.cuenta_codigo} · {c.cuenta_nombre}
                 </td>

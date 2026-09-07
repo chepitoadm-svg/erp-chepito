@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarAsientos } from "@/lib/data/asientos";
 import type { AsientoEstado } from "@/types/database";
@@ -101,7 +102,7 @@ export default async function AsientosPage({
               <tr key={a.id} className="hover:bg-neutral-50">
                 <td className="px-4 py-3">
                   <Link href={`/asientos/${a.id}`} className="block text-neutral-900">
-                    {a.fecha}
+                    {fechaCR(a.fecha)}
                   </Link>
                 </td>
                 <td className="px-4 py-3 capitalize text-neutral-600">{a.tipo}</td>

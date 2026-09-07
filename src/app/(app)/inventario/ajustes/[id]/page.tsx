@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerAjuste } from "@/lib/data/inventario";
@@ -39,7 +40,7 @@ export default async function AjusteDetallePage({
             Ajuste — {ajuste.bodega_codigo}
           </h1>
           <p className="text-sm text-neutral-500">
-            {ajuste.fecha} · {ajuste.motivo}
+            {fechaCR(ajuste.fecha)} · {ajuste.motivo}
           </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[ajuste.estado]}`}>

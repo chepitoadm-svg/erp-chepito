@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarPlanillas } from "@/lib/data/planilla";
@@ -46,7 +47,7 @@ export default async function PlanillaPage() {
             <tbody className="divide-y divide-neutral-100">
               {planillas.map((p) => (
                 <tr key={p.id}>
-                  <td className="px-4 py-2 text-neutral-600">{p.fecha}</td>
+                  <td className="px-4 py-2 text-neutral-600">{fechaCR(p.fecha)}</td>
                   <td className="px-4 py-2 text-neutral-800">{p.titulo ?? "—"}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-neutral-600">{p.n_colaboradores}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-neutral-900">₡{fmt(p.neto)}</td>

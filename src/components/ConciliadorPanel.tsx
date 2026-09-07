@@ -10,6 +10,7 @@ import {
   desconciliarLinea,
   conciliarAutomatico,
   registrarAsientoBanco,
+  registrarAsientoBancoGrupo,
   type FormState,
 } from "@/app/(app)/tesoreria/conciliaciones/actions";
 import SelectBuscable, { type OpcionBuscable } from "@/components/SelectBuscable";
@@ -237,6 +238,7 @@ export default function ConciliadorPanel({
   const [selLibros, setSelLibros] = useState<Set<string> | null>(null);
   const [selBancoDoc, setSelBancoDoc] = useState<Set<string> | null>(null);
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
+  const [stateG, formActionG, pendingG] = useActionState(registrarAsientoBancoGrupo, inicial);
   const router = useRouter();
   const [refrescando, startRefresh] = useTransition();
 
@@ -398,12 +400,12 @@ export default function ConciliadorPanel({
               </button>
               <button
                 type="button"
-                disabled={bancosSel.length !== 1}
+                disabled={bancosSel.length < 1}
                 onClick={() => setModoRegistrar((v) => !v)}
                 className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-                title={bancosSel.length === 1 ? "" : "Elegí exactamente una línea del banco"}
+                title={bancosSel.length >= 1 ? "" : "Elegí una o varias líneas del banco"}
               >
-                Generar asiento del banco
+                Generar asiento del banco{bancosSel.length > 1 ? ` (${bancosSel.length})` : ""}
               </button>
 
               {/* Estado de la selección */}
@@ -423,6 +425,72 @@ export default function ConciliadorPanel({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Generar UN asiento que agrupa VARIAS líneas del banco contra una cuenta */}
+          {editable && modoRegistrar && bancosSel.length >= 2 && (
+            <form action={formActionG} className="mb-4 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
+              <input type="hidden" name="lineas" value={Array.from(selBancos).join(",")} />
+              <p className="mb-2 text-xs text-neutral-600">
+                Matar <b>{bancosSel.length}</b> líneas del banco contra <b>una sola cuenta</b> de libros.{" "}
+                {sumBancoCredito > 0 && <span>Entra ₡{money(sumBancoCredito)}. </span>}
+                {sumBancoDebito > 0 && <span>Sale ₡{money(sumBancoDebito)}. </span>}
+                <span className="text-neutral-500">Se crea un asiento con una línea por movimiento y una contrapartida por el neto.</span>
+              </p>
+              {sumBancoCredito > 0 && (
+                <p className="mb-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                  Si son <b>depósitos de ventas ya registradas</b>, la contrapartida es <b>Caja general</b> (traslado de caja a
+                  banco), <b>no</b> una cuenta de ventas — si no, se doblaría el ingreso.
+                </p>
+              )}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wide text-neutral-500">Cuenta de contrapartida</span>
+                  <SelectBuscable
+                    name="cuenta_contra_id"
+                    required
+                    placeholder="Buscá la cuenta (Caja general, cuenta puente…)…"
+                    options={cuentas}
+                    className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wide text-neutral-500">Centro (si es cuenta de resultado)</span>
+                  <select
+                    name="centro_costo_id"
+                    defaultValue=""
+                    className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+                  >
+                    <option value="">— sin centro —</option>
+                    {centros.map((cc) => (
+                      <option key={cc.id} value={cc.id}>
+                        {cc.codigo} — {cc.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <input
+                type="text"
+                name="glosa"
+                placeholder="Glosa (ej. Depósitos de ventas agosto)"
+                className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              />
+              {stateG.error && <p className="mt-1 text-xs text-red-600">{stateG.error}</p>}
+              {stateG.ok && <p className="mt-1 text-xs text-green-700">{stateG.ok}</p>}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={pendingG}
+                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  {pendingG ? "Creando…" : `Crear asiento y conciliar ${bancosSel.length} líneas`}
+                </button>
+                <button type="button" onClick={() => setModoRegistrar(false)} className="px-2 py-1.5 text-xs text-neutral-500 hover:text-neutral-800">
+                  Cerrar
+                </button>
+              </div>
+            </form>
           )}
 
           {/* Registrar asiento del banco (comisión / interés / SINPE) — una línea */}
@@ -659,6 +727,33 @@ export default function ConciliadorPanel({
             </div>
           </div>
         </>
+      )}
+
+      {/* Barra flotante: suma de las líneas del banco marcadas. */}
+      {selBancos.size > 0 && (
+        <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+          <div className="flex items-center gap-4 rounded-full border border-neutral-300 bg-neutral-900 px-5 py-2.5 text-sm text-white shadow-lg">
+            <span className="font-medium">
+              {selBancos.size} línea{selBancos.size > 1 ? "s" : ""}
+            </span>
+            <span className="h-4 w-px bg-white/25" />
+            <span className="tabular-nums">
+              Total <span className="font-semibold">₡{money(sumBancoDebito + sumBancoCredito)}</span>
+            </span>
+            {sumBancoCredito > 0 && sumBancoDebito > 0 && (
+              <span className="text-xs text-white/70">
+                (entra ₡{money(sumBancoCredito)} · sale ₡{money(sumBancoDebito)})
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelBancos(new Set())}
+              className="ml-1 rounded-full px-2 py-0.5 text-xs text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

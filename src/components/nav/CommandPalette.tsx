@@ -12,7 +12,7 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 // secciones, sin cambiar el componente.
 type Resultado = NavTarget;
 
-export default function CommandPalette() {
+export default function CommandPalette({ hideTrigger = false }: { hideTrigger?: boolean }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [q, setQ] = useState("");
@@ -74,21 +74,23 @@ export default function CommandPalette() {
 
   return (
     <>
-      {/* Disparador en la barra, a la par del logo */}
-      <button
-        type="button"
-        onClick={() => setAbierto(true)}
-        className="flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-400 hover:border-neutral-400 hover:text-neutral-600"
-      >
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
-        <span className="hidden sm:inline">Buscar…</span>
-        <kbd className="hidden rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 sm:inline">
-          {mac ? "⌘K" : "Ctrl K"}
-        </kbd>
-      </button>
+      {/* Disparador (opcional; en el sidebar el buscador es propio) */}
+      {!hideTrigger && (
+        <button
+          type="button"
+          onClick={() => setAbierto(true)}
+          className="flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-400 hover:border-neutral-400 hover:text-neutral-600"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <span className="hidden sm:inline">Buscar…</span>
+          <kbd className="hidden rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 sm:inline">
+            {mac ? "⌘K" : "Ctrl K"}
+          </kbd>
+        </button>
+      )}
 
       {abierto && (
         <div

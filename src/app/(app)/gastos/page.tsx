@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
@@ -6,8 +7,10 @@ import {
   listarGastos,
   listarCentrosDeGastos,
   listarCuentasDeGastos,
+  listarCuentasPagoGasto,
   type GastoListado,
 } from "@/lib/data/gastos";
+import PagarGastoBtn from "@/components/PagarGastoBtn";
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,6 +21,19 @@ const ESTADO_CLS: Record<string, string> = {
   anulado: "bg-red-50 text-red-700",
 };
 
+const PAGO_CLS: Record<string, string> = {
+  pagada: "bg-green-50 text-green-700",
+  vencida: "bg-red-50 text-red-700",
+  pendiente: "bg-amber-50 text-amber-700",
+  na: "bg-neutral-100 text-neutral-400",
+};
+const PAGO_LBL: Record<string, string> = {
+  pagada: "Pagado",
+  vencida: "Vencida",
+  pendiente: "Pendiente",
+  na: "—",
+};
+
 type SP = {
   centro?: string;
   cuenta?: string;
@@ -25,6 +41,7 @@ type SP = {
   desde?: string;
   hasta?: string;
   agrupar?: string;
+  pago?: string;
 };
 
 const inputCls =
@@ -42,13 +59,18 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
   };
   const agrupar = sp.agrupar === "centro" || sp.agrupar === "cuenta" || sp.agrupar === "estado" ? sp.agrupar : "";
 
-  const [gastos, centros, cuentas] = await Promise.all([
+  const [gastosTodos, centros, cuentas, cuentasPagoRaw] = await Promise.all([
     listarGastos(filtro),
     listarCentrosDeGastos(),
     listarCuentasDeGastos(),
+    listarCuentasPagoGasto(),
   ]);
+  const cuentasPago = cuentasPagoRaw.pagado_con;
+  const hoy = new Date().toISOString().slice(0, 10);
+  const pagoFiltro = sp.pago && ["pagada", "vencida", "pendiente"].includes(sp.pago) ? sp.pago : "";
+  const gastos = pagoFiltro ? gastosTodos.filter((g) => g.pago === pagoFiltro) : gastosTodos;
 
-  const hayFiltro = !!(sp.centro || sp.cuenta || sp.estado || sp.desde || sp.hasta);
+  const hayFiltro = !!(sp.centro || sp.cuenta || sp.estado || sp.desde || sp.hasta || pagoFiltro);
   const total = gastos.reduce((s, g) => s + g.total, 0);
 
   // Agrupación: clave y etiqueta por gasto.
@@ -69,7 +91,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
 
   const Fila = ({ g }: { g: GastoListado }) => (
     <tr>
-      <td className="px-4 py-3 text-neutral-600">{g.fecha}</td>
+      <td className="px-4 py-3 text-neutral-600">{fechaCR(g.fecha)}</td>
       <td className="px-4 py-3 text-neutral-800">{g.centro_codigo ?? "—"}</td>
       <td className="px-4 py-3 text-neutral-600">
         {g.cuenta_codigo ? `${g.cuenta_codigo} · ${g.cuenta_nombre}` : "—"}
@@ -77,12 +99,33 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
       <td className="px-4 py-3 text-neutral-500">{g.descripcion ?? "—"}</td>
       <td className="px-4 py-3 text-right tabular-nums font-medium text-neutral-900">{fmt(g.total)}</td>
       <td className="px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          <span className={`w-fit rounded-full px-2 py-0.5 text-xs ${PAGO_CLS[g.pago]}`}>{PAGO_LBL[g.pago]}</span>
+          {g.pago_ids.length > 0 && (
+            <Link
+              href={g.pago_ids.length === 1 ? `/compras/pagos/${g.pago_ids[0]}` : `/gastos/${g.id}`}
+              className="text-xs text-neutral-500 underline hover:text-neutral-900"
+            >
+              ver pago{g.pago_ids.length > 1 ? "s" : ""}
+            </Link>
+          )}
+          {g.pago === "vencida" && g.cxp_saldo != null && (
+            <span className="text-xs text-red-500">debe ₡{fmt(g.cxp_saldo)}</span>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3">
         <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[g.estado]}`}>{g.estado}</span>
       </td>
       <td className="px-4 py-3 text-right">
-        <Link href={`/gastos/${g.id}`} className="text-neutral-600 hover:text-neutral-900">
-          Ver
-        </Link>
+        <div className="flex items-center justify-end gap-3">
+          {(g.pago === "pendiente" || g.pago === "vencida") && g.cxp_saldo != null && (
+            <PagarGastoBtn gastoId={g.id} saldo={g.cxp_saldo} cuentas={cuentasPago} fechaDefault={hoy} />
+          )}
+          <Link href={`/gastos/${g.id}`} className="text-neutral-600 hover:text-neutral-900">
+            Ver
+          </Link>
+        </div>
       </td>
     </tr>
   );
@@ -139,6 +182,15 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
+          Pago
+          <select name="pago" defaultValue={sp.pago ?? ""} className={inputCls}>
+            <option value="">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="vencida">Vencida</option>
+            <option value="pagada">Pagado</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
           Desde
           <input type="date" name="desde" defaultValue={sp.desde ?? ""} className={inputCls} />
         </label>
@@ -169,7 +221,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
       </form>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[860px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-4 py-3 font-medium">Fecha</th>
@@ -177,6 +229,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
               <th className="px-4 py-3 font-medium">Cuenta</th>
               <th className="px-4 py-3 font-medium">Descripción</th>
               <th className="px-4 py-3 text-right font-medium">Total</th>
+              <th className="px-4 py-3 font-medium">Pago</th>
               <th className="px-4 py-3 font-medium">Estado</th>
               <th className="px-4 py-3 text-right" />
             </tr>
@@ -185,7 +238,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
           {gastos.length === 0 ? (
             <tbody>
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
                   {hayFiltro ? "Ningún gasto con esos filtros." : "Todavía no hay gastos registrados."}
                 </td>
               </tr>
@@ -202,7 +255,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
                     <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-neutral-900">
                       {fmt(sub)}
                     </td>
-                    <td colSpan={2} />
+                    <td colSpan={3} />
                   </tr>
                   {filas.map((g) => (
                     <Fila key={g.id} g={g} />
@@ -225,7 +278,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Promi
                   Total ({gastos.length} gasto{gastos.length === 1 ? "" : "s"})
                 </td>
                 <td className="px-4 py-2 text-right text-sm font-bold tabular-nums text-neutral-900">{fmt(total)}</td>
-                <td colSpan={2} />
+                <td colSpan={3} />
               </tr>
             </tfoot>
           )}

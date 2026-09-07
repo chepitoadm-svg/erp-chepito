@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerConciliacion } from "@/lib/data/conciliaciones";
@@ -7,6 +8,7 @@ import { listarProveedoresActivos } from "@/lib/data/compras";
 import { marcarConciliada, reabrirConciliacion } from "../actions";
 import ConciliadorPanel from "@/components/ConciliadorPanel";
 import AnularConciliacion from "@/components/AnularConciliacion";
+import ImportarMasBanco from "@/components/ImportarMasBanco";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -52,7 +54,7 @@ export default async function ConciliacionDetallePage({ params }: { params: Prom
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">
-            {c.cuenta_codigo} — corte {c.fecha_corte}
+            {c.cuenta_codigo} — corte {fechaCR(c.fecha_corte)}
           </h1>
           <p className="text-sm text-neutral-500">{c.cuenta_nombre}</p>
         </div>
@@ -86,6 +88,12 @@ export default async function ConciliacionDetallePage({ params }: { params: Prom
           El saldo del banco y el de libros aún no calzan (diferencia ₡{money(diferencia)}). Casá las líneas de abajo:
           elegí una de cada lado y &ldquo;Conciliar seleccionados&rdquo;, o creá el asiento faltante desde la línea del banco.
         </p>
+      )}
+
+      {editable && (
+        <div className="mb-4">
+          <ImportarMasBanco conciliacionId={c.id} />
+        </div>
       )}
 
       <ConciliadorPanel

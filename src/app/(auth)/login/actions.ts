@@ -32,5 +32,8 @@ export async function iniciarSesion(
     return { error: "Credenciales inválidas." };
   }
 
+  // Abre el primer bloque de la bitácora de tiempo (best-effort).
+  await supabase.rpc("fn_latido_sesion");
+
   redirect("/usuarios");
 }

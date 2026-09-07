@@ -53,15 +53,27 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
 
   const setDestino = (i: number, d: Destino) =>
     setLineas((prev) => (prev ? prev.map((l, j) => (j === i ? { ...l, destino: d } : l)) : prev));
-  const setNum = (i: number, campo: "rebajos" | "embargo", v: number) =>
-    setLineas((prev) => (prev ? prev.map((l, j) => (j === i ? { ...l, [campo]: Number.isFinite(v) ? v : 0 } : l)) : prev));
+  const setRebajos = (i: number, v: number) =>
+    setLineas((prev) => (prev ? prev.map((l, j) => (j === i ? { ...l, rebajos: Number.isFinite(v) ? v : 0 } : l)) : prev));
+  // Al poner un embargo, se MUEVE ese monto desde los rebajos (rebajos + embargo se mantiene).
+  const setEmbargo = (i: number, v: number) =>
+    setLineas((prev) =>
+      prev
+        ? prev.map((l, j) => {
+            if (j !== i) return l;
+            const nuevo = Number.isFinite(v) ? v : 0;
+            const delta = nuevo - l.embargo;
+            const rebajos = Math.max(0, Math.round((l.rebajos - delta) * 100) / 100);
+            return { ...l, embargo: nuevo, rebajos };
+          })
+        : prev,
+    );
 
   const calc = useMemo(() => {
     if (!lineas) return null;
     let ded = 0, carg = 0, nod = 0, ret = 0, apo = 0, adel = 0, emb = 0, neto = 0;
     for (const l of lineas) {
-      // El embargo es parte de los rebajos: el salario devengado = base − (rebajos − embargo).
-      const baseEf = l.salario_base - l.rebajos + l.embargo;
+      const baseEf = l.salario_base - l.rebajos; // salario devengado (el embargo NO baja el salario)
       if (l.tiene_ccss) {
         ded += baseEf;
         carg += l.cargas_patronal;
@@ -71,7 +83,7 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
       apo += l.cargas_patronal;
       adel += l.adelanto;
       emb += l.embargo;
-      neto += l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.adelanto;
+      neto += baseEf + l.pago_adicional - l.ccss_obrero - l.embargo - l.adelanto;
     }
     const r2 = (n: number) => Math.round(n * 100) / 100;
     const debe = r2(ded + carg + nod);
@@ -146,8 +158,8 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
             <span className="text-xs text-neutral-400">El resto ({100 - reparto}%) va a CH2.</span>
           </div>
           <p className="text-xs text-neutral-400">
-            <b>Embargo:</b> si parte de los <i>rebajos</i> de alguien es un embargo, ponelo en la columna Embargo — el
-            sistema lo saca de los rebajos solo (no restés nada) y lo manda a &ldquo;embargos por pagar&rdquo;. El neto no cambia.
+            <b>Embargo:</b> si parte de los <i>rebajos</i> de alguien es un embargo, ponelo en la columna Embargo — los
+            <i> rebajos bajan solos</i> por ese monto y el embargo va a &ldquo;embargos por pagar&rdquo;. El neto no cambia.
           </p>
 
           {/* Tabla editable */}
@@ -170,7 +182,7 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {lineas.map((l, i) => {
-                  const neto = l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.adelanto;
+                  const neto = l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.embargo - l.adelanto;
                   return (
                     <tr key={l.clave + i}>
                       <td className="px-3 py-1.5 text-neutral-800">
@@ -201,7 +213,7 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
                           type="number"
                           min={0}
                           value={l.rebajos || ""}
-                          onChange={(e) => setNum(i, "rebajos", Number(e.target.value))}
+                          onChange={(e) => setRebajos(i, Number(e.target.value))}
                           placeholder="0"
                           className="w-24 rounded border border-neutral-300 px-1.5 py-0.5 text-right text-xs tabular-nums outline-none focus:border-neutral-500"
                         />
@@ -211,7 +223,7 @@ export default function PlanillaImportar({ edicion }: { edicion?: EdicionPlanill
                           type="number"
                           min={0}
                           value={l.embargo || ""}
-                          onChange={(e) => setNum(i, "embargo", Number(e.target.value))}
+                          onChange={(e) => setEmbargo(i, Number(e.target.value))}
                           placeholder="0"
                           className="w-24 rounded border border-amber-300 px-1.5 py-0.5 text-right text-xs tabular-nums outline-none focus:border-amber-500"
                         />

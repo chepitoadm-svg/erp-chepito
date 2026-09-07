@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { mayorCuenta, flujoDetalle, type FlujoDetalleLinea } from "@/lib/data/reportes";
+import { mayorCuenta, flujoDetalleBancario, type FlujoDetalleLinea } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 import SelectBuscable from "@/components/SelectBuscable";
 import BotonVolver from "@/components/BotonVolver";
@@ -36,7 +37,7 @@ function hrefOrigen(m: MayorRow): string {
 function FilaFlujo({ l, href }: { l: FlujoDetalleLinea; href: string }) {
   return (
     <tr>
-      <td className="whitespace-nowrap px-3 py-2 text-neutral-600">{l.fecha}</td>
+      <td className="whitespace-nowrap px-3 py-2 text-neutral-600">{fechaCR(l.fecha)}</td>
       <td className="px-3 py-2 text-neutral-700">
         <Link href={href} className="underline decoration-dotted underline-offset-2 hover:text-neutral-900">
           {l.referencia && <span className="text-neutral-500">{l.referencia} · </span>}
@@ -112,7 +113,7 @@ export default async function MayorPage({
   const agruparDet =
     sp.agrupar === "proveedor" || sp.agrupar === "tipo" || sp.agrupar === "centro" ? sp.agrupar : "";
   const flujoRows: FlujoDetalleLinea[] =
-    detalleBanco && cuentaId && desde && hasta ? await flujoDetalle(cuentaId, desde, hasta) : [];
+    detalleBanco && cuentaId && desde && hasta ? await flujoDetalleBancario(cuentaId, desde, hasta) : [];
   const flujoNeto = flujoRows.reduce((s, r) => s + r.monto, 0);
   const hrefOrigenDet = (l: { origen_tipo: string | null; origen_id: string | null; asiento_id: string }) =>
     l.origen_tipo === "gasto" && l.origen_id
@@ -310,7 +311,7 @@ export default async function MayorPage({
                       return (
                         <li key={i} className={`flex items-start gap-2 px-3 py-1.5 text-sm ${anulado ? "text-neutral-400" : "text-neutral-700"}`}>
                           <span className="mt-0.5 text-green-600">•</span>
-                          <span className="w-24 shrink-0 text-neutral-500">{m.fecha}</span>
+                          <span className="w-24 shrink-0 text-neutral-500">{fechaCR(m.fecha)}</span>
                           <Link href={hrefOrigen(m)} className="shrink-0 underline decoration-dotted underline-offset-2 hover:text-neutral-900" title="Abrir el origen">
                             {m.asiento_numero ? `${m.asiento_tipo.slice(0, 3).toUpperCase()}-${m.asiento_numero}` : m.asiento_tipo}
                           </Link>
@@ -355,7 +356,7 @@ export default async function MayorPage({
                   const anulado = m.asiento_estado === "anulado";
                   return (
                   <tr key={i} className={`border-t border-neutral-100 ${anulado ? "text-neutral-400" : ""}`}>
-                    <td className="px-3 py-1.5">{m.fecha}</td>
+                    <td className="px-3 py-1.5">{fechaCR(m.fecha)}</td>
                     <td className="px-3 py-1.5">
                       <Link
                         href={hrefOrigen(m)}

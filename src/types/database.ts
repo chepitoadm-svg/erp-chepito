@@ -230,7 +230,14 @@ export interface Database {
           datos_despues: Record<string, unknown> | null;
           ocurrido_en: string;
         };
-        Insert: never;
+        Insert: {
+          tabla: string;
+          registro_id: string;
+          accion: string;
+          usuario_id?: string | null;
+          datos_antes?: Record<string, unknown> | null;
+          datos_despues?: Record<string, unknown> | null;
+        };
         Update: never;
         Relationships: [];
       };
@@ -473,6 +480,72 @@ export interface Database {
           alias: string;
         };
         Update: Partial<Database["public"]["Tables"]["proveedor_alias_banco"]["Insert"]>;
+        Relationships: [];
+      };
+      usuarios_permisos: {
+        Row: {
+          usuario_id: string;
+          permiso_id: string;
+          efecto: string;
+          creado_en: string;
+          creado_por: string | null;
+        };
+        Insert: { usuario_id: string; permiso_id: string; efecto: string };
+        Update: Partial<Database["public"]["Tables"]["usuarios_permisos"]["Insert"]>;
+        Relationships: [];
+      };
+      retiro_caja: {
+        Row: {
+          id: string;
+          centro_id: string;
+          anio: number;
+          mes: number;
+          fecha: string;
+          control_caja: string | null;
+          monto: number;
+          motivo: string | null;
+          cajero: string | null;
+          caja: string | null;
+          huella: string;
+          estado: "pendiente" | "ingresado" | "na";
+          gasto_id: string | null;
+          nota: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          centro_id: string;
+          anio: number;
+          mes: number;
+          fecha: string;
+          monto: number;
+          huella: string;
+          control_caja?: string | null;
+          motivo?: string | null;
+          cajero?: string | null;
+          caja?: string | null;
+          estado?: string;
+          gasto_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["retiro_caja"]["Insert"]>;
+        Relationships: [];
+      };
+      panaderia_dato: {
+        Row: {
+          id: string;
+          centro_costo_id: string;
+          etiqueta: string;
+          valor: string | null;
+          nota: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: { centro_costo_id: string; etiqueta: string; valor?: string | null; nota?: string | null };
+        Update: Partial<Database["public"]["Tables"]["panaderia_dato"]["Insert"]>;
         Relationships: [];
       };
       costo_producto_vinculo: {
@@ -1311,6 +1384,294 @@ export interface Database {
       fn_planilla_neto: { Args: { p_planilla: string }; Returns: number };
       fn_anular_planilla: { Args: { p_planilla: string; p_motivo: string }; Returns: undefined };
       fn_descartar_planilla: { Args: { p_id: string }; Returns: undefined };
+      fn_guardar_panaderia_dato: {
+        Args: { p_id: string | null; p_centro: string; p_etiqueta: string; p_valor: string | null; p_nota: string | null };
+        Returns: string;
+      };
+      fn_borrar_panaderia_dato: { Args: { p_id: string }; Returns: undefined };
+      fn_pagar_gasto: { Args: { p_gasto: string; p_cuenta: string; p_fecha: string; p_monto: number }; Returns: string };
+      fn_anular_pago_gasto: { Args: { p_pago: string; p_motivo: string }; Returns: undefined };
+      fn_crear_rol: { Args: { p_nombre: string; p_descripcion: string | null; p_permisos: string[] }; Returns: string };
+      fn_editar_rol: { Args: { p_rol: string; p_nombre: string; p_descripcion: string | null; p_permisos: string[] }; Returns: undefined };
+      fn_cambiar_estado_rol: { Args: { p_rol: string; p_estado: string }; Returns: undefined };
+      fn_set_permisos_usuario: { Args: { p_usuario: string; p_conceder: string[]; p_revocar: string[] }; Returns: undefined };
+      fn_latido_sesion: { Args: Record<string, never>; Returns: undefined };
+      app_reporte_sesiones: {
+        Args: { p_usuario?: string | null; p_desde?: string | null; p_hasta?: string | null; p_limit?: number };
+        Returns: {
+          id: string;
+          usuario_id: string;
+          usuario_nombre: string | null;
+          dia: string;
+          dia_txt: string;
+          hora_inicio: string;
+          hora_fin: string;
+          duracion_min: number;
+          activa: boolean;
+          inicio: string;
+        }[];
+      };
+      app_sesiones_usuarios: { Args: Record<string, never>; Returns: { usuario_id: string; nombre_completo: string }[] };
+      fn_generar_cierre: { Args: { p_anio: number; p_mes: number }; Returns: string };
+      fn_marcar_item: { Args: { p_item: string; p_estado: string; p_nota?: string | null }; Returns: undefined };
+      fn_registrar_archivo_cierre: {
+        Args: { p_item: string; p_path: string; p_nombre: string; p_tamano: number | null; p_mime: string | null };
+        Returns: string;
+      };
+      fn_anular_archivo_cierre: { Args: { p_archivo: string }; Returns: undefined };
+      fn_cerrar_mes: { Args: { p_cierre: string; p_cerrar: boolean }; Returns: undefined };
+      fn_guardar_requisito: {
+        Args: {
+          p_id: string | null;
+          p_nombre: string;
+          p_grupo: string;
+          p_alcance: string;
+          p_auto: string;
+          p_centros: string[] | null;
+          p_requiere_archivo: boolean;
+          p_orden: number;
+        };
+        Returns: string;
+      };
+      fn_desactivar_requisito: { Args: { p_id: string; p_activo: boolean }; Returns: undefined };
+      app_listar_cierres: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          anio: number;
+          mes: number;
+          estado: "en_proceso" | "cerrado";
+          total: number;
+          listos: number;
+          pendientes: number;
+        }[];
+      };
+      app_cierre_detalle: {
+        Args: { p_anio: number; p_mes: number };
+        Returns: {
+          item_id: string;
+          requisito_id: string;
+          codigo: string;
+          nombre: string;
+          grupo: string;
+          orden: number;
+          alcance: "global" | "centro" | "cuenta_banco";
+          auto_fuente: "ventas" | "compras" | "planilla" | "conciliacion" | "retiros_caja" | "retiros_dep" | "salidas_vext" | null;
+          requiere_archivo: boolean;
+          centro_id: string | null;
+          centro_codigo: string | null;
+          cuenta_id: string | null;
+          cuenta_codigo: string | null;
+          cuenta_nombre: string | null;
+          estado_manual: "pendiente" | "listo" | "na";
+          nota: string | null;
+          auto_listo: boolean | null;
+          auto_n: number | null;
+          auto_monto: number | null;
+          auto_detalle: string | null;
+          estado_efectivo: "pendiente" | "listo" | "na";
+          n_archivos: number;
+        }[];
+      };
+      app_archivos_item: {
+        Args: { p_item: string };
+        Returns: { id: string; nombre: string; tamano: number | null; mime: string | null; path: string; subido_en: string }[];
+      };
+      app_archivo_path: { Args: { p_archivo: string }; Returns: string };
+      fn_importar_retiros: {
+        Args: { p_centro: string; p_anio: number; p_mes: number; p_filas: unknown };
+        Returns: { insertados: number; duplicados: number }[];
+      };
+      fn_marcar_retiro: { Args: { p_retiro: string; p_estado: string }; Returns: undefined };
+      fn_importar_retiros_dep: {
+        Args: { p_anio: number; p_mes: number; p_filas: unknown };
+        Returns: { insertados: number; duplicados: number }[];
+      };
+      app_listar_retiros_dep: {
+        Args: { p_anio: number; p_mes: number };
+        Returns: {
+          id: string;
+          fecha: string;
+          control_caja: string | null;
+          monto: number;
+          motivo: string | null;
+          cajero: string | null;
+          caja: string | null;
+          estado: "pendiente" | "ingresado" | "na";
+          mov_tipo: "gasto" | "pago" | null;
+          mov_desc: string | null;
+          asiento_id: string | null;
+          asiento_numero: number | null;
+          sug_gasto_id: string | null;
+          sug_fecha: string | null;
+          sug_desc: string | null;
+          sug_dif_dias: number | null;
+        }[];
+      };
+      fn_enlazar_retiro: { Args: { p_retiro: string; p_gasto: string }; Returns: undefined };
+      app_listar_retiros: {
+        Args: { p_centro: string; p_anio: number; p_mes: number };
+        Returns: {
+          id: string;
+          fecha: string;
+          control_caja: string | null;
+          monto: number;
+          motivo: string | null;
+          cajero: string | null;
+          caja: string | null;
+          estado: "pendiente" | "ingresado" | "na";
+          mov_tipo: "gasto" | "pago" | null;
+          mov_desc: string | null;
+          asiento_id: string | null;
+          asiento_numero: number | null;
+          sug_gasto_id: string | null;
+          sug_fecha: string | null;
+          sug_desc: string | null;
+          sug_dif_dias: number | null;
+        }[];
+      };
+      app_cxp_pendientes: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          proveedor_id: string;
+          proveedor_nombre: string;
+          fecha: string;
+          vence: string | null;
+          consecutivo: string | null;
+          saldo: number;
+        }[];
+      };
+      fn_enlazar_pago_retiro: { Args: { p_retiro: string; p_pago: string }; Returns: undefined };
+      fn_enlazar_planilla_retiro: { Args: { p_retiro: string; p_pago: string }; Returns: undefined };
+      fn_deshacer_retiro: { Args: { p_retiro: string; p_motivo?: string }; Returns: undefined };
+      fn_agregar_retiro_manual: {
+        Args: { p_fecha: string; p_monto: number; p_motivo: string | null; p_fuente: string };
+        Returns: string;
+      };
+      fn_borrar_retiro: { Args: { p_id: string }; Returns: undefined };
+      app_listar_retiros_ext: {
+        Args: { p_anio: number; p_mes: number };
+        Returns: {
+          id: string;
+          fecha: string;
+          control_caja: string | null;
+          monto: number;
+          motivo: string | null;
+          cajero: string | null;
+          caja: string | null;
+          estado: "pendiente" | "ingresado" | "na";
+          mov_tipo: "gasto" | "pago" | "planilla" | null;
+          mov_desc: string | null;
+          asiento_id: string | null;
+          asiento_numero: number | null;
+          sug_gasto_id: string | null;
+          sug_fecha: string | null;
+          sug_desc: string | null;
+          sug_dif_dias: number | null;
+        }[];
+      };
+      app_listar_clientes_ext: {
+        Args: Record<string, never>;
+        Returns: { id: string; nombre: string; orden: number; activo: boolean }[];
+      };
+      fn_guardar_cliente_ext: { Args: { p_id: string | null; p_nombre: string; p_orden: number }; Returns: string };
+      fn_desactivar_cliente_ext: { Args: { p_id: string; p_activo: boolean }; Returns: undefined };
+      fn_guardar_venta_ext: { Args: { p_cliente: string; p_fecha: string; p_monto: number }; Returns: undefined };
+      app_ventas_ext_mes: {
+        Args: { p_anio: number; p_mes: number };
+        Returns: { cliente_id: string; dia: number; monto: number }[];
+      };
+      fn_importar_ventas_ext: {
+        Args: { p_filas: unknown };
+        Returns: { celdas: number; clientes_nuevos: number }[];
+      };
+      app_salidas_ext_mes: {
+        Args: { p_anio: number; p_mes: number };
+        Returns: { id: string; fecha: string; descripcion: string | null; monto: number }[];
+      };
+      fn_guardar_salida_ext: {
+        Args: { p_id: string | null; p_fecha: string; p_descripcion: string | null; p_monto: number };
+        Returns: string;
+      };
+      fn_borrar_salida_ext: { Args: { p_id: string }; Returns: undefined };
+      app_planillas_pendientes: {
+        Args: Record<string, never>;
+        Returns: { id: string; titulo: string; fecha: string; neto: number; pagado: number; saldo: number }[];
+      };
+      fn_pagar_factura_caja_dif: {
+        Args: {
+          p_retiro: string;
+          p_cxp: string;
+          p_cuenta_caja: string;
+          p_monto_caja: number;
+          p_cuenta_dif: string | null;
+          p_centro_dif: string | null;
+        };
+        Returns: string;
+      };
+      app_listar_requisitos: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          grupo: string;
+          alcance: "global" | "centro" | "cuenta_banco";
+          auto_fuente: string | null;
+          centros: string[] | null;
+          requiere_archivo: boolean;
+          orden: number;
+          activo: boolean;
+        }[];
+      };
+      app_listar_roles: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          descripcion: string | null;
+          es_sistema: boolean;
+          estado: Estado;
+          n_permisos: number;
+          n_usuarios: number;
+        }[];
+      };
+      app_listar_permisos: {
+        Args: Record<string, never>;
+        Returns: { id: string; modulo: string; accion: string; codigo: string; descripcion: string | null }[];
+      };
+      app_permisos_rol: { Args: { p_rol: string }; Returns: { permiso_id: string }[] };
+      app_permisos_usuario: {
+        Args: { p_usuario: string };
+        Returns: { permiso_id: string; efecto: "conceder" | "revocar" }[];
+      };
+      app_listar_auditoria: {
+        Args: {
+          p_usuario?: string | null;
+          p_tabla?: string | null;
+          p_accion?: string | null;
+          p_desde?: string | null;
+          p_hasta?: string | null;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: {
+          id: number;
+          tabla: string;
+          registro_id: string;
+          accion: "insert" | "update" | "delete";
+          usuario_id: string | null;
+          usuario_nombre: string | null;
+          usuario_email: string | null;
+          datos_antes: Record<string, unknown> | null;
+          datos_despues: Record<string, unknown> | null;
+          ocurrido_en: string;
+        }[];
+      };
+      app_auditoria_tablas: { Args: Record<string, never>; Returns: { tabla: string; n: number }[] };
+      app_auditoria_usuarios: { Args: Record<string, never>; Returns: { usuario_id: string; nombre_completo: string }[] };
       fn_ligar_costo_producto: { Args: { p_codigo: string; p_producto_id: string; p_nombre: string }; Returns: undefined };
       fn_desligar_costo_producto: { Args: { p_codigo: string }; Returns: undefined };
       fn_asignar_alias_proveedor: { Args: { p_proveedor: string; p_alias: string }; Returns: string };
@@ -1638,6 +1999,7 @@ export interface Database {
       fn_desconciliar_linea: { Args: { p_linea: string }; Returns: undefined };
       fn_marcar_conciliada: { Args: { p_conciliacion: string }; Returns: undefined };
       fn_reabrir_conciliacion: { Args: { p_conciliacion: string }; Returns: undefined };
+      fn_agregar_lineas_conciliacion: { Args: { p_conciliacion: string; p_saldo_final: number; p_lineas: unknown }; Returns: number };
       fn_anular_conciliacion: { Args: { p_conciliacion: string; p_motivo: string }; Returns: undefined };
       fn_actualizar_gasto: {
         Args: {

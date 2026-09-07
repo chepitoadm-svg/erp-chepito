@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerPago, medioLabel } from "@/lib/data/compras";
@@ -35,7 +36,7 @@ export default async function PagoDetallePage({
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">{p.proveedor_nombre}</h1>
           <p className="text-sm text-neutral-500">
-            {p.fecha} · {medioLabel(p.medio_pago)} · {p.cuenta_codigo} {p.cuenta_nombre}
+            {fechaCR(p.fecha)} · {medioLabel(p.medio_pago)} · {p.cuenta_codigo} {p.cuenta_nombre}
             {p.referencia ? ` · ref. ${p.referencia}` : ""}
           </p>
           {p.glosa && <p className="text-xs text-neutral-400">{p.glosa}</p>}

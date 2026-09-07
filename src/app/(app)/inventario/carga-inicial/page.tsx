@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import {
@@ -101,7 +102,7 @@ export default async function CargaInicialPage() {
             )}
             {cargas.map((m) => (
               <tr key={m.id}>
-                <td className="px-4 py-3 text-neutral-600">{m.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(m.fecha)}</td>
                 <td className="px-4 py-3 font-mono text-xs text-neutral-700">{m.articulo_codigo}</td>
                 <td className="px-4 py-3 text-neutral-900">{m.articulo_nombre}</td>
                 <td className="px-4 py-3 text-neutral-600">{m.bodega_codigo}</td>

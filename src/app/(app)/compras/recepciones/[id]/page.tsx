@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerRecepcion } from "@/lib/data/compras";
@@ -39,7 +40,7 @@ export default async function RecepcionDetallePage({
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">{r.proveedor_nombre}</h1>
           <p className="text-sm text-neutral-500">
-            {r.fecha} · ingresa a {r.bodega_codigo}
+            {fechaCR(r.fecha)} · ingresa a {r.bodega_codigo}
             {r.glosa ? ` · ${r.glosa}` : ""}
           </p>
         </div>

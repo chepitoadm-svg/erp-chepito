@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarRecepciones } from "@/lib/data/compras";
@@ -56,7 +57,7 @@ export default async function RecepcionesPage() {
             )}
             {recepciones.map((r) => (
               <tr key={r.id}>
-                <td className="px-4 py-3 text-neutral-600">{r.fecha}</td>
+                <td className="px-4 py-3 text-neutral-600">{fechaCR(r.fecha)}</td>
                 <td className="px-4 py-3 text-neutral-900">{r.proveedor_nombre}</td>
                 <td className="px-4 py-3 text-neutral-600">{r.bodega_codigo}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{r.n_lineas}</td>

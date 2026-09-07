@@ -229,6 +229,47 @@ export async function flujoDetalle(cuentaId: string, desde: string, hasta: strin
   }));
 }
 
+// Igual que flujoDetalle pero EXPLOTADO a las líneas reales del estado de cuenta
+// (las "verdes"): un gasto agrupado que concilió N líneas del banco se ve como
+// esas N líneas, no como un solo movimiento. Suma el mismo número del flujo.
+export async function flujoDetalleBancario(
+  cuentaId: string,
+  desde: string,
+  hasta: string,
+): Promise<FlujoDetalleLinea[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_detalle_bancario_cuenta", {
+    p_cuenta: cuentaId,
+    p_desde: desde,
+    p_hasta: hasta,
+  });
+  if (error) throw new Error(`No se pudo cargar el detalle bancario: ${error.message}`);
+  const filas = (data ?? []) as {
+    centro_codigo: string;
+    fecha: string;
+    referencia: string | null;
+    descripcion: string | null;
+    monto: number;
+    conciliado: boolean;
+    origen_tipo: string | null;
+    origen_id: string | null;
+    asiento_id: string;
+  }[];
+  const aliases = await obtenerMapaAlias();
+  return filas.map((f) => ({
+    fecha: f.fecha,
+    referencia: f.referencia,
+    descripcion: f.descripcion,
+    monto: Number(f.monto),
+    proveedor_nombre: detectarProveedor(f.referencia, f.descripcion, aliases),
+    origen_tipo: f.origen_tipo,
+    tipo_label: f.origen_tipo ? (TIPO_LABEL[f.origen_tipo] ?? "Asiento") : "Banco",
+    centro_codigo: f.centro_codigo === "(sin centro)" ? null : f.centro_codigo,
+    asiento_id: f.asiento_id,
+    origen_id: f.origen_id,
+  }));
+}
+
 export interface DetalleBancarioLinea {
   fecha: string;
   referencia: string | null;

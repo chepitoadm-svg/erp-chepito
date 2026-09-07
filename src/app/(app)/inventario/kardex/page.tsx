@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarArticulosParaSelector, listarKardex } from "@/lib/data/inventario";
@@ -85,7 +86,7 @@ export default async function KardexPage({
               )}
               {movimientos.map((m) => (
                 <tr key={m.id}>
-                  <td className="px-4 py-3 text-neutral-600">{m.fecha}</td>
+                  <td className="px-4 py-3 text-neutral-600">{fechaCR(m.fecha)}</td>
                   <td className="px-4 py-3 text-neutral-600">{m.bodega_codigo}</td>
                   <td className="px-4 py-3 text-neutral-700">
                     {TIPO_ETIQUETA[m.tipo] ?? m.tipo}

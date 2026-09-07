@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarCxP, listarProveedoresDeCxP, type CxPFiltro, type CxPOrden } from "@/lib/data/compras";
@@ -199,7 +200,7 @@ export default async function CxPPage({ searchParams }: { searchParams: Promise<
               return (
                 <tr key={q.id}>
                   <td className="px-4 py-3 text-neutral-600">
-                    {q.fecha_vencimiento ?? "—"}
+                    {fechaCR(q.fecha_vencimiento) || "—"}
                     {vencida && <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600">vencida</span>}
                   </td>
                   <td className="px-4 py-3 text-neutral-900">{q.proveedor_nombre}</td>

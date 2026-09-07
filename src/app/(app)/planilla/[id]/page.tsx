@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerPlanilla, listarBancos, type PlanillaLinea, type Destino } from "@/lib/data/planilla";
@@ -13,7 +14,7 @@ const ESTADO_CLS: Record<string, string> = {
   anulada: "bg-red-50 text-red-700",
 };
 const neto = (l: PlanillaLinea) =>
-  l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.adelanto;
+  l.salario_base - l.rebajos + l.pago_adicional - l.ccss_obrero - l.embargo - l.adelanto;
 
 export default async function PlanillaDetallePage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await tienePermiso("gastos.registrar"))) redirect("/");
@@ -34,7 +35,7 @@ export default async function PlanillaDetallePage({ params }: { params: Promise<
       <div className="mt-1 mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-semibold text-neutral-900">{p.titulo ?? "Planilla"}</h1>
         <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[p.estado]}`}>{p.estado}</span>
-        <span className="text-sm text-neutral-400">{p.fecha}{p.quincena ? ` · ${p.quincena}ª quincena` : ""}</span>
+        <span className="text-sm text-neutral-400">{fechaCR(p.fecha)}{p.quincena ? ` · ${p.quincena}ª quincena` : ""}</span>
         <span className="text-sm text-neutral-400">Reparto Dividir: {p.reparto_ch1}% CH1 / {100 - p.reparto_ch1}% CH2</span>
       </div>
 
@@ -109,7 +110,7 @@ export default async function PlanillaDetallePage({ params }: { params: Promise<
             <tbody className="divide-y divide-neutral-100">
               {p.pagos.map((pg) => (
                 <tr key={pg.id} className={pg.estado === "anulado" ? "opacity-50" : ""}>
-                  <td className="px-4 py-2 text-neutral-600">{pg.fecha}</td>
+                  <td className="px-4 py-2 text-neutral-600">{fechaCR(pg.fecha)}</td>
                   <td className="px-4 py-2 text-neutral-700">
                     {pg.cuenta_codigo} · {pg.cuenta_nombre}
                   </td>

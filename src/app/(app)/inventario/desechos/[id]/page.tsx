@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerDesecho, motivoDesechoLabel } from "@/lib/data/inventario";
@@ -33,7 +34,7 @@ export default async function DesechoDetallePage({
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-neutral-900">
-            Desecho {d.centro_codigo} — {d.fecha}
+            Desecho {d.centro_codigo} — {fechaCR(d.fecha)}
           </h1>
           <p className="text-sm text-neutral-500">
             {d.centro_nombre} · {motivoDesechoLabel[d.motivo]}
