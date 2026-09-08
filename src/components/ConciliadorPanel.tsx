@@ -11,6 +11,7 @@ import {
   conciliarAutomatico,
   registrarAsientoBanco,
   registrarAsientoBancoGrupo,
+  registrarTrasladoBanco,
   type FormState,
 } from "@/app/(app)/tesoreria/conciliaciones/actions";
 import SelectBuscable, { type OpcionBuscable } from "@/components/SelectBuscable";
@@ -215,6 +216,7 @@ export default function ConciliadorPanel({
   lineas,
   movimientos,
   cuentas,
+  cuentasBanco,
   centros,
   editable,
   proveedores,
@@ -223,6 +225,7 @@ export default function ConciliadorPanel({
   lineas: LineaBanco[];
   movimientos: MovimientoLibro[];
   cuentas: OpcionBuscable[];
+  cuentasBanco: { id: string; codigo: string; nombre: string }[];
   centros: Centro[];
   editable: boolean;
   proveedores: { id: string; nombre: string }[];
@@ -239,6 +242,8 @@ export default function ConciliadorPanel({
   const [selBancoDoc, setSelBancoDoc] = useState<Set<string> | null>(null);
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
   const [stateG, formActionG, pendingG] = useActionState(registrarAsientoBancoGrupo, inicial);
+  const [stateT, formActionT, pendingT] = useActionState(registrarTrasladoBanco, inicial);
+  const [esTraslado, setEsTraslado] = useState(false);
   const router = useRouter();
   const [refrescando, startRefresh] = useTransition();
 
@@ -493,10 +498,9 @@ export default function ConciliadorPanel({
             </form>
           )}
 
-          {/* Registrar asiento del banco (comisión / interés / SINPE) — una línea */}
+          {/* Registrar asiento del banco (comisión / interés / SINPE / traslado) — una línea */}
           {editable && modoRegistrar && bancosSel.length === 1 && (
-            <form action={formAction} className="mb-4 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
-              <input type="hidden" name="linea_id" value={bancosSel[0].id} />
+            <div className="mb-4 rounded-lg border border-neutral-300 bg-neutral-50 p-3">
               <p className="mb-1 text-xs text-neutral-600">
                 Registrar{" "}
                 <span className="font-medium">
@@ -505,60 +509,125 @@ export default function ConciliadorPanel({
                 </span>{" "}
                 y conciliarlo.
               </p>
-              {bancosSel[0].debito > 0 && (
-                <p className="mb-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
-                  Si elegís una <b>cuenta de gasto</b>, se crea un <b>Gasto</b> (aparece en el auxiliar de Gastos), no un
-                  asiento suelto. Para eso elegí también el centro de costo.
-                </p>
+
+              {cuentasBanco.length > 0 && (
+                <label className="mb-2 flex items-center gap-2 text-xs text-neutral-700">
+                  <input type="checkbox" checked={esTraslado} onChange={(e) => setEsTraslado(e.target.checked)} className="h-3.5 w-3.5" />
+                  Es un <b>traslado</b> entre mis cuentas bancarias
+                </label>
               )}
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wide text-neutral-500">Cuenta de contrapartida</span>
-                  <SelectBuscable
-                    name="cuenta_contra_id"
-                    required
-                    placeholder="Buscá la cuenta (gasto, ingreso, comisión…)…"
-                    options={cuentas}
-                    className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+
+              {!esTraslado ? (
+                <form action={formAction}>
+                  <input type="hidden" name="linea_id" value={bancosSel[0].id} />
+                  {bancosSel[0].debito > 0 && (
+                    <p className="mb-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                      Si elegís una <b>cuenta de gasto</b>, se crea un <b>Gasto</b> (aparece en el auxiliar de Gastos), no un
+                      asiento suelto. Para eso elegí también el centro de costo.
+                    </p>
+                  )}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wide text-neutral-500">Cuenta de contrapartida</span>
+                      <SelectBuscable
+                        name="cuenta_contra_id"
+                        required
+                        placeholder="Buscá la cuenta (gasto, ingreso, comisión…)…"
+                        options={cuentas}
+                        className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wide text-neutral-500">Centro (si es cuenta de resultado)</span>
+                      <select
+                        name="centro_costo_id"
+                        defaultValue=""
+                        className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+                      >
+                        <option value="">— sin centro —</option>
+                        {centros.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.codigo} — {c.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    name="glosa"
+                    defaultValue={bancosSel[0].descripcion ?? ""}
+                    placeholder="Glosa"
+                    className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
                   />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-wide text-neutral-500">Centro (si es cuenta de resultado)</span>
-                  <select
-                    name="centro_costo_id"
-                    defaultValue=""
-                    className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
-                  >
-                    <option value="">— sin centro —</option>
-                    {centros.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.codigo} — {c.nombre}
+                  {state.error && <p className="mt-1 text-xs text-red-600">{state.error}</p>}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+                    >
+                      {pending ? "Registrando…" : "Crear y conciliar"}
+                    </button>
+                    <button type="button" onClick={() => setModoRegistrar(false)} className="px-2 py-1.5 text-xs text-neutral-500 hover:text-neutral-800">
+                      Cerrar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form action={formActionT}>
+                  <input type="hidden" name="linea_id" value={bancosSel[0].id} />
+                  <p className="mb-2 rounded bg-blue-50 px-2 py-1 text-[11px] text-blue-800">
+                    {bancosSel[0].debito > 0
+                      ? "Salió de ESTA cuenta y entró a la otra."
+                      : "Entró a ESTA cuenta; salió de la otra."}{" "}
+                    Se crea un asiento entre las dos cuentas y se concilia este lado. El otro lado se empareja solo si ya
+                    importaste ese estado de cuenta (si no, queda esperando).
+                  </p>
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                      {bancosSel[0].debito > 0 ? "Cuenta que RECIBE" : "Cuenta de donde SALIÓ"}
+                    </span>
+                    <select
+                      name="cuenta_otra_id"
+                      required
+                      defaultValue=""
+                      className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+                    >
+                      <option value="" disabled>
+                        Elegí la otra cuenta…
                       </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <input
-                type="text"
-                name="glosa"
-                defaultValue={bancosSel[0].descripcion ?? ""}
-                placeholder="Glosa"
-                className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
-              />
-              {state.error && <p className="mt-1 text-xs text-red-600">{state.error}</p>}
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
-                >
-                  {pending ? "Registrando…" : "Crear y conciliar"}
-                </button>
-                <button type="button" onClick={() => setModoRegistrar(false)} className="px-2 py-1.5 text-xs text-neutral-500 hover:text-neutral-800">
-                  Cerrar
-                </button>
-              </div>
-            </form>
+                      {cuentasBanco.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.codigo} — {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    name="glosa"
+                    defaultValue={bancosSel[0].descripcion ?? ""}
+                    placeholder="Glosa"
+                    className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+                  />
+                  {stateT.error && <p className="mt-1 text-xs text-red-600">{stateT.error}</p>}
+                  {stateT.ok && <p className="mt-1 text-xs text-green-700">{stateT.ok}</p>}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={pendingT}
+                      className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+                    >
+                      {pendingT ? "Registrando…" : "Registrar traslado"}
+                    </button>
+                    <button type="button" onClick={() => setModoRegistrar(false)} className="px-2 py-1.5 text-xs text-neutral-500 hover:text-neutral-800">
+                      Cerrar
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
 
           {/* Dos columnas: libros | banco */}

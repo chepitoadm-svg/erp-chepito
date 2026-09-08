@@ -2,7 +2,7 @@ import Link from "next/link";
 import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { obtenerConciliacion } from "@/lib/data/conciliaciones";
+import { obtenerConciliacion, listarCuentasBanco } from "@/lib/data/conciliaciones";
 import { listarCuentasPosteables, listarCentrosCosto } from "@/lib/data/asientos";
 import { listarProveedoresActivos } from "@/lib/data/compras";
 import { marcarConciliada, reabrirConciliacion } from "../actions";
@@ -22,13 +22,18 @@ const ESTADO_CLS: Record<string, string> = {
 export default async function ConciliacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await tienePermiso("tesoreria.conciliar"))) redirect("/");
   const { id } = await params;
-  const [c, cuentasRaw, centros, proveedoresRaw] = await Promise.all([
+  const [c, cuentasRaw, centros, proveedoresRaw, cuentasBancoRaw] = await Promise.all([
     obtenerConciliacion(id),
     listarCuentasPosteables(),
     listarCentrosCosto(),
     listarProveedoresActivos(),
+    listarCuentasBanco(),
   ]);
   if (!c) notFound();
+  // Otras cuentas bancarias (para traslados entre cuentas): todas menos esta.
+  const cuentasBanco = cuentasBancoRaw
+    .filter((x) => x.id !== c.cuenta_id)
+    .map((x) => ({ id: x.id, codigo: x.codigo, nombre: x.nombre }));
   const proveedores = (proveedoresRaw as { id: string; nombre: string }[]).map((p) => ({
     id: p.id,
     nombre: p.nombre,
@@ -101,6 +106,7 @@ export default async function ConciliacionDetallePage({ params }: { params: Prom
         lineas={c.lineas}
         movimientos={c.movimientos_sin_conciliar}
         cuentas={cuentas}
+        cuentasBanco={cuentasBanco}
         centros={centros}
         editable={editable}
         proveedores={proveedores}

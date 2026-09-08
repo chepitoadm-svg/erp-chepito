@@ -328,6 +328,101 @@ export async function registrarAsientoBanco(_prev: FormState, formData: FormData
   return { ok: "Asiento registrado y conciliado." };
 }
 
+// TRASLADO entre dos cuentas bancarias propias, desde la conciliación. Crea UN
+// asiento (Debe la que recibe / Haber la que envía), concilia esta línea y, si
+// la línea espejo ya está importada en la otra cuenta, la concilia también.
+export async function registrarTrasladoBanco(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("tesoreria.conciliar");
+  const lineaId = String(formData.get("linea_id") ?? "");
+  const otra = String(formData.get("cuenta_otra_id") ?? "");
+  const glosa = String(formData.get("glosa") ?? "").trim();
+  if (!otra) return { error: "Elegí la otra cuenta del traslado." };
+
+  const supabase = await createClient();
+  const { data: linea } = await supabase
+    .from("estado_cuenta_lineas")
+    .select("id, fecha, debito, credito, descripcion, conciliacion:conciliaciones_banco(cuenta_id)")
+    .eq("id", lineaId)
+    .single();
+  if (!linea) return { error: "Línea del banco inexistente." };
+  const l = linea as unknown as {
+    fecha: string;
+    debito: number;
+    credito: number;
+    descripcion: string | null;
+    conciliacion: { cuenta_id: string } | { cuenta_id: string }[];
+  };
+  const banco = Array.isArray(l.conciliacion) ? l.conciliacion[0]?.cuenta_id : l.conciliacion?.cuenta_id;
+  if (!banco) return { error: "No pude identificar la cuenta del banco." };
+  if (otra === banco) return { error: "Elegí una cuenta distinta a la de esta conciliación." };
+
+  const entra = Number(l.credito) > 0; // crédito en ESTA cuenta = recibió plata
+  const monto = entra ? Number(l.credito) : Number(l.debito);
+  if (!(monto > 0)) return { error: "La línea no tiene monto." };
+
+  // Debe la que recibe / Haber la que envía. Sin centro (son cuentas de balance).
+  const lineaEsta = entra
+    ? { cuenta_id: banco, debito: monto, detalle: "Traslado (recibe)" }
+    : { cuenta_id: banco, credito: monto, detalle: "Traslado (envía)" };
+  const lineaOtra = entra
+    ? { cuenta_id: otra, credito: monto, detalle: "Traslado (envía)" }
+    : { cuenta_id: otra, debito: monto, detalle: "Traslado (recibe)" };
+
+  const { data: asientoId, error } = await supabase.rpc("app_crear_asiento", {
+    p_tipo: "diario",
+    p_fecha: l.fecha,
+    p_glosa: glosa || l.descripcion || "Traslado entre cuentas",
+    p_lineas: [lineaEsta, lineaOtra],
+    p_confirmar: true,
+  });
+  if (error || !asientoId) return { error: limpiar(error?.message ?? "No se pudo crear el asiento.") };
+
+  // Conciliar ESTA línea con su lado del asiento.
+  const { data: alEsta } = await supabase
+    .from("asientos_lineas").select("id").eq("asiento_id", asientoId).eq("cuenta_id", banco).single();
+  if (alEsta?.id) {
+    const { error: e2 } = await supabase.rpc("fn_conciliar_linea", { p_linea: lineaId, p_asiento_linea: alEsta.id });
+    if (e2) return { error: limpiar(e2.message) };
+  }
+
+  // Buscar la línea espejo en la OTRA cuenta: signo opuesto, mismo monto, ±7 días,
+  // pendiente. Si esta cuenta recibió (crédito), la otra envió (débito), y viceversa.
+  let espejoConciliada = false;
+  const t = new Date(l.fecha).getTime();
+  const desde = new Date(t - 7 * 864e5).toISOString().slice(0, 10);
+  const hasta = new Date(t + 7 * 864e5).toISOString().slice(0, 10);
+  const colEspejo = entra ? "debito" : "credito";
+  const { data: concs } = await supabase.from("conciliaciones_banco").select("id").eq("cuenta_id", otra);
+  const concIds = (concs ?? []).map((x) => (x as { id: string }).id);
+  if (concIds.length) {
+    const { data: espejos } = await supabase
+      .from("estado_cuenta_lineas")
+      .select("id, fecha")
+      .in("conciliacion_id", concIds)
+      .eq("estado", "pendiente")
+      .eq(colEspejo, monto)
+      .gte("fecha", desde)
+      .lte("fecha", hasta);
+    const cand = (espejos ?? []) as { id: string; fecha: string }[];
+    if (cand.length) {
+      cand.sort((a, b) => Math.abs(+new Date(a.fecha) - t) - Math.abs(+new Date(b.fecha) - t));
+      const { data: alOtra } = await supabase
+        .from("asientos_lineas").select("id").eq("asiento_id", asientoId).eq("cuenta_id", otra).single();
+      if (alOtra?.id) {
+        const { error: e3 } = await supabase.rpc("fn_conciliar_linea", { p_linea: cand[0].id, p_asiento_linea: alOtra.id });
+        if (!e3) espejoConciliada = true;
+      }
+    }
+  }
+
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
+  return {
+    ok: espejoConciliada
+      ? "Traslado registrado y conciliado en ambas cuentas."
+      : "Traslado registrado y conciliado en esta cuenta. El otro lado se emparejará cuando conciliés la otra cuenta.",
+  };
+}
+
 // Liga un identificador del estado de cuenta con un proveedor (agenda bancaria).
 // Genera UN asiento que agrupa VARIAS líneas del banco contra una sola cuenta de
 // libros (ej. varios depósitos de ventas → una cuenta de ventas), y concilia todas.
