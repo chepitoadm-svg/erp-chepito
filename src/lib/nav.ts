@@ -12,6 +12,7 @@ export type IconKey =
   | "costos"
   | "cierre"
   | "reportes"
+  | "analisis"
   | "planilla"
   | "usuarios"
   | "perfiles"
@@ -53,6 +54,12 @@ export const NAV: NavEntry[] = [
       { label: "Costos", href: "/costos", desc: "Costo de ventas del mes.", icon: "costos" },
       { label: "Cierre", href: "/cierre", desc: "Checklist de cierre mensual.", icon: "cierre" },
       { label: "Reportes", href: "/reportes", desc: "Flujo, resultados, balance y mayor.", icon: "reportes" },
+    ],
+  },
+  {
+    label: "Análisis",
+    items: [
+      { label: "Ventas y rentabilidad", href: "/analisis/ventas", desc: "Ventas, margen y utilidad por sucursal, comparativos y tendencia.", icon: "analisis" },
     ],
   },
   { label: "Planilla", href: "/planilla", icon: "planilla" },

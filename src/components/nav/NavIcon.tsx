@@ -53,6 +53,13 @@ const PATHS: Record<IconKey, React.ReactNode> = {
       <path d="M8 20v-6M12 20v-10M16 20v-4" />
     </>
   ),
+  analisis: (
+    <>
+      <path d="M4 19V5" />
+      <path d="M4 15l4-4 3 3 6-7" />
+      <path d="M17 7h3v3" />
+    </>
+  ),
   planilla: (
     <>
       <circle cx="9" cy="8" r="3" />
