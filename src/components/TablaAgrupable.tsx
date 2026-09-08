@@ -98,27 +98,30 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
           const key = e.dataTransfer.getData("text/col");
           if (key) agregar(key);
         }}
-        className={`mb-2 flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs ${
-          arrastreOver ? "border-neutral-500 bg-neutral-50" : "border-neutral-300"
+        className={`mb-2 flex flex-wrap items-center gap-2 rounded-md px-3 py-2 text-xs text-neutral-200 ${
+          arrastreOver ? "bg-neutral-600 ring-1 ring-inset ring-neutral-400" : "bg-neutral-700"
         }`}
       >
+        <span aria-hidden className="text-sm leading-none text-neutral-400">
+          ▦
+        </span>
         {agrupado.length === 0 ? (
-          <span className="text-neutral-400">Arrastrá una columna acá (o tocala) para agrupar por ella.</span>
+          <span className="text-neutral-300">Arrastrá una columna acá (o tocala) para agrupar por dicha columna.</span>
         ) : (
           <>
-            <span className="text-neutral-500">Agrupado por:</span>
+            <span className="text-neutral-400">Agrupado por:</span>
             {agrupado.map((key, i) => (
               <span key={key} className="flex items-center gap-1">
-                {i > 0 && <span className="text-neutral-300">›</span>}
-                <span className="flex items-center gap-1 rounded-full border border-neutral-300 bg-white px-2 py-0.5">
+                {i > 0 && <span className="text-neutral-500">›</span>}
+                <span className="flex items-center gap-1 rounded-full border border-neutral-500 bg-neutral-800 px-2 py-0.5 text-neutral-100">
                   {colDe(key).titulo}
-                  <button onClick={() => quitar(key)} className="text-neutral-400 hover:text-red-600" title="Quitar">
+                  <button onClick={() => quitar(key)} className="text-neutral-400 hover:text-red-400" title="Quitar">
                     ✕
                   </button>
                 </span>
               </span>
             ))}
-            <button onClick={() => setAgrupado([])} className="ml-1 text-neutral-400 underline hover:text-neutral-900">
+            <button onClick={() => setAgrupado([])} className="ml-1 text-neutral-300 underline hover:text-white">
               limpiar
             </button>
           </>
