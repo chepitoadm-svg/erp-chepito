@@ -24,12 +24,12 @@ export default function ImportarMasBanco({ conciliacionId }: { conciliacionId: s
       >
         <input type="hidden" name="id" value={conciliacionId} />
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
-          Estado de cuenta (.xls del BAC) — podés subirlo por partes
+          Estado de cuenta (.xls del BAC o .pdf del Popular) — podés subirlo por partes
           <input
             type="file"
             name="archivo"
             required
-            accept=".xls,.xlsx"
+            accept=".xls,.xlsx,.pdf"
             className="w-full max-w-md rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none file:mr-3 file:rounded file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:text-neutral-700 hover:file:bg-neutral-200"
           />
         </label>

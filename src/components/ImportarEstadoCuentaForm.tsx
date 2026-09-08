@@ -34,12 +34,12 @@ export default function ImportarEstadoCuentaForm({ cuentas, hoy }: { cuentas: Cu
       </div>
 
       <label className="block">
-        <span className="text-xs uppercase tracking-wide text-neutral-500">Estado de cuenta (.xls del BAC)</span>
+        <span className="text-xs uppercase tracking-wide text-neutral-500">Estado de cuenta (.xls del BAC o .pdf del Popular)</span>
         <input
           type="file"
           name="archivo"
           required
-          accept=".xls,.xlsx"
+          accept=".xls,.xlsx,.pdf"
           className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none file:mr-3 file:rounded file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:text-neutral-700 hover:file:bg-neutral-200"
         />
       </label>
