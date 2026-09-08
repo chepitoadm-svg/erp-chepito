@@ -1,32 +1,12 @@
 import Link from "next/link";
-import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarFacturas, listarProveedoresDeFacturas, type FacturasFiltro } from "@/lib/data/compras";
 import { listarCentrosCosto } from "@/lib/data/asientos";
-import { numeroFactura } from "@/lib/compras/numeroFactura";
+import ComprasFacturasTabla from "@/components/ComprasFacturasTabla";
 
 const fmt = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const ESTADO_CLS: Record<string, string> = {
-  borrador: "bg-neutral-100 text-neutral-600",
-  confirmada: "bg-green-50 text-green-700",
-  anulada: "bg-red-50 text-red-700",
-};
-
-const PAGO_CLS: Record<string, string> = {
-  pagada: "bg-green-50 text-green-700",
-  vencida: "bg-red-50 text-red-700",
-  pendiente: "bg-amber-50 text-amber-700",
-  na: "bg-neutral-100 text-neutral-400",
-};
-const PAGO_LBL: Record<string, string> = {
-  pagada: "Pagada",
-  vencida: "Vencida",
-  pendiente: "Pendiente",
-  na: "—",
-};
 
 type SP = { proveedor?: string; desde?: string; hasta?: string; centro?: string; estado?: string; pago?: string };
 
@@ -185,119 +165,30 @@ export default async function FacturasPage({ searchParams }: { searchParams: Pro
         </div>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-        <table className="w-full min-w-[980px] text-sm">
-          <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-            <tr>
-              <th className="px-4 py-3 font-medium">Emisión</th>
-              <th className="px-4 py-3 font-medium">Vence</th>
-              <th className="px-4 py-3 font-medium">Proveedor</th>
-              <th className="px-4 py-3 font-medium">Factura</th>
-              <th className="px-4 py-3 font-medium">Centro</th>
-              <th className="px-4 py-3 text-right font-medium">Líneas</th>
-              <th className="px-4 py-3 text-right font-medium">Total</th>
-              <th className="px-4 py-3 font-medium">Pago</th>
-              <th className="px-4 py-3 font-medium">Estado</th>
-              <th className="px-4 py-3 text-right" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {facturas.length === 0 && (
-              <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-neutral-400">
-                  {hayFiltro ? "Ninguna factura coincide con los filtros." : "Todavía no hay facturas."}
-                </td>
-              </tr>
-            )}
-            {facturas.map((f) => (
-              <tr key={f.id}>
-                <td className="px-4 py-3 text-neutral-600">{fechaCR(f.fecha_emision)}</td>
-                <td className={`px-4 py-3 ${f.pago === "vencida" ? "font-medium text-red-600" : "text-neutral-500"}`}>
-                  {fechaCR(f.fecha_vencimiento) || "—"}
-                </td>
-                <td className="px-4 py-3 text-neutral-900">{f.proveedor_nombre}</td>
-                <td className="px-4 py-3 font-mono text-xs text-neutral-500">
-                  {numeroFactura(f.clave) ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-neutral-600">
-                  {f.centro_codigo ? (
-                    <span title={f.centro_nombre ?? ""}>{f.centro_codigo}</span>
-                  ) : (
-                    <span className="text-neutral-300">— inventario</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-600">{f.n_lineas}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-900">{fmt(f.total)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className={`w-fit rounded-full px-2 py-0.5 text-xs ${PAGO_CLS[f.pago]}`}>
-                      {PAGO_LBL[f.pago]}
-                    </span>
-                    {f.pago_ids.length > 0 && (
-                      <Link
-                        href={
-                          f.pago_ids.length === 1
-                            ? `/compras/pagos/${f.pago_ids[0]}`
-                            : `/compras/facturas/${f.id}`
-                        }
-                        className="text-xs text-neutral-500 underline hover:text-neutral-900"
-                      >
-                        ver pago{f.pago_ids.length > 1 ? "s" : ""}
-                      </Link>
-                    )}
-                    {f.pago === "vencida" && f.cxp_saldo != null && (
-                      <span className="text-xs text-red-500">debe ₡{fmt(f.cxp_saldo)}</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[f.estado]}`}>
-                    {f.estado}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    href={`/compras/facturas/${f.id}`}
-                    className="text-neutral-600 hover:text-neutral-900"
-                  >
-                    Ver
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          {facturas.length > 0 && (
-            <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm text-neutral-700">
-              <tr>
-                <td className="px-4 py-2 text-xs font-normal text-neutral-500" colSpan={10}>
-                  {vivas.length} factura{vivas.length !== 1 ? "s" : ""} (sin anuladas)
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-1 text-right text-xs text-neutral-500" colSpan={6}>
-                  Base sin IVA
-                </td>
-                <td className="px-4 py-1 text-right tabular-nums">{fmt(totBase)}</td>
-                <td className="px-4 py-1" colSpan={3} />
-              </tr>
-              <tr>
-                <td className="px-4 py-1 text-right text-xs text-neutral-500" colSpan={6}>
-                  IVA
-                </td>
-                <td className="px-4 py-1 text-right tabular-nums text-neutral-600">{fmt(totIva)}</td>
-                <td className="px-4 py-1" colSpan={3} />
-              </tr>
-              <tr className="border-t border-neutral-200 font-semibold">
-                <td className="px-4 py-2 text-right text-xs font-normal text-neutral-500" colSpan={6}>
-                  Total con IVA
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmt(total)}</td>
-                <td className="px-4 py-2" colSpan={3} />
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
+      {facturas.length === 0 && !hayFiltro ? (
+        <div className="rounded-lg border border-neutral-200 bg-white px-4 py-8 text-center text-neutral-400">
+          Todavía no hay facturas.
+        </div>
+      ) : (
+        <ComprasFacturasTabla facturas={facturas} />
+      )}
+
+      {facturas.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
+          <span className="text-xs text-neutral-500">
+            {vivas.length} factura{vivas.length !== 1 ? "s" : ""} (sin anuladas)
+          </span>
+          <span>
+            Base sin IVA <strong className="tabular-nums">{fmt(totBase)}</strong>
+          </span>
+          <span>
+            IVA <strong className="tabular-nums">{fmt(totIva)}</strong>
+          </span>
+          <span>
+            Total con IVA <strong className="tabular-nums">{fmt(total)}</strong>
+          </span>
+        </div>
+      )}
 
       {facturas.length > 0 && (
         <p className="mt-3 text-xs text-neutral-500">
