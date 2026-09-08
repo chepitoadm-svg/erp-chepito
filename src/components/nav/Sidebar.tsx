@@ -102,9 +102,11 @@ export default function Sidebar({
 
       {/* Módulos */}
       <nav className="flex-1 overflow-y-auto px-2 pb-2">
-        {grupos.map((g) => (
-          <div key={g.label} className="mb-1">
-            {g.label !== "​" && (
+        {grupos.map((g) => {
+          const esDirecto = g.label === "​";
+          return (
+          <div key={g.label} className={esDirecto ? "mb-1 mt-2 border-t border-neutral-200 pt-2" : "mb-1"}>
+            {!esDirecto && (
               <div className="px-2 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
                 {g.label}
               </div>
@@ -130,7 +132,8 @@ export default function Sidebar({
               );
             })}
           </div>
-        ))}
+          );
+        })}
         {visibles.length === 0 && (
           <div className="px-2 py-4 text-center text-sm text-neutral-400">Nada que coincida.</div>
         )}
