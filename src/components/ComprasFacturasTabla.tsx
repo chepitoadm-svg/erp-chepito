@@ -37,6 +37,8 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
       grupo: (f) => fechaCR(f.fecha_emision),
       celda: (f) => <span className="text-neutral-600">{fechaCR(f.fecha_emision)}</span>,
     },
+    { key: "mes", titulo: "Mes", soloGrupo: true, grupo: (f) => f.fecha_emision.slice(0, 7), celda: () => null },
+    { key: "anio", titulo: "Año", soloGrupo: true, grupo: (f) => f.fecha_emision.slice(0, 4), celda: () => null },
     {
       key: "vence",
       titulo: "Vence",

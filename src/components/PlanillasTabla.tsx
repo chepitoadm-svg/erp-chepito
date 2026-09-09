@@ -28,6 +28,8 @@ export default function PlanillasTabla({ planillas }: { planillas: PlanillaLista
       grupo: (p) => p.titulo ?? "—",
       celda: (p) => <span className="text-neutral-800">{p.titulo ?? "—"}</span>,
     },
+    { key: "mes", titulo: "Mes", soloGrupo: true, grupo: (p) => p.fecha.slice(0, 7), celda: () => null },
+    { key: "anio", titulo: "Año", soloGrupo: true, grupo: (p) => p.fecha.slice(0, 4), celda: () => null },
     {
       key: "colab",
       titulo: "Colab.",

@@ -21,6 +21,8 @@ export default function ConciliacionesTabla({ filas }: { filas: ConciliacionList
       grupo: (c) => fechaCR(c.fecha_corte),
       celda: (c) => <span className="text-neutral-600">{fechaCR(c.fecha_corte)}</span>,
     },
+    { key: "mes", titulo: "Mes", soloGrupo: true, grupo: (c) => c.fecha_corte.slice(0, 7), celda: () => null },
+    { key: "anio", titulo: "Año", soloGrupo: true, grupo: (c) => c.fecha_corte.slice(0, 4), celda: () => null },
     {
       key: "cuenta",
       titulo: "Cuenta",

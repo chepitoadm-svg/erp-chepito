@@ -27,6 +27,8 @@ export default function VentasTabla({ ventas }: { ventas: VentaDiaListado[] }) {
       grupo: (v) => v.centro_codigo ?? "—",
       celda: (v) => <span className="text-neutral-800">{v.centro_codigo ?? "—"}</span>,
     },
+    { key: "mes", titulo: "Mes", soloGrupo: true, grupo: (v) => v.fecha.slice(0, 7), celda: () => null },
+    { key: "anio", titulo: "Año", soloGrupo: true, grupo: (v) => v.fecha.slice(0, 4), celda: () => null },
     // Los subtotales excluyen las anuladas (la fila igual muestra su monto real).
     { key: "gravado", titulo: "Gravado", align: "right", monto: (v) => (v.estado === "anulado" ? 0 : v.gravado), celda: (v) => <span className="text-neutral-600">{money(v.gravado)}</span> },
     { key: "exento", titulo: "Exento", align: "right", monto: (v) => (v.estado === "anulado" ? 0 : v.exento), celda: (v) => <span className="text-neutral-600">{money(v.exento)}</span> },

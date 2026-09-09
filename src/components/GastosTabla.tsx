@@ -54,6 +54,8 @@ export default function GastosTabla({
       grupo: (g) => g.centro_codigo ?? "—",
       celda: (g) => <span className="text-neutral-800">{g.centro_codigo ?? "—"}</span>,
     },
+    { key: "mes", titulo: "Mes", soloGrupo: true, grupo: (g) => g.fecha.slice(0, 7), celda: () => null },
+    { key: "anio", titulo: "Año", soloGrupo: true, grupo: (g) => g.fecha.slice(0, 4), celda: () => null },
     {
       key: "cuenta",
       titulo: "Cuenta",

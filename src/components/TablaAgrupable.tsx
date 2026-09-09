@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const money = (n: number) => n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -17,6 +17,9 @@ export interface ColumnaTabla<T> {
   fmt?: (n: number) => string;
   /** Ancho mínimo opcional para la columna. */
   th?: string;
+  /** Solo para agrupar: no se muestra como columna, pero se puede agregar a la
+   *  barra de agrupado (ej. "Mes", "Año"). */
+  soloGrupo?: boolean;
 }
 
 interface Props<T> {
@@ -29,11 +32,13 @@ interface Props<T> {
 
 export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth = "min-w-[720px]", vacio }: Props<T>) {
   const agrupables = columnas.filter((c) => c.grupo);
+  const visibles = columnas.filter((c) => !c.soloGrupo);
   const [agrupado, setAgrupado] = useState<string[]>([]);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [arrastreOver, setArrastreOver] = useState(false);
 
   const colDe = (key: string) => columnas.find((c) => c.key === key)!;
+  const noAgrupadas = agrupables.filter((c) => !agrupado.includes(c.key));
 
   const agregar = (key: string) => {
     const c = colDe(key);
@@ -50,7 +55,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
 
   const subtotales = (rows: T[]) => {
     const r: Record<string, number> = {};
-    for (const c of columnas) if (c.monto) r[c.key] = rows.reduce((s, x) => s + c.monto!(x), 0);
+    for (const c of visibles) if (c.monto) r[c.key] = rows.reduce((s, x) => s + c.monto!(x), 0);
     return r;
   };
   const totalGeneral = useMemo(() => subtotales(filas), [filas, columnas]);
@@ -106,7 +111,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
           ▦
         </span>
         {agrupado.length === 0 ? (
-          <span className="text-neutral-300">Arrastrá una columna acá (o tocala) para agrupar por dicha columna.</span>
+          <span className="text-neutral-300">Arrastrá una columna acá para agrupar, o tocá una de:</span>
         ) : (
           <>
             <span className="text-neutral-400">Agrupado por:</span>
@@ -124,15 +129,28 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
             <button onClick={() => setAgrupado([])} className="ml-1 text-neutral-300 underline hover:text-white">
               limpiar
             </button>
+            {noAgrupadas.length > 0 && <span className="ml-1 text-neutral-500">agregar:</span>}
           </>
         )}
+        {/* Chips para agregar una columna de agrupado con un clic (incluye las
+            "solo para agrupar" como Mes / Año). */}
+        {noAgrupadas.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => agregar(c.key)}
+            className="rounded-full border border-neutral-500 px-2 py-0.5 text-neutral-200 hover:bg-neutral-600"
+            title={`Agrupar por ${c.titulo}`}
+          >
+            {c.titulo}
+          </button>
+        ))}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className={`w-full ${minWidth} text-sm`}>
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {columnas.map((c) => (
+              {visibles.map((c) => (
                 <th
                   key={c.key}
                   draggable={!!c.grupo}
@@ -153,14 +171,14 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
           <tbody className="divide-y divide-neutral-100">
             {filas.length === 0 ? (
               <tr>
-                <td colSpan={columnas.length} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={visibles.length} className="px-4 py-8 text-center text-neutral-400">
                   {vacio ?? "Sin datos."}
                 </td>
               </tr>
             ) : agrupado.length === 0 ? (
               filas.map((row) => (
                 <tr key={claveFila(row)}>
-                  {columnas.map((c) => (
+                  {visibles.map((c) => (
                     <td key={c.key} className={`px-4 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}>
                       {c.celda(row)}
                     </td>
@@ -171,7 +189,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
               entries.map((e, idx) =>
                 e.t === "g" ? (
                   <tr key={`g${idx}`} className="bg-neutral-50/70">
-                    {columnas.map((c, ci) => (
+                    {visibles.map((c, ci) => (
                       <td
                         key={c.key}
                         className={`px-4 py-2 text-sm ${c.align === "right" ? "text-right tabular-nums font-semibold text-neutral-900" : ""}`}
@@ -194,7 +212,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
                   </tr>
                 ) : (
                   <tr key={claveFila(e.row)}>
-                    {columnas.map((c, ci) => (
+                    {visibles.map((c, ci) => (
                       <td
                         key={c.key}
                         className={`px-4 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}
@@ -212,7 +230,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
           {filas.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-neutral-300 bg-neutral-50">
-                {columnas.map((c, ci) => (
+                {visibles.map((c, ci) => (
                   <td key={c.key} className={`px-4 py-2 text-sm ${c.align === "right" ? "text-right font-bold tabular-nums text-neutral-900" : ""}`}>
                     {ci === 0 ? (
                       <span className="font-semibold text-neutral-700">Total ({filas.length})</span>
@@ -226,12 +244,6 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
           )}
         </table>
       </div>
-
-      {agrupables.length > 0 && agrupado.length === 0 && (
-        <p className="mt-1 text-xs text-neutral-400">
-          Columnas agrupables: {agrupables.map((c) => c.titulo).join(" · ")}.
-        </p>
-      )}
     </div>
   );
 }
