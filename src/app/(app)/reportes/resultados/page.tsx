@@ -34,13 +34,15 @@ export default async function ResultadosPage({
   ]);
   // código de cuenta -> id, para enlazar cada celda al Libro Mayor (drill-down).
   const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
+  // Al tocar una celda se ve el DETALLE de la cuenta (los ítems con su
+  // descripción real), no la vista contable de asientos.
   const hrefMayor = (cod: string, centro: string) => {
     const id = codToId.get(cod);
     if (!id) return null;
     const p = new URLSearchParams({ cuenta: id, desde, hasta });
     if (centro !== "TOTAL") p.set("centro", centro);
     if (!conProrrateo) p.set("prorrateo", "no");
-    return `/reportes/mayor?${p.toString()}`;
+    return `/reportes/detalle-cuenta?${p.toString()}`;
   };
 
   const centros = Array.from(new Set(filas.map((f) => f.centro_codigo))).sort();
@@ -139,7 +141,7 @@ export default async function ResultadosPage({
                     <Link
                       href={href}
                       className="text-neutral-600 underline decoration-dotted underline-offset-2 hover:text-neutral-900"
-                      title="Ver el detalle en el Libro Mayor"
+                      title="Ver el detalle de esta cuenta (los ítems)"
                     >
                       {txt}
                     </Link>

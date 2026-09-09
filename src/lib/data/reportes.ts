@@ -325,6 +325,62 @@ export async function detalleBancarioCuenta(cuentaId: string, desde: string, has
   return [...m.values()].sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
 }
 
+export interface DetalleCuentaLinea {
+  fecha: string;
+  descripcion: string; // descripción real del ítem (gasto/factura), no la glosa genérica
+  centro_codigo: string | null;
+  origen_tipo: string | null;
+  origen_id: string | null;
+  asiento_id: string;
+  asiento_numero: number | null;
+  monto: number; // débito - crédito (neto)
+}
+
+// Detalle "legible" de una cuenta: los ítems que la componen con su descripción
+// real (ej. el gasto "licencia ncq"), para el drill-down del Estado de Resultados.
+// No es la vista contable del Mayor. Excluye anulados y (opcional) prorrateo.
+export async function detalleCuenta(
+  cuentaId: string,
+  desde?: string,
+  hasta?: string,
+  sinProrrateo = false,
+): Promise<DetalleCuentaLinea[]> {
+  const movs = (await mayorCuenta(cuentaId, desde, hasta, sinProrrateo, true)) as {
+    fecha: string;
+    asiento_id: string;
+    asiento_numero: number | null;
+    glosa: string | null;
+    centro_codigo: string | null;
+    origen_tipo: string | null;
+    origen_id: string | null;
+    debito: number;
+    credito: number;
+  }[];
+
+  // Enriquecer con la descripción real del gasto (la glosa del asiento suele ser
+  // genérica, "Gasto"). Para facturas y otros orígenes se usa la glosa.
+  const supabase = await createClient();
+  const gastoIds = [...new Set(movs.filter((m) => m.origen_tipo === "gasto" && m.origen_id).map((m) => m.origen_id as string))];
+  const desc = new Map<string, string>();
+  if (gastoIds.length) {
+    const { data } = await supabase.from("gastos").select("id, descripcion").in("id", gastoIds);
+    ((data ?? []) as { id: string; descripcion: string | null }[]).forEach((g) => {
+      if (g.descripcion) desc.set(g.id, g.descripcion);
+    });
+  }
+
+  return movs.map((m) => ({
+    fecha: m.fecha,
+    centro_codigo: m.centro_codigo,
+    origen_tipo: m.origen_tipo,
+    origen_id: m.origen_id,
+    asiento_id: m.asiento_id,
+    asiento_numero: m.asiento_numero,
+    descripcion: (m.origen_tipo === "gasto" && m.origen_id && desc.get(m.origen_id)) || m.glosa || "—",
+    monto: Number(m.debito) - Number(m.credito),
+  }));
+}
+
 export async function mayorCuenta(
   cuentaId: string,
   desde?: string,
