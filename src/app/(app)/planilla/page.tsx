@@ -1,21 +1,35 @@
 import Link from "next/link";
-import { fechaCR } from "@/lib/fecha";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarPlanillas } from "@/lib/data/planilla";
 import PlanillaImportar from "@/components/PlanillaImportar";
+import PlanillasTabla from "@/components/PlanillasTabla";
 
-const fmt = (n: number) => n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const inputCls =
+  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm text-neutral-700 focus:border-neutral-500 focus:outline-none";
 
-const ESTADO_CLS: Record<string, string> = {
-  borrador: "bg-neutral-100 text-neutral-600",
-  confirmada: "bg-green-50 text-green-700",
-  anulada: "bg-red-50 text-red-700",
-};
+type SP = { q?: string; estado?: string; provision?: string; pago?: string };
 
-export default async function PlanillaPage() {
+export default async function PlanillaPage({ searchParams }: { searchParams: Promise<SP> }) {
   if (!(await tienePermiso("gastos.registrar"))) redirect("/");
-  const planillas = await listarPlanillas();
+  const sp = await searchParams;
+  const todas = await listarPlanillas();
+
+  const estado = ["borrador", "confirmada", "anulada"].includes(sp.estado ?? "") ? sp.estado : "";
+  const provision = ["posteada", "pendiente"].includes(sp.provision ?? "") ? sp.provision : "";
+  const pago = ["pagada", "sin"].includes(sp.pago ?? "") ? sp.pago : "";
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const hayFiltro = !!(estado || provision || pago || q);
+
+  const planillas = todas.filter((p) => {
+    if (estado && p.estado !== estado) return false;
+    if (provision === "posteada" && !p.posteada) return false;
+    if (provision === "pendiente" && p.posteada) return false;
+    if (pago === "pagada" && !p.pagada) return false;
+    if (pago === "sin" && p.pagada) return false;
+    if (q && !(p.titulo ?? "").toLowerCase().includes(q)) return false;
+    return true;
+  });
 
   return (
     <div>
@@ -26,54 +40,53 @@ export default async function PlanillaPage() {
         </p>
       </div>
 
-      {planillas.length > 0 && (
-        <div className="mb-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-          <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-800">
-            Planillas
+      {todas.length > 0 && (
+        <>
+          {/* Filtros */}
+          <form method="get" className="mb-3 flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1 text-xs text-neutral-500">
+              Buscar título
+              <input type="text" name="q" defaultValue={sp.q ?? ""} placeholder="ej. Agosto" className={inputCls} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-neutral-500">
+              Estado
+              <select name="estado" defaultValue={estado ?? ""} className={inputCls}>
+                <option value="">Todos</option>
+                <option value="confirmada">Confirmada</option>
+                <option value="borrador">Borrador</option>
+                <option value="anulada">Anulada</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-neutral-500">
+              Provisión
+              <select name="provision" defaultValue={provision ?? ""} className={inputCls}>
+                <option value="">Todas</option>
+                <option value="posteada">Posteada</option>
+                <option value="pendiente">Pendiente</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-neutral-500">
+              Pago
+              <select name="pago" defaultValue={pago ?? ""} className={inputCls}>
+                <option value="">Todos</option>
+                <option value="pagada">Pagada</option>
+                <option value="sin">Sin pagar</option>
+              </select>
+            </label>
+            <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800">
+              Filtrar
+            </button>
+            {hayFiltro && (
+              <Link href="/planilla" className="px-2 py-2 text-sm text-neutral-500 hover:text-neutral-900">
+                Limpiar
+              </Link>
+            )}
+          </form>
+
+          <div className="mb-6">
+            <PlanillasTabla planillas={planillas} />
           </div>
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-4 py-2 font-medium">Fecha</th>
-                <th className="px-4 py-2 font-medium">Título</th>
-                <th className="px-4 py-2 text-right font-medium">Colab.</th>
-                <th className="px-4 py-2 text-right font-medium">Neto</th>
-                <th className="px-4 py-2 font-medium">Provisión</th>
-                <th className="px-4 py-2 font-medium">Pago</th>
-                <th className="px-4 py-2 font-medium">Estado</th>
-                <th className="px-4 py-2 text-right" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {planillas.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-4 py-2 text-neutral-600">{fechaCR(p.fecha)}</td>
-                  <td className="px-4 py-2 text-neutral-800">{p.titulo ?? "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-neutral-600">{p.n_colaboradores}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-neutral-900">₡{fmt(p.neto)}</td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${p.posteada ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}>
-                      {p.posteada ? "posteada" : "pendiente"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${p.pagada ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}>
-                      {p.pagada ? "pagada" : "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[p.estado]}`}>{p.estado}</span>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <Link href={`/planilla/${p.id}`} className="text-neutral-600 hover:text-neutral-900">
-                      Ver
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        </>
       )}
 
       <div className="mb-2 text-sm font-semibold text-neutral-800">Nueva planilla</div>
