@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { balanza } from "@/lib/data/reportes";
-import ExportarExcel from "@/components/ExportarExcel";
+import ExportarExcel, { type FilaExcel } from "@/components/ExportarExcel";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -38,22 +38,20 @@ export default async function BalancePage({
   const pasivoPatrimonio = pasivo + patrimonioTotal;
   const cuadra = Math.abs(activo - pasivoPatrimonio) < 0.01;
 
-  // Matriz para exportar a Excel (mismo contenido que la tabla).
-  const excel: (string | number | null)[][] = [
-    ["Balance de Situación", `al ${fecha}`],
-    [],
-    ["Cuenta", "Saldo"],
-    ["ACTIVO"],
-    ...seccion("activo").map((f) => [`${f.codigo} ${f.nombre}`, Number(f.saldo)]),
-    ["Total activo", activo],
-    [],
-    ["PASIVO"],
-    ...seccion("pasivo").map((f) => [`${f.codigo} ${f.nombre}`, Number(f.saldo)]),
-    [],
-    ["PATRIMONIO"],
-    ...seccion("patrimonio").map((f) => [`${f.codigo} ${f.nombre}`, Number(f.saldo)]),
-    ["Resultado del periodo (sin cerrar)", resultado],
-    ["Total pasivo + patrimonio", pasivoPatrimonio],
+  // Filas para exportar a Excel (mismo contenido que la tabla, con estilos).
+  const datos = (tipo: string): FilaExcel[] =>
+    seccion(tipo).map((f) => ({ celdas: [`${f.codigo} · ${f.nombre}`, Number(f.saldo)], estilo: "dato" as const }));
+  const excel: FilaExcel[] = [
+    { celdas: ["ACTIVO", null], estilo: "seccion" },
+    ...datos("activo"),
+    { celdas: ["Total activo", activo], estilo: "total" },
+    { celdas: [null, null] },
+    { celdas: ["PASIVO", null], estilo: "seccion" },
+    ...datos("pasivo"),
+    { celdas: ["PATRIMONIO", null], estilo: "seccion" },
+    ...datos("patrimonio"),
+    { celdas: ["Resultado del periodo (sin cerrar)", resultado], estilo: "dato" },
+    { celdas: ["Total pasivo + patrimonio", pasivoPatrimonio], estilo: "total" },
   ];
 
   const Seccion = ({ titulo, tipo }: { titulo: string; tipo: string }) => (
@@ -92,7 +90,17 @@ export default async function BalancePage({
         <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-800">
           Aplicar
         </button>
-        <ExportarExcel nombre={`balance-situacion-${fecha}.xlsx`} hoja="Balance" filas={excel} />
+        <ExportarExcel
+          nombre={`balance-situacion-${fecha}.xlsx`}
+          hoja="Balance"
+          titulo="Balance de Situación"
+          subtitulo={`Panaderías Chepito · al ${fecha}`}
+          columnas={[
+            { titulo: "Cuenta", ancho: 46 },
+            { titulo: "Saldo", money: true, ancho: 18 },
+          ]}
+          filas={excel}
+        />
       </form>
 
       <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
