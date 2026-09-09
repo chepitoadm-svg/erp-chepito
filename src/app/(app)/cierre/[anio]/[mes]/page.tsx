@@ -4,6 +4,7 @@ import { tienePermiso } from "@/lib/auth/permisos";
 import { detalleCierre, listarCierres, archivosDeItem, type ArchivoItem } from "@/lib/data/cierre";
 import CierreItemRow from "@/components/CierreItemRow";
 import CerrarMesBtn from "@/components/CerrarMesBtn";
+import RegenerarMesBtn from "@/components/RegenerarMesBtn";
 
 const MESES = [
   "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -58,7 +59,10 @@ export default async function CierreMesPage({
             )}
           </h1>
         </div>
-        <CerrarMesBtn cierreId={cierre.id} cerrado={bloqueado} />
+        <div className="flex items-start gap-2">
+          {!bloqueado && <RegenerarMesBtn anio={anio} mes={mes} />}
+          <CerrarMesBtn cierreId={cierre.id} cerrado={bloqueado} />
+        </div>
       </div>
 
       {/* Avance */}
