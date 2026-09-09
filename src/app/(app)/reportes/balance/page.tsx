@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { balanza } from "@/lib/data/reportes";
+import ExportarExcel from "@/components/ExportarExcel";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -36,6 +37,24 @@ export default async function BalancePage({
   const patrimonioTotal = patrimonio + resultado;
   const pasivoPatrimonio = pasivo + patrimonioTotal;
   const cuadra = Math.abs(activo - pasivoPatrimonio) < 0.01;
+
+  // Matriz para exportar a Excel (mismo contenido que la tabla).
+  const excel: (string | number | null)[][] = [
+    ["Balance de Situación", `al ${fecha}`],
+    [],
+    ["Cuenta", "Saldo"],
+    ["ACTIVO"],
+    ...seccion("activo").map((f) => [`${f.codigo} ${f.nombre}`, Number(f.saldo)]),
+    ["Total activo", activo],
+    [],
+    ["PASIVO"],
+    ...seccion("pasivo").map((f) => [`${f.codigo} ${f.nombre}`, Number(f.saldo)]),
+    [],
+    ["PATRIMONIO"],
+    ...seccion("patrimonio").map((f) => [`${f.codigo} ${f.nombre}`, Number(f.saldo)]),
+    ["Resultado del periodo (sin cerrar)", resultado],
+    ["Total pasivo + patrimonio", pasivoPatrimonio],
+  ];
 
   const Seccion = ({ titulo, tipo }: { titulo: string; tipo: string }) => (
     <>
@@ -73,6 +92,7 @@ export default async function BalancePage({
         <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-800">
           Aplicar
         </button>
+        <ExportarExcel nombre={`balance-situacion-${fecha}.xlsx`} hoja="Balance" filas={excel} />
       </form>
 
       <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">

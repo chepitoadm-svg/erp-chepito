@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { estadoResultados } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
+import ExportarExcel from "@/components/ExportarExcel";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -88,6 +89,32 @@ export default async function ResultadosPage({
   const utilOper = combinar((c) => utilBruta[c] - (tGastosOper[c] ?? 0));
   const antesImp = combinar((c) => utilOper[c] + (tOtrosIng[c] ?? 0) - (tOtrosGas[c] ?? 0));
 
+  // Matriz para exportar a Excel (mismo contenido que la tabla).
+  const secExcel = (
+    titulo: string,
+    rows: ReturnType<typeof armar>,
+    total: Record<string, number>,
+  ): (string | number | null)[][] => {
+    if (rows.length === 0) return [];
+    const out: (string | number | null)[][] = [[titulo]];
+    for (const r of rows) out.push([`${r.cod} ${r.nombre}`, ...cols.map((c) => r.celdas[c] ?? 0)]);
+    out.push([`Total ${titulo.toLowerCase()}`, ...cols.map((c) => total[c] ?? 0)]);
+    return out;
+  };
+  const excel: (string | number | null)[][] = [
+    ["Estado de Resultados", `desde ${desde}`, `hasta ${hasta}`, conProrrateo ? "con prorrateo" : "sin prorrateo"],
+    [],
+    ["Cuenta", ...cols],
+    ...secExcel("Ingresos de operación", ingOper, tIngOper),
+    ...secExcel("Costo de ventas", costo, tCosto),
+    ["Utilidad bruta", ...cols.map((c) => utilBruta[c] ?? 0)],
+    ...secExcel("Gastos de operación", gastosOper, tGastosOper),
+    ["Utilidad de operación", ...cols.map((c) => utilOper[c] ?? 0)],
+    ...secExcel("Otros ingresos", otrosIng, tOtrosIng),
+    ...secExcel("Otros gastos", otrosGas, tOtrosGas),
+    ["Utilidad antes de impuestos", ...cols.map((c) => antesImp[c] ?? 0)],
+  ];
+
   const SeccionRows = ({ titulo, rows, total, neg }: { titulo: string; rows: ReturnType<typeof armar>; total: Record<string, number>; neg?: boolean }) =>
     rows.length === 0 ? null : (
       <>
@@ -169,6 +196,7 @@ export default async function ResultadosPage({
         <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-800">
           Aplicar
         </button>
+        <ExportarExcel nombre={`estado-resultados-${desde}_a_${hasta}.xlsx`} hoja="Resultados" filas={excel} />
       </form>
 
       {filas.length === 0 ? (
