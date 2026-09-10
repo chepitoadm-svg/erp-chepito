@@ -38,11 +38,13 @@ async function autoEmparejar(supabase: Awaited<ReturnType<typeof createClient>>,
     .eq("cuenta_id", cuenta)
     .eq("asiento.estado", "confirmado")
     .neq("asiento.tipo", "reversion");
-  const { data: yaMatch } = await supabase
-    .from("estado_cuenta_lineas")
-    .select("asiento_linea_id")
-    .not("asiento_linea_id", "is", null);
-  const usados = new Set((yaMatch ?? []).map((m: { asiento_linea_id: string }) => m.asiento_linea_id));
+  const [{ data: yaMatch }, { data: yaExtra }] = await Promise.all([
+    supabase.from("estado_cuenta_lineas").select("asiento_linea_id").not("asiento_linea_id", "is", null),
+    supabase.from("conciliacion_lineas_extra").select("asiento_linea_id"),
+  ]);
+  const usados = new Set<string>();
+  for (const m of yaMatch ?? []) if (m.asiento_linea_id) usados.add(m.asiento_linea_id);
+  for (const m of yaExtra ?? []) if (m.asiento_linea_id) usados.add(m.asiento_linea_id);
 
   const disponibles = ((movs ?? []) as unknown as {
     id: string;
@@ -210,6 +212,23 @@ export async function conciliarGrupo(formData: FormData): Promise<void> {
   await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
   // no solo el listado, para que la pantalla refleje el cambio de una vez.
+  revalidatePath(`/tesoreria/conciliaciones`, "layout");
+}
+
+// Empareja VARIOS movimientos de libros con UNA línea del banco (si la suma
+// calza, aceptando diferencias chicas de redondeo ≤ ₡100). Caso inverso a
+// conciliarGrupo: el banco cobró de un tirón dos pagos que van por separado.
+export async function conciliarGrupoLibros(formData: FormData): Promise<void> {
+  await requerirPermiso("tesoreria.conciliar");
+  const linea = String(formData.get("linea_id") ?? "");
+  const movs = String(formData.get("movimientos") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!linea || movs.length === 0) return;
+  const supabase = await createClient();
+  await supabase.rpc("fn_conciliar_grupo_libros", { p_linea: linea, p_asiento_lineas: movs });
+  // "layout" cae en cascada sobre la página de detalle [id] (donde se opera).
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
 }
 

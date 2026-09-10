@@ -111,7 +111,7 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
       "id, cuenta_id, fecha_corte, saldo_inicial, saldo_final, estado, " +
         "cuenta:cuentas(codigo, nombre), " +
         "lineas:estado_cuenta_lineas(id, orden, fecha, referencia, codigo, descripcion, debito, credito, balance, estado, asiento_linea_id, " +
-        "al:asientos_lineas(asiento_id, asiento:asientos(numero)))",
+        "al:asientos_lineas!estado_cuenta_lineas_asiento_linea_id_fkey(asiento_id, asiento:asientos(numero)))",
     )
     .eq("id", id)
     .single();
@@ -194,11 +194,16 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
     };
   }[];
 
-  const { data: matchedData } = await supabase
-    .from("estado_cuenta_lineas")
-    .select("asiento_linea_id")
-    .not("asiento_linea_id", "is", null);
-  const matched = new Set((matchedData ?? []).map((m: { asiento_linea_id: string }) => m.asiento_linea_id));
+  const [{ data: matchedData }, { data: extraData }] = await Promise.all([
+    supabase.from("estado_cuenta_lineas").select("asiento_linea_id").not("asiento_linea_id", "is", null),
+    supabase.from("conciliacion_lineas_extra").select("asiento_linea_id"),
+  ]);
+  // "matched" incluye tanto el movimiento principal (asiento_linea_id de la línea
+  // del banco) como los movimientos "extra" ligados en la conciliación 1 banco : N
+  // libros, para que ninguno de ellos siga apareciendo como pendiente.
+  const matched = new Set<string>();
+  for (const m of matchedData ?? []) if (m.asiento_linea_id) matched.add(m.asiento_linea_id);
+  for (const m of extraData ?? []) if (m.asiento_linea_id) matched.add(m.asiento_linea_id);
 
   const movimientos_sin_conciliar: MovimientoLibro[] = movs
     // Los ajustes de redondeo y las líneas de SALDO INICIAL (apertura de la

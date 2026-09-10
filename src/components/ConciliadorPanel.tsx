@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   conciliarGrupo,
-  conciliarRedondeo,
+  conciliarGrupoLibros,
   desconciliarLinea,
   conciliarAutomatico,
   registrarAsientoBanco,
@@ -232,7 +232,7 @@ export default function ConciliadorPanel({
 }) {
   const [tab, setTab] = useState<"pendientes" | "conciliados">("pendientes");
   const [selBancos, setSelBancos] = useState<Set<string>>(new Set());
-  const [selLibro, setSelLibro] = useState<string | null>(null);
+  const [selMovs, setSelMovs] = useState<Set<string>>(new Set());
   const [modoRegistrar, setModoRegistrar] = useState(false);
   const [sortLibros, setSortLibros] = useState<SortState>({ key: null, dir: "asc" });
   const [sortBanco, setSortBanco] = useState<SortState>({ key: null, dir: "asc" });
@@ -270,7 +270,7 @@ export default function ConciliadorPanel({
   }, [lineas, sortBanco]);
 
   const bancosSel = pendientes.filter((l) => selBancos.has(l.id));
-  const libro = movimientos.find((m) => m.id === selLibro) ?? null;
+  const movsSel = movimientos.filter((m) => selMovs.has(m.id));
 
   // Pantalla de origen del movimiento de libros, para abrirlo y modificarlo.
   const hrefOrigen = (m: MovimientoLibro) => {
@@ -287,30 +287,59 @@ export default function ConciliadorPanel({
       else s.add(id);
       return s;
     });
+  const toggleMov = (id: string) =>
+    setSelMovs((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
 
-  // Suma de las líneas del banco seleccionadas.
+  // Sumas de cada lado.
   const sumBancoDebito = bancosSel.reduce((s, l) => s + l.debito, 0);
   const sumBancoCredito = bancosSel.reduce((s, l) => s + l.credito, 0);
-  // Regla: SUM(crédito banco) = Debe libros y SUM(débito banco) = Haber libros.
-  const grupoCalza =
-    !!libro && bancosSel.length > 0 && c2(sumBancoCredito) === c2(libro.debito) && c2(sumBancoDebito) === c2(libro.credito);
+  const sumMovDebe = movsSel.reduce((s, m) => s + m.debito, 0);
+  const sumMovHaber = movsSel.reduce((s, m) => s + m.credito, 0);
+  const haySel = movsSel.length > 0 && bancosSel.length > 0;
 
-  // Redondeo: 1 libro + 1 banco que difieren por pocos colones (≤ ₡100).
+  // Forma de la selección → qué función usar:
+  //  "libros" = 1 línea del banco : N movimientos de libros (acepta redondeo).
+  //  "banco"  = 1 movimiento de libros : N líneas del banco (exacto).
+  // El 1:1 cae en "libros" (así el redondeo también aplica). Con ambos lados
+  // múltiples no hay función: se pide hacerlo en dos pasos.
+  const modo: "libros" | "banco" | null =
+    bancosSel.length === 1 && movsSel.length >= 1
+      ? "libros"
+      : movsSel.length === 1 && bancosSel.length >= 1
+        ? "banco"
+        : null;
+
   const TOL_REDONDEO = 100;
-  const bancoUnico = bancosSel.length === 1 ? bancosSel[0] : null;
+  // Residuo (diferencia) igual que en la base: (Haber libros − débito banco) −
+  // (Debe libros − crédito banco). 0 = calza exacto.
   const residuo =
-    libro && bancoUnico ? Math.round(((libro.credito - bancoUnico.debito) - (libro.debito - bancoUnico.credito)) * 100) / 100 : 0;
-  const puedeRedondear = !!libro && !!bancoUnico && !grupoCalza && residuo !== 0 && Math.abs(residuo) <= TOL_REDONDEO;
+    Math.round(((sumMovHaber - sumBancoDebito) - (sumMovDebe - sumBancoCredito)) * 100) / 100;
+  const calza =
+    modo === "libros"
+      ? haySel && Math.abs(residuo) <= TOL_REDONDEO
+      : modo === "banco"
+        ? haySel && residuo === 0
+        : false;
 
-  // Sugerencias: al elegir un movimiento de libros, resaltar las líneas del
-  // banco que calzan una a una (atajo para el caso 1:1).
+  // Sugerencias 1:1: al elegir un solo lado, resaltar las del otro que calzan una
+  // a una (atajo visual).
   const compatible = (l: LineaBanco, m: MovimientoLibro) =>
     c2(l.debito) === c2(m.credito) && c2(l.credito) === c2(m.debito);
+  const movUnico = movsSel.length === 1 ? movsSel[0] : null;
+  const bancoUnico = bancosSel.length === 1 ? bancosSel[0] : null;
   const bancosSugeridos = useMemo(
-    () => (libro ? new Set(pendientes.filter((l) => compatible(l, libro)).map((l) => l.id)) : new Set<string>()),
-    [libro, pendientes],
+    () => (movUnico ? new Set(pendientes.filter((l) => compatible(l, movUnico)).map((l) => l.id)) : new Set<string>()),
+    [movUnico, pendientes],
   );
-  const librosSugeridos = useMemo(() => new Set<string>(), []);
+  const librosSugeridos = useMemo(
+    () => (bancoUnico ? new Set(movimientos.filter((m) => compatible(bancoUnico, m)).map((m) => m.id)) : new Set<string>()),
+    [bancoUnico, movimientos],
+  );
 
   // Filtro "empieza con" (case-insensitive) por texto o por número de documento.
   const empiezaCon = (texto: string, f: string) => texto.toLowerCase().startsWith(f.trim().toLowerCase());
@@ -360,28 +389,34 @@ export default function ConciliadorPanel({
           {/* Barra de acciones */}
           {editable && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <form action={conciliarGrupo}>
-                <input type="hidden" name="asiento_linea_id" value={selLibro ?? ""} />
-                <input type="hidden" name="lineas" value={Array.from(selBancos).join(",")} />
-                <button
-                  type="submit"
-                  disabled={!grupoCalza}
-                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-                  title={grupoCalza ? "" : "Elegí un movimiento de libros y una o varias líneas del banco cuya suma calce"}
-                >
-                  Conciliar seleccionados
-                </button>
-              </form>
-              {puedeRedondear && (
-                <form action={conciliarRedondeo}>
-                  <input type="hidden" name="asiento_linea_id" value={selLibro ?? ""} />
-                  <input type="hidden" name="linea_id" value={bancoUnico?.id ?? ""} />
+              {modo === "banco" ? (
+                <form action={conciliarGrupo}>
+                  <input type="hidden" name="asiento_linea_id" value={movsSel[0]?.id ?? ""} />
+                  <input type="hidden" name="lineas" value={Array.from(selBancos).join(",")} />
                   <button
                     type="submit"
-                    className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
-                    title="Casar aceptando la diferencia como redondeo"
+                    disabled={!calza}
+                    className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    title={calza ? "" : "La suma de las líneas del banco debe calzar con el movimiento de libros"}
                   >
-                    Conciliar con redondeo (dif ₡{money(Math.abs(residuo))})
+                    Conciliar seleccionados
+                  </button>
+                </form>
+              ) : (
+                <form action={conciliarGrupoLibros}>
+                  <input type="hidden" name="linea_id" value={bancosSel[0]?.id ?? ""} />
+                  <input type="hidden" name="movimientos" value={movsSel.map((m) => m.id).join(",")} />
+                  <button
+                    type="submit"
+                    disabled={!calza}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 ${
+                      calza && residuo !== 0 ? "bg-amber-600 hover:bg-amber-700" : "bg-neutral-900 hover:bg-neutral-800"
+                    }`}
+                    title={calza ? "" : "Elegí una línea del banco y uno o varios movimientos de libros cuya suma calce"}
+                  >
+                    {calza && residuo !== 0
+                      ? `Conciliar con redondeo (dif ₡${money(Math.abs(residuo))})`
+                      : "Conciliar seleccionados"}
                   </button>
                 </form>
               )}
@@ -415,18 +450,23 @@ export default function ConciliadorPanel({
 
               {/* Estado de la selección */}
               <div className="ml-auto text-xs">
-                {libro && bancosSel.length > 0 ? (
-                  grupoCalza ? (
+                {haySel ? (
+                  modo === null ? (
+                    <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                      Elegí varios de un solo lado (o 1 y 1). Para varios de los dos lados, hacelo en dos pasos.
+                    </span>
+                  ) : calza ? (
                     <span className="rounded-full bg-green-50 px-2 py-1 text-green-700">
-                      ✓ Suma calza ({bancosSel.length} línea{bancosSel.length > 1 ? "s" : ""} del banco)
+                      ✓ {residuo !== 0 ? `Calza con redondeo (dif ₡${money(Math.abs(residuo))})` : "Suma calza"} ·{" "}
+                      {movsSel.length} libros / {bancosSel.length} banco
                     </span>
                   ) : (
                     <span className="rounded-full bg-red-50 px-2 py-1 text-red-700">
-                      ✗ No calza — banco {money(sumBancoCredito - sumBancoDebito)} vs libros {money(libro.debito - libro.credito)}
+                      ✗ No calza — libros {money(sumMovHaber - sumMovDebe)} vs banco {money(sumBancoDebito - sumBancoCredito)}
                     </span>
                   )
                 ) : (
-                  <span className="text-neutral-400">Elegí un movimiento de libros y una o varias líneas del banco</span>
+                  <span className="text-neutral-400">Elegí líneas del banco y movimientos de libros</span>
                 )}
               </div>
             </div>
@@ -671,15 +711,18 @@ export default function ConciliadorPanel({
                       </tr>
                     )}
                     {movimientosVis.map((m) => {
-                      const sel = m.id === selLibro;
+                      const sel = selMovs.has(m.id);
                       const sug = librosSugeridos.has(m.id);
                       return (
                         <tr
                           key={m.id}
-                          onClick={editable ? () => setSelLibro(sel ? null : m.id) : undefined}
+                          onClick={editable ? () => toggleMov(m.id) : undefined}
                           className={`${editable ? "cursor-pointer" : ""} ${sel ? "bg-blue-50" : sug ? "bg-green-50/50" : "hover:bg-neutral-50"}`}
                         >
-                          <td className="whitespace-nowrap px-2 py-1 text-neutral-600">{m.fecha}</td>
+                          <td className="whitespace-nowrap px-2 py-1 text-neutral-600">
+                            {editable && <input type="checkbox" readOnly checked={sel} className="mr-1.5 align-middle" />}
+                            {m.fecha}
+                          </td>
                           <td className="px-2 py-1 text-neutral-700">
                             <a
                               href={hrefOrigen(m)}

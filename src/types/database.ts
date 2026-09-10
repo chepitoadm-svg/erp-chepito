@@ -913,6 +913,17 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      conciliacion_lineas_extra: {
+        Row: {
+          linea_banco_id: string;
+          asiento_linea_id: string;
+          creado_en: string;
+          creado_por: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       ventas_dia: {
         Row: {
           id: string;
@@ -1968,6 +1979,10 @@ export interface Database {
       };
       fn_conciliar_linea: { Args: { p_linea: string; p_asiento_linea: string }; Returns: undefined };
       fn_conciliar_grupo: { Args: { p_asiento_linea: string; p_lineas: string[] }; Returns: undefined };
+      fn_conciliar_grupo_libros: {
+        Args: { p_linea: string; p_asiento_lineas: string[]; p_tolerancia?: number };
+        Returns: undefined;
+      };
       fn_crear_nota_credito: {
         Args: {
           p_proveedor: string;
