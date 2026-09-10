@@ -15,6 +15,9 @@ export interface ColumnaTabla<T> {
   monto?: (row: T) => number;
   align?: "left" | "right";
   fmt?: (n: number) => string;
+  /** Valor por el que ordena al tocar el encabezado. Si no se da pero hay
+   *  `monto`, se ordena por el monto. */
+  orden?: (row: T) => number | string;
   /** Ancho mínimo opcional para la columna. */
   th?: string;
   /** Solo para agrupar: no se muestra como columna, pero se puede agregar a la
@@ -36,9 +39,32 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
   const [agrupado, setAgrupado] = useState<string[]>([]);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [arrastreOver, setArrastreOver] = useState(false);
+  const [orden, setOrden] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
 
   const colDe = (key: string) => columnas.find((c) => c.key === key)!;
   const noAgrupadas = agrupables.filter((c) => !agrupado.includes(c.key));
+
+  // Una columna es ordenable si tiene un accesor de orden explícito o un monto.
+  const esOrdenable = (c: ColumnaTabla<T>) => !!c.orden || !!c.monto;
+  const valorOrden = (c: ColumnaTabla<T>, row: T) =>
+    c.orden ? c.orden(row) : c.monto ? c.monto(row) : 0;
+  // Al tocar el encabezado: 1er clic mayor→menor, 2º menor→mayor, 3º sin orden.
+  const alternarOrden = (key: string) =>
+    setOrden((o) => (o?.key === key ? (o.dir === "desc" ? { key, dir: "asc" } : null) : { key, dir: "desc" }));
+  const ordenar = (rows: T[]) => {
+    if (!orden) return rows;
+    const c = colDe(orden.key);
+    if (!esOrdenable(c)) return rows;
+    const arr = [...rows];
+    arr.sort((a, b) => {
+      const va = valorOrden(c, a);
+      const vb = valorOrden(c, b);
+      const cmp =
+        typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      return orden.dir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  };
 
   const agregar = (key: string) => {
     const c = colDe(key);
@@ -59,6 +85,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
     return r;
   };
   const totalGeneral = useMemo(() => subtotales(filas), [filas, columnas]);
+  const filasOrdenadas = useMemo(() => ordenar(filas), [filas, orden]);
 
   // Construir las filas a renderizar (grupos + datos) respetando lo expandido.
   type Entry =
@@ -84,7 +111,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
       }
     }
   };
-  if (agrupado.length > 0) construir(filas, 0, "");
+  if (agrupado.length > 0) construir(filasOrdenadas, 0, "");
 
   const fmt = (c: ColumnaTabla<T>, n: number) => (c.fmt ? c.fmt(n) : money(n));
 
@@ -150,21 +177,35 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
         <table className={`w-full ${minWidth} text-sm`}>
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {visibles.map((c) => (
-                <th
-                  key={c.key}
-                  draggable={!!c.grupo}
-                  onDragStart={(e) => c.grupo && e.dataTransfer.setData("text/col", c.key)}
-                  onClick={() => c.grupo && agregar(c.key)}
-                  title={c.grupo ? "Arrastrá o tocá para agrupar" : undefined}
-                  className={`px-4 py-3 font-medium ${c.align === "right" ? "text-right" : ""} ${c.th ?? ""} ${
-                    c.grupo ? "cursor-grab select-none hover:text-neutral-800" : ""
-                  }`}
-                >
-                  {c.titulo}
-                  {c.grupo && <span className="ml-1 text-neutral-300">⠿</span>}
-                </th>
-              ))}
+              {visibles.map((c) => {
+                const ordenable = esOrdenable(c);
+                const activa = orden?.key === c.key;
+                return (
+                  <th
+                    key={c.key}
+                    draggable={!!c.grupo}
+                    onDragStart={(e) => c.grupo && e.dataTransfer.setData("text/col", c.key)}
+                    onClick={() => (c.grupo ? agregar(c.key) : ordenable ? alternarOrden(c.key) : undefined)}
+                    title={
+                      c.grupo ? "Arrastrá o tocá para agrupar" : ordenable ? "Tocá para ordenar" : undefined
+                    }
+                    className={`px-4 py-3 font-medium ${c.align === "right" ? "text-right" : ""} ${c.th ?? ""} ${
+                      c.grupo ? "cursor-grab select-none hover:text-neutral-800" : ""
+                    } ${ordenable ? "cursor-pointer select-none hover:text-neutral-800" : ""} ${
+                      activa ? "text-neutral-800" : ""
+                    }`}
+                  >
+                    {c.titulo}
+                    {c.grupo && <span className="ml-1 text-neutral-300">⠿</span>}
+                    {ordenable &&
+                      (activa ? (
+                        <span className="ml-1 text-neutral-700">{orden!.dir === "desc" ? "↓" : "↑"}</span>
+                      ) : (
+                        <span className="ml-1 text-neutral-300">⇅</span>
+                      ))}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
@@ -176,7 +217,7 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
                 </td>
               </tr>
             ) : agrupado.length === 0 ? (
-              filas.map((row) => (
+              filasOrdenadas.map((row) => (
                 <tr key={claveFila(row)}>
                   {visibles.map((c) => (
                     <td key={c.key} className={`px-4 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}>
