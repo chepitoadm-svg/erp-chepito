@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { crearPago, type FormState } from "@/app/(app)/compras/actions";
 import SelectBuscable from "@/components/SelectBuscable";
 import { numeroFactura } from "@/lib/compras/numeroFactura";
@@ -42,6 +42,24 @@ export default function PagoForm({ proveedorId, proveedorNombre, cxp, cuentas }:
   const [monto, setMonto] = useState<Record<string, string>>(
     () => Object.fromEntries(cxp.map((q) => [q.id, String(q.saldo)])),
   );
+  // Orden de la lista de facturas/notas (por vencimiento o por saldo).
+  const [orden, setOrden] = useState<{ col: "vence" | "saldo"; dir: "asc" | "desc" } | null>(null);
+  const alternar = (col: "vence" | "saldo") =>
+    setOrden((o) => (o?.col === col ? (o.dir === "desc" ? { col, dir: "asc" } : null) : { col, dir: "desc" }));
+  const flecha = (col: "vence" | "saldo") =>
+    orden?.col === col ? (orden.dir === "desc" ? "↓" : "↑") : "⇅";
+  const cxpOrden = useMemo(() => {
+    if (!orden) return cxp;
+    const arr = [...cxp];
+    arr.sort((a, b) => {
+      const cmp =
+        orden.col === "saldo"
+          ? a.saldo - b.saldo
+          : (a.fecha_vencimiento ?? "").localeCompare(b.fecha_vencimiento ?? "");
+      return orden.dir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [cxp, orden]);
 
   const lineas = cxp
     .filter((q) => sel[q.id])
@@ -110,13 +128,31 @@ export default function PagoForm({ proveedorId, proveedorNombre, cxp, cuentas }:
               <tr>
                 <th className="px-3 py-2 font-medium" />
                 <th className="px-3 py-2 font-medium">Factura / Nota</th>
-                <th className="px-3 py-2 font-medium">Vence</th>
-                <th className="px-3 py-2 text-right font-medium">Saldo</th>
+                <th
+                  onClick={() => alternar("vence")}
+                  title="Tocá para ordenar por vencimiento"
+                  className={`cursor-pointer select-none px-3 py-2 font-medium hover:text-neutral-800 ${orden?.col === "vence" ? "text-neutral-800" : ""}`}
+                >
+                  Vence
+                  <span className={`ml-1 ${orden?.col === "vence" ? "text-neutral-700" : "text-neutral-300"}`}>
+                    {flecha("vence")}
+                  </span>
+                </th>
+                <th
+                  onClick={() => alternar("saldo")}
+                  title="Tocá para ordenar por saldo"
+                  className={`cursor-pointer select-none px-3 py-2 text-right font-medium hover:text-neutral-800 ${orden?.col === "saldo" ? "text-neutral-800" : ""}`}
+                >
+                  Saldo
+                  <span className={`ml-1 ${orden?.col === "saldo" ? "text-neutral-700" : "text-neutral-300"}`}>
+                    {flecha("saldo")}
+                  </span>
+                </th>
                 <th className="px-3 py-2 text-right font-medium">A aplicar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {cxp.map((q) => {
+              {cxpOrden.map((q) => {
                 const credito = q.tipo === "credito";
                 return (
                   <tr key={q.id} className={credito ? "bg-green-50/40" : sel[q.id] ? "bg-neutral-50/60" : ""}>
