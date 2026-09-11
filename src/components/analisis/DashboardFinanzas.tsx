@@ -231,13 +231,14 @@ export default function DashboardFinanzas({ data }: { data: FinData }) {
       {/* Por sucursal */}
       {data.porCentroSel.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[880px] text-sm">
             <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Sucursal</th>
-                <th className="px-4 py-2 text-right font-medium">Ventas</th>
+                <th className="px-4 py-2 text-right font-medium">Vendés</th>
                 <th className="px-4 py-2 text-right font-medium">Margen contrib.</th>
                 <th className="px-4 py-2 text-right font-medium">Equilibrio/mes</th>
+                <th className="px-4 py-2 text-right font-medium">Falta / sobra</th>
                 <th className="px-4 py-2 text-right font-medium">Meta/día</th>
                 <th className="px-4 py-2 text-right font-medium">Margen seg.</th>
                 <th className="px-4 py-2 text-right font-medium">Utilidad</th>
@@ -246,12 +247,16 @@ export default function DashboardFinanzas({ data }: { data: FinData }) {
             <tbody className="divide-y divide-neutral-100">
               {data.porCentroSel.map(({ centro, cvp, dias }) => {
                 const md = cvp.puntoEquilibrio != null && dias > 0 ? cvp.puntoEquilibrio / dias : null;
+                const gap = cvp.puntoEquilibrio == null ? null : cvp.ventas - cvp.puntoEquilibrio; // + sobra, − falta
                 return (
                   <tr key={centro} className="text-neutral-700">
                     <td className="px-4 py-2 font-medium text-neutral-900">{centro}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{money0(cvp.ventas)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{pct(cvp.mcPct)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{cvp.puntoEquilibrio == null ? "—" : money0(cvp.puntoEquilibrio)}</td>
+                    <td className={`px-4 py-2 text-right font-medium tabular-nums ${gap == null ? "" : gap >= 0 ? "text-green-700" : "text-red-700"}`}>
+                      {gap == null ? "—" : `${gap >= 0 ? "sobra " : "falta "}${money0(Math.abs(gap))}`}
+                    </td>
                     <td className="px-4 py-2 text-right tabular-nums">{md == null ? "—" : money0(md)}</td>
                     <td className={`px-4 py-2 text-right tabular-nums ${cvp.margenSeguridadPct == null ? "" : cvp.margenSeguridadPct >= 0 ? "text-green-700" : "text-red-700"}`}>
                       {cvp.margenSeguridadPct == null ? "—" : pct(cvp.margenSeguridadPct)}
