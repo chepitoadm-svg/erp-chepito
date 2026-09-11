@@ -29,6 +29,7 @@ export default function EscenariosSucursales({ data }: { data: Data }) {
   const candidata = [...conVentas].sort((a, b) => a.aporte - b.aporte)[0]?.centro ?? "";
   const [sel, setSel] = useState(candidata);
   const [migracion, setMigracion] = useState(0); // % de ventas que se pasan a otras sucursales
+  const [ayuda, setAyuda] = useState(false); // explicación del "aporte real"
 
   const s = conVentas.find((x) => x.centro === sel) ?? conVentas[0];
 
@@ -53,7 +54,22 @@ export default function EscenariosSucursales({ data }: { data: Data }) {
               <th className="px-4 py-2 text-right font-medium">Ventas</th>
               <th className="px-4 py-2 text-right font-medium">Contribución</th>
               <th className="px-4 py-2 text-right font-medium">− Fijos directos</th>
-              <th className="px-4 py-2 text-right font-medium">= Aporte real</th>
+              <th className="px-4 py-2 text-right font-medium">
+                <span className="inline-flex items-center gap-1">
+                  = Aporte real
+                  <button
+                    type="button"
+                    onClick={() => setAyuda((v) => !v)}
+                    className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] font-bold ${
+                      ayuda ? "border-indigo-400 bg-indigo-100 text-indigo-700" : "border-neutral-300 text-neutral-400 hover:text-neutral-700"
+                    }`}
+                    title="¿De dónde sale el aporte real?"
+                    aria-label="Explicación del aporte real"
+                  >
+                    i
+                  </button>
+                </span>
+              </th>
               <th className="px-4 py-2 text-right font-medium">Compartidos (se mantienen)</th>
               <th className="px-4 py-2 text-right font-medium">Utilidad contable</th>
             </tr>
@@ -83,12 +99,47 @@ export default function EscenariosSucursales({ data }: { data: Data }) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-neutral-500">
-        <b>Aporte real</b> = contribución (ventas − costos variables) − fijos directos de la sucursal. Es lo que deja para
-        pagar los costos compartidos y la utilidad. La <b>utilidad contable</b> (última columna) le resta además su parte
-        del Taller y administración — costos que <b>no</b> desaparecen si cerrás la sucursal, por eso engañan. Aporte
-        positivo = conviene mantenerla.
-      </p>
+      {ayuda ? (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 text-sm text-neutral-700">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold text-neutral-900">¿De dónde sale el “aporte real”?</span>
+            <button type="button" onClick={() => setAyuda(false)} className="text-xs text-neutral-500 hover:text-neutral-800">
+              cerrar ✕
+            </button>
+          </div>
+          <p className="font-medium text-neutral-900">Aporte real = Contribución − Fijos directos</p>
+          <ul className="mt-2 space-y-1.5">
+            <li>
+              <b>Contribución</b> = Ventas − costos <b>variables</b> (la mercadería/materia prima que se va con cada venta,
+              incluida la parte que la sucursal le “jala” al Taller). Es lo que deja cada colón de venta después de pagar el
+              producto — el % que ves en esa columna.
+            </li>
+            <li>
+              <b>− Fijos directos</b> = los costos fijos <b>propios</b> de la sucursal (su alquiler, su gente, sus
+              servicios). Son los que <b>sí se ahorran</b> si la cerrás.
+            </li>
+            <li>
+              <b>= Aporte real</b> = lo que la sucursal deja <b>después de cubrir todo lo suyo</b>, para pagar los costos
+              compartidos (Taller, administración) y la utilidad.
+            </li>
+          </ul>
+          <p className="mt-2 text-neutral-600">
+            Sale del Estado de Resultados: la <b>contribución</b> con prorrateo (reparte el Taller entre las que venden); los{" "}
+            <b>fijos directos</b> sin prorrateo (solo lo cargado directo a la sucursal).
+          </p>
+          <p className="mt-2 rounded-md bg-white/70 px-3 py-2 text-neutral-600">
+            Ojo: NO es la <b>utilidad contable</b> (última columna). Esa le resta <b>además</b> su parte de los costos
+            compartidos — costos que <b>no</b> desaparecen si cerrás la sucursal, por eso engañan. Para decidir cerrar o no,
+            el número bueno es el <b>aporte real</b>: positivo = conviene mantenerla; negativo = es un drenaje.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-neutral-500">
+          <b>Aporte real</b> = contribución (ventas − costos variables) − fijos directos de la sucursal. Es lo que deja para
+          pagar los costos compartidos y la utilidad. Tocá el <b>ⓘ</b> del encabezado para el detalle. Aporte positivo =
+          conviene mantenerla.
+        </p>
+      )}
 
       {/* Simulador de cierre */}
       <div className="rounded-lg border border-neutral-200 bg-white p-4">
