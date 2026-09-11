@@ -246,6 +246,76 @@ export async function escenarioSucursales(desde: string, hasta: string): Promise
   return { utilidadActual: conPro.total.utilidad, costosCompartidos, segmentos };
 }
 
+/** Escenario promediado sobre los últimos `nMeses` (terminando en `hastaMes`),
+ *  usando solo los meses CON actividad. Sirve para no decidir con un mes atípico:
+ *  el costeo periódico hace que un mes de compras altas se vea malo y el siguiente
+ *  bueno. Devuelve promedios MENSUALES, misma forma que escenarioSucursales. */
+export async function escenarioSucursalesPromedio(
+  hastaMes: string,
+  nMeses: number,
+): Promise<Escenarios & { mesesUsados: number; meses: string[] }> {
+  const meses = Array.from({ length: nMeses }, (_, i) => sumarMeses(hastaMes, -(nMeses - 1 - i)));
+  const porMes = await Promise.all(
+    meses.map(async (ym) => {
+      const { desde, hasta } = rangoMes(ym);
+      return { ym, esc: await escenarioSucursales(desde, hasta) };
+    }),
+  );
+  // Solo meses OPERATIVOS. Se excluyen los no representativos (arranque, cierre
+  // parcial): un mes cuenta si sus ventas llegan al menos al 25% del mes pico de
+  // la ventana. Así el mes de cutover (ventas casi nulas pero con costos de
+  // apertura) no distorsiona el promedio.
+  const ventasMes = porMes.map((p) => ({ ...p, v: p.esc.segmentos.reduce((s, x) => s + x.ventas, 0) }));
+  const maxV = Math.max(0, ...ventasMes.map((x) => x.v));
+  const usados = ventasMes.filter((x) => x.v > 0 && x.v >= 0.25 * maxV);
+  const n = usados.length || 1;
+
+  // Acumular por centro y dividir por la cantidad de meses usados.
+  const acc = new Map<string, { nombre: string; ventas: number; contribucion: number; fijosDirectos: number; fijosCompartidos: number; utilidadReportada: number }>();
+  let utilidadActual = 0;
+  let costosCompartidos = 0;
+  for (const { esc } of usados) {
+    utilidadActual += esc.utilidadActual;
+    costosCompartidos += esc.costosCompartidos;
+    for (const s of esc.segmentos) {
+      const a = acc.get(s.centro) ?? { nombre: s.nombre, ventas: 0, contribucion: 0, fijosDirectos: 0, fijosCompartidos: 0, utilidadReportada: 0 };
+      a.ventas += s.ventas;
+      a.contribucion += s.contribucion;
+      a.fijosDirectos += s.fijosDirectos;
+      a.fijosCompartidos += s.fijosCompartidos;
+      a.utilidadReportada += s.utilidadReportada;
+      acc.set(s.centro, a);
+    }
+  }
+
+  const segmentos: SegmentoCentro[] = [...acc.entries()]
+    .map(([centro, a]) => {
+      const ventas = a.ventas / n;
+      const contribucion = a.contribucion / n;
+      const fijosDirectos = a.fijosDirectos / n;
+      return {
+        centro,
+        nombre: a.nombre,
+        ventas,
+        contribucion,
+        mcPct: a.ventas ? a.contribucion / a.ventas : 0,
+        fijosDirectos,
+        fijosCompartidos: a.fijosCompartidos / n,
+        utilidadReportada: a.utilidadReportada / n,
+        aporte: contribucion - fijosDirectos,
+      };
+    })
+    .sort((x, y) => y.aporte - x.aporte);
+
+  return {
+    utilidadActual: utilidadActual / n,
+    costosCompartidos: costosCompartidos / n,
+    segmentos,
+    mesesUsados: usados.length,
+    meses: usados.map((u) => u.ym),
+  };
+}
+
 // ---- Clasificación (para la pantalla de configuración) ----
 
 export interface CuentaClasificable {
