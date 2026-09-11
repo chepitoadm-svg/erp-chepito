@@ -90,6 +90,7 @@ export default function DashboardFinanzas({ data }: { data: FinData }) {
   const ventasMetaUtil = ventaMeta(s.costosFijosEfectivos, s.mcPct, data.metaPct);
   const metaDiaUtil = ventasMetaUtil != null && dias > 0 ? ventasMetaUtil / dias : null;
   const sobreEquilibrio = pe != null && s.ventas >= pe;
+  const gapMes = pe != null ? s.ventas - pe : null; // + sobra, − falta
 
   return (
     <div className="space-y-4">
@@ -143,6 +144,14 @@ export default function DashboardFinanzas({ data }: { data: FinData }) {
                 v={ventaDiaActual != null ? money0(ventaDiaActual) : "—"}
                 tono={ventaDiaActual != null && metaDiaEquilibrio != null ? (ventaDiaActual >= metaDiaEquilibrio ? "verde" : "rojo") : undefined}
               />
+              <div className="mt-1 border-t border-neutral-100 pt-1">
+                <Renglon
+                  k="Te falta / sobra (mes)"
+                  v={gapMes == null ? "—" : `${gapMes >= 0 ? "sobra " : "falta "}${money0(Math.abs(gapMes))}`}
+                  fuerte
+                  tono={gapMes == null ? undefined : gapMes >= 0 ? "verde" : "rojo"}
+                />
+              </div>
             </div>
           )}
         </div>
