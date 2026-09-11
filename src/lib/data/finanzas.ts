@@ -171,6 +171,81 @@ export async function serieCVP(hastaMes: string, n: number, prorrateo = true): P
   );
 }
 
+// ---- Escenarios por sucursal (análisis "mantener o cerrar") ----
+
+// Aporte de una sucursal final: lo que deja DESPUÉS de cubrir sus propios costos
+// directos, para pagar los costos compartidos (Taller, administración) y la
+// utilidad. Es el número que de verdad decide si conviene cerrarla — no la
+// "utilidad" con todo el prorrateo encima, que carga costos que NO desaparecen
+// si la sucursal cierra.
+export interface SegmentoCentro {
+  centro: string; // código
+  nombre: string;
+  ventas: number;
+  contribucion: number; // ventas − costos variables (con prorrateo: incluye lo que jala del Taller). SE PIERDE si cierra.
+  mcPct: number;
+  fijosDirectos: number; // costos fijos propios de la sucursal (sin prorrateo). SE AHORRAN si cierra.
+  fijosCompartidos: number; // parte de Taller/administración que tiene asignada. SE MANTIENE si cierra.
+  utilidadReportada: number; // utilidad con todo el prorrateo (como se ve en el ER por centro)
+  aporte: number; // contribución − fijos directos (a compartidos + utilidad)
+}
+
+export interface Escenarios {
+  utilidadActual: number; // utilidad de toda la empresa (== ER)
+  costosCompartidos: number; // pool de Taller + administración (no atribuible), informativo
+  segmentos: SegmentoCentro[]; // sucursales finales, ordenadas por aporte desc
+}
+
+/** Análisis mantener-o-cerrar por sucursal, para un periodo. Combina la vista CON
+ *  prorrateo (contribución, que captura lo que cada sucursal jala del Taller) con
+ *  la vista SIN prorrateo (costos fijos DIRECTOS, los únicos que se ahorran al
+ *  cerrar). */
+export async function escenarioSucursales(desde: string, hasta: string): Promise<Escenarios> {
+  const supabase = await createClient();
+  const ov = await overridesMap(supabase);
+  const [conPro, sinPro, cc] = await Promise.all([
+    cvpPeriodo(desde, hasta, true, ov),
+    cvpPeriodo(desde, hasta, false, ov),
+    supabase.from("centros_costo").select("codigo, nombre, tipo"),
+  ]);
+  const centros = (cc.data ?? []) as { codigo: string; nombre: string; tipo: string }[];
+
+  const segmentos: SegmentoCentro[] = [];
+  for (const c of centros) {
+    if (c.tipo !== "final") continue;
+    const p = conPro.porCentro[c.codigo];
+    const s = sinPro.porCentro[c.codigo];
+    if (!p && !s) continue;
+    const ventas = p?.ventas ?? 0;
+    const contribucion = p?.margenContribucion ?? 0;
+    const fijosDirectos = s?.fijos ?? 0;
+    const fijosTotal = p?.fijos ?? 0;
+    segmentos.push({
+      centro: c.codigo,
+      nombre: c.nombre,
+      ventas,
+      contribucion,
+      mcPct: p?.mcPct ?? 0,
+      fijosDirectos,
+      fijosCompartidos: fijosTotal - fijosDirectos,
+      utilidadReportada: p?.utilidad ?? 0,
+      aporte: contribucion - fijosDirectos,
+    });
+  }
+  segmentos.sort((a, b) => b.aporte - a.aporte);
+
+  // Pool compartido (Taller + General): costo directo de los centros intermedios.
+  let costosCompartidos = 0;
+  for (const c of centros) {
+    if (c.tipo === "intermedio") {
+      const s = sinPro.porCentro[c.codigo];
+      if (s) costosCompartidos += s.variables + s.fijos - s.otrosIng;
+    }
+  }
+
+  return { utilidadActual: conPro.total.utilidad, costosCompartidos, segmentos };
+}
+
 // ---- Clasificación (para la pantalla de configuración) ----
 
 export interface CuentaClasificable {

@@ -84,6 +84,10 @@ export default async function AnalisisFinanzasPage({ searchParams }: { searchPar
           <h1 className="text-lg font-semibold text-neutral-900">Rentabilidad y punto de equilibrio</h1>
           <p className="text-sm text-neutral-500">
             Cuánto tenés que vender para no perder y para ganar tu meta. Sale del Estado de Resultados (sin IVA).{" "}
+            <Link href="/analisis/finanzas/escenarios" className="text-neutral-700 underline hover:text-neutral-900">
+              Escenarios por sucursal
+            </Link>
+            {" · "}
             <Link href="/analisis/finanzas/clasificacion" className="text-neutral-700 underline hover:text-neutral-900">
               Ajustar costos fijos/variables
             </Link>
