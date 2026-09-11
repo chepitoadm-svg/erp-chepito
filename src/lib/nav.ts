@@ -60,6 +60,7 @@ export const NAV: NavEntry[] = [
     label: "Análisis",
     items: [
       { label: "Ventas y rentabilidad", href: "/analisis/ventas", desc: "Ventas, margen y utilidad por sucursal, comparativos y tendencia.", icon: "analisis" },
+      { label: "Punto de equilibrio", href: "/analisis/finanzas", desc: "Cuánto vender para no perder y para tu meta; margen de contribución y seguridad.", icon: "analisis" },
     ],
   },
   { label: "Planilla", href: "/planilla", icon: "planilla" },

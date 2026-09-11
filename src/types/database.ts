@@ -924,6 +924,27 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      clasificacion_costo: {
+        Row: {
+          id: string;
+          cuenta_id: string;
+          tipo: "fijo" | "variable";
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          cuenta_id: string;
+          tipo: "fijo" | "variable";
+        };
+        Update: {
+          tipo?: "fijo" | "variable";
+          actualizado_en?: string | null;
+          actualizado_por?: string | null;
+        };
+        Relationships: [];
+      };
       ventas_dia: {
         Row: {
           id: string;
