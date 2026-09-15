@@ -243,9 +243,26 @@ export default function ConciliadorPanel({
   const [state, formAction, pending] = useActionState(registrarAsientoBanco, inicial);
   const [stateG, formActionG, pendingG] = useActionState(registrarAsientoBancoGrupo, inicial);
   const [stateT, formActionT, pendingT] = useActionState(registrarTrasladoBanco, inicial);
+  const [stateCG, formActionCG, pendingCG] = useActionState(conciliarGrupo, inicial);
+  const [stateCGL, formActionCGL, pendingCGL] = useActionState(conciliarGrupoLibros, inicial);
+  const conciliando = pendingCG || pendingCGL;
   const [esTraslado, setEsTraslado] = useState(false);
   const router = useRouter();
   const [refrescando, startRefresh] = useTransition();
+
+  // Al conciliar con éxito, limpiar la selección y REFRESCAR la lista. El
+  // revalidatePath del servidor a veces no repinta (la revalidación se aborta en
+  // páginas pesadas), y quedaban líneas ya conciliadas mostrándose como
+  // pendientes → al re-seleccionarlas la base las rechazaba. router.refresh()
+  // fuerza traer el estado real.
+  useEffect(() => {
+    if (stateCG.ok || stateCGL.ok) {
+      setSelBancos(new Set());
+      setSelMovs(new Set());
+      router.refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateCG.ok, stateCGL.ok]);
 
   const pendientes = lineas.filter((l) => l.estado === "pendiente");
   const conciliadas = lineas.filter((l) => l.estado === "conciliada");
@@ -390,33 +407,35 @@ export default function ConciliadorPanel({
           {editable && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {modo === "banco" ? (
-                <form action={conciliarGrupo}>
+                <form action={formActionCG}>
                   <input type="hidden" name="asiento_linea_id" value={movsSel[0]?.id ?? ""} />
                   <input type="hidden" name="lineas" value={Array.from(selBancos).join(",")} />
                   <button
                     type="submit"
-                    disabled={!calza}
+                    disabled={!calza || conciliando}
                     className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
                     title={calza ? "" : "La suma de las líneas del banco debe calzar con el movimiento de libros"}
                   >
-                    Conciliar seleccionados
+                    {pendingCG ? "Conciliando…" : "Conciliar seleccionados"}
                   </button>
                 </form>
               ) : (
-                <form action={conciliarGrupoLibros}>
+                <form action={formActionCGL}>
                   <input type="hidden" name="linea_id" value={bancosSel[0]?.id ?? ""} />
                   <input type="hidden" name="movimientos" value={movsSel.map((m) => m.id).join(",")} />
                   <button
                     type="submit"
-                    disabled={!calza}
+                    disabled={!calza || conciliando}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 ${
                       calza && residuo !== 0 ? "bg-amber-600 hover:bg-amber-700" : "bg-neutral-900 hover:bg-neutral-800"
                     }`}
                     title={calza ? "" : "Elegí una línea del banco y uno o varios movimientos de libros cuya suma calce"}
                   >
-                    {calza && residuo !== 0
-                      ? `Conciliar con redondeo (dif ₡${money(Math.abs(residuo))})`
-                      : "Conciliar seleccionados"}
+                    {pendingCGL
+                      ? "Conciliando…"
+                      : calza && residuo !== 0
+                        ? `Conciliar con redondeo (dif ₡${money(Math.abs(residuo))})`
+                        : "Conciliar seleccionados"}
                   </button>
                 </form>
               )}
@@ -470,6 +489,14 @@ export default function ConciliadorPanel({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Resultado de conciliar (antes fallaba en silencio) */}
+          {editable && (stateCG.error || stateCGL.error) && (
+            <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{stateCG.error || stateCGL.error}</p>
+          )}
+          {editable && !(stateCG.error || stateCGL.error) && (stateCG.ok || stateCGL.ok) && (
+            <p className="mb-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">✓ {stateCG.ok || stateCGL.ok}</p>
           )}
 
           {/* Generar UN asiento que agrupa VARIAS líneas del banco contra una cuenta */}

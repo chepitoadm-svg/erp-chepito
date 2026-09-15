@@ -200,36 +200,41 @@ export async function conciliarLinea(formData: FormData): Promise<void> {
 }
 
 // Empareja UN movimiento de libros con VARIAS líneas del banco (si la suma calza).
-export async function conciliarGrupo(formData: FormData): Promise<void> {
+// Devuelve el error de la base para mostrarlo (antes se tragaba y "no hacía nada").
+export async function conciliarGrupo(_prev: FormState, formData: FormData): Promise<FormState> {
   await requerirPermiso("tesoreria.conciliar");
   const mov = String(formData.get("asiento_linea_id") ?? "");
   const lineas = String(formData.get("lineas") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!mov || lineas.length === 0) return;
+  if (!mov || lineas.length === 0) return { error: "Elegí un movimiento de libros y una o varias líneas del banco." };
   const supabase = await createClient();
-  await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
+  const { error } = await supabase.rpc("fn_conciliar_grupo", { p_asiento_linea: mov, p_lineas: lineas });
+  if (error) return { error: limpiar(error.message) };
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera),
   // no solo el listado, para que la pantalla refleje el cambio de una vez.
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
+  return { ok: `Conciliado (${lineas.length} línea${lineas.length > 1 ? "s" : ""} del banco).` };
 }
 
 // Empareja VARIOS movimientos de libros con UNA línea del banco (si la suma
 // calza, aceptando diferencias chicas de redondeo ≤ ₡100). Caso inverso a
 // conciliarGrupo: el banco cobró de un tirón dos pagos que van por separado.
-export async function conciliarGrupoLibros(formData: FormData): Promise<void> {
+export async function conciliarGrupoLibros(_prev: FormState, formData: FormData): Promise<FormState> {
   await requerirPermiso("tesoreria.conciliar");
   const linea = String(formData.get("linea_id") ?? "");
   const movs = String(formData.get("movimientos") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!linea || movs.length === 0) return;
+  if (!linea || movs.length === 0) return { error: "Elegí una línea del banco y uno o varios movimientos de libros." };
   const supabase = await createClient();
-  await supabase.rpc("fn_conciliar_grupo_libros", { p_linea: linea, p_asiento_lineas: movs });
+  const { error } = await supabase.rpc("fn_conciliar_grupo_libros", { p_linea: linea, p_asiento_lineas: movs });
+  if (error) return { error: limpiar(error.message) };
   // "layout" cae en cascada sobre la página de detalle [id] (donde se opera).
   revalidatePath(`/tesoreria/conciliaciones`, "layout");
+  return { ok: `Conciliado (${movs.length} movimiento${movs.length > 1 ? "s" : ""} de libros).` };
 }
 
 // Concilia una línea del banco con un movimiento de libros que difiere por pocos
