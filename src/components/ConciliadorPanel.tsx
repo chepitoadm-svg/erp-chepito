@@ -913,6 +913,18 @@ function TablaConciliados({
   const [montoMin, setMontoMin] = useState("");
   const [montoMax, setMontoMax] = useState("");
   const [sort, setSort] = useState<SortState>({ key: null, dir: "asc" });
+  const router = useRouter();
+  const [desconciliando, startDesc] = useTransition();
+  // Desconcilia y REFRESCA (el revalidatePath del servidor a veces no repinta en
+  // esta página pesada). Al desconciliar un grupo, la base suelta todas sus
+  // líneas y el movimiento de libros reaparece.
+  const desconciliar = (id: string) =>
+    startDesc(async () => {
+      const fd = new FormData();
+      fd.set("linea_id", id);
+      await desconciliarLinea(fd);
+      router.refresh();
+    });
 
   const inputCls = "rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500";
   const montoDe = (l: LineaBanco) => (l.debito ? l.debito : l.credito);
@@ -1034,12 +1046,14 @@ function TablaConciliados({
                     </Link>
                   )}
                   {editable && (
-                    <form action={desconciliarLinea}>
-                      <input type="hidden" name="linea_id" value={l.id} />
-                      <button type="submit" className="text-xs text-neutral-400 hover:text-red-600">
-                        desconciliar
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      onClick={() => desconciliar(l.id)}
+                      disabled={desconciliando}
+                      className="text-xs text-neutral-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {desconciliando ? "…" : "desconciliar"}
+                    </button>
                   )}
                 </div>
               </td>
