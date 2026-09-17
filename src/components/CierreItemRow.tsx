@@ -162,7 +162,11 @@ export default function CierreItemRow({
             item.auto_fuente &&
             MODULO[item.auto_fuente] && (
               <Link
-                href={MODULO[item.auto_fuente].href}
+                href={
+                  item.auto_fuente === "conciliacion" && item.cuenta_id
+                    ? `/tesoreria/conciliaciones/ir?cuenta=${item.cuenta_id}&anio=${anio}&mes=${mes}`
+                    : MODULO[item.auto_fuente].href
+                }
                 className="text-xs font-medium text-blue-600 underline hover:text-blue-800"
               >
                 {MODULO[item.auto_fuente].label}
