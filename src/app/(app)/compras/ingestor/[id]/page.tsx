@@ -13,6 +13,7 @@ import { listarCentrosCosto } from "@/lib/data/asientos";
 import { descartarIngesta, crearProveedorDesdeIngesta, reparsearIngesta } from "../../actions";
 import MapearLinea from "@/components/MapearLinea";
 import CrearFacturaIngesta from "@/components/CrearFacturaIngesta";
+import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 const fmt = (n: number | null) =>
   n == null ? "—" : Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -73,7 +74,9 @@ export default async function IngestaDetallePage({
             {c.condicion_venta ? ` · ${COND[c.condicion_venta] ?? c.condicion_venta}` : ""}
             {c.plazo_credito ? ` (${c.plazo_credito} d, vence ${fechaCR(c.fecha_vencimiento)})` : ""}
           </p>
-          <p className="break-all text-xs text-neutral-400">clave {c.clave ?? "—"}</p>
+          <p className="break-all text-xs text-neutral-400" title={c.clave ?? undefined}>
+            Consecutivo {numeroFactura(c.clave) ?? "—"}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[c.estado]}`}>
