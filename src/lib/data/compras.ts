@@ -893,6 +893,18 @@ export interface IngestaListado {
   total: number | null;
   estado: IngestaEstado;
   estado_hacienda: string | null;
+  ya_ingresada: boolean; // ya existe una factura viva con ese consecutivo
+}
+
+// Consecutivo (20 díg) de una clave, sea de 50 díg (embebido) o de 20 (ya es el
+// consecutivo). Igual que fn_consecutivo en la base; sirve para detectar el mismo
+// documento aunque una vía guarde la clave completa y otra solo el consecutivo.
+function consecutivoFlex(clave: string | null | undefined): string | null {
+  if (!clave) return null;
+  const d = String(clave).replace(/\D/g, "");
+  if (d.length === 50) return d.slice(21, 41);
+  if (d.length === 20) return d;
+  return null;
 }
 
 interface IngestaRowEmbebido {
@@ -916,16 +928,34 @@ export async function listarIngesta(): Promise<IngestaListado[]> {
     )
     .order("creado_en", { ascending: false });
   if (error) throw new Error(`No se pudo cargar la bandeja del ingestor: ${error.message}`);
-  return ((data ?? []) as unknown as IngestaRowEmbebido[]).map((c) => ({
-    id: c.id,
-    clave: c.clave,
-    fecha_emision: c.fecha_emision,
-    emisor_nombre: c.emisor_nombre,
-    proveedor_nombre: c.proveedor?.nombre ?? null,
-    total: c.total != null ? Number(c.total) : null,
-    estado: c.estado,
-    estado_hacienda: c.estado_hacienda,
-  }));
+
+  // Consecutivos de las facturas VIVAS, para marcar comprobantes ya ingresados
+  // (por cualquier vía: correo, a mano o Excel).
+  const { data: facturas } = await supabase
+    .from("facturas_compra")
+    .select("clave")
+    .neq("estado", "anulada")
+    .not("clave", "is", null);
+  const yaExisten = new Set<string>();
+  for (const f of (facturas ?? []) as { clave: string | null }[]) {
+    const cc = consecutivoFlex(f.clave);
+    if (cc) yaExisten.add(cc);
+  }
+
+  return ((data ?? []) as unknown as IngestaRowEmbebido[]).map((c) => {
+    const cc = consecutivoFlex(c.clave);
+    return {
+      id: c.id,
+      clave: c.clave,
+      fecha_emision: c.fecha_emision,
+      emisor_nombre: c.emisor_nombre,
+      proveedor_nombre: c.proveedor?.nombre ?? null,
+      total: c.total != null ? Number(c.total) : null,
+      estado: c.estado,
+      estado_hacienda: c.estado_hacienda,
+      ya_ingresada: cc != null && yaExisten.has(cc),
+    };
+  });
 }
 
 export interface IngestaDetalle {

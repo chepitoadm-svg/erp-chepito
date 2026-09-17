@@ -74,9 +74,19 @@ export default async function IngestorPage() {
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-900">{fmt(c.total)}</td>
                 <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[c.estado]}`}>
-                    {ESTADO_LBL[c.estado]}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[c.estado]}`}>
+                      {ESTADO_LBL[c.estado]}
+                    </span>
+                    {c.ya_ingresada && c.estado !== "procesado" && c.estado !== "descartado" && (
+                      <span
+                        className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700"
+                        title="Ya existe una factura con este consecutivo. No la creés de nuevo: descartala."
+                      >
+                        ya ingresada
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
