@@ -38,15 +38,20 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient();
 
-  // Si el correo viene de un remitente con emisor fijado, solo se acepta ese emisor.
-  let cedulaPermitida: string | null = null;
+  // Un mismo remitente (facturador compartido) puede tener varios proveedores,
+  // cada uno con su cédula. Se aceptan TODAS las cédulas configuradas para ese
+  // remitente. Si alguna fuente no tiene cédula (comodín), se acepta cualquiera.
+  let cedulasPermitidas: string[] | null = null;
   if (body.remitente) {
-    const { data: fuente } = await supabase
+    const { data: fuentes } = await supabase
       .from("correo_fuentes")
       .select("cedula_emisor")
-      .eq("remitente", body.remitente.toLowerCase())
-      .maybeSingle();
-    cedulaPermitida = fuente?.cedula_emisor ?? null;
+      .eq("remitente", body.remitente.toLowerCase());
+    const rows = fuentes ?? [];
+    const hayComodin = rows.length === 0 || rows.some((f) => !f.cedula_emisor);
+    cedulasPermitidas = hayComodin
+      ? null
+      : (rows.map((f) => f.cedula_emisor).filter(Boolean) as string[]);
   }
 
   const resultados = [];
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest) {
     const clave = claveDe(comp);
     const resp =
       respuestas.find((r) => claveDe(r) === clave) ?? (respuestas.length === 1 ? respuestas[0] : null);
-    const res = await ingestarComprobante(supabase, comp, resp ?? null, cedulaPermitida);
+    const res = await ingestarComprobante(supabase, comp, resp ?? null, cedulasPermitidas);
     resultados.push(res.ok ? { ok: true, id: res.id, estado: res.estado } : { ok: false, error: res.error, code: res.code });
   }
 

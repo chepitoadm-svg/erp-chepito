@@ -34,7 +34,7 @@ export async function crearFuenteCorreo(_prev: FormState, formData: FormData): P
   if (error) {
     return {
       error: error.message.includes("duplicate")
-        ? "Ese remitente ya está en la lista."
+        ? "Ese remitente con esa cédula ya está en la lista. Si es otro proveedor del mismo correo, poné su cédula para diferenciarlos."
         : limpiar(error.message),
     };
   }
