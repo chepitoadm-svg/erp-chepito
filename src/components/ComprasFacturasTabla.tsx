@@ -52,7 +52,11 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
       key: "proveedor",
       titulo: "Proveedor",
       grupo: (f) => f.proveedor_nombre || "—",
-      celda: (f) => <span className="text-neutral-900">{f.proveedor_nombre}</span>,
+      celda: (f) => (
+        <Link href={`/compras/facturas/${f.id}`} className="font-medium text-neutral-900 hover:underline">
+          {f.proveedor_nombre}
+        </Link>
+      ),
     },
     {
       key: "factura",

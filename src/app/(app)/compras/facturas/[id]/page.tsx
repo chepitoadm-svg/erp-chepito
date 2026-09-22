@@ -3,9 +3,11 @@ import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { obtenerFactura, listarPagosDeFactura, medioLabel } from "@/lib/data/compras";
+import { listarCentrosCosto } from "@/lib/data/asientos";
 import { numeroFactura } from "@/lib/compras/numeroFactura";
 import { confirmarFactura } from "../../actions";
 import AnularFactura from "@/components/AnularFactura";
+import CambiarCentroFactura from "@/components/CambiarCentroFactura";
 
 const PAGO_ESTADO_CLS: Record<string, string> = {
   borrador: "bg-neutral-100 text-neutral-600",
@@ -33,6 +35,7 @@ export default async function FacturaDetallePage({
   const f = await obtenerFactura(id);
   if (!f) notFound();
 
+  const centros = f.tipo === "gasto" ? await listarCentrosCosto() : [];
   const pagos = f.estado === "confirmada" ? await listarPagosDeFactura(f.id) : [];
   const abonado = pagos
     .filter((p) => p.estado !== "anulado")
@@ -86,9 +89,16 @@ export default async function FacturaDetallePage({
               <div className="text-xs uppercase tracking-wide text-neutral-500">
                 Centro de costo (negocio)
               </div>
-              <div className="mt-0.5 font-medium text-neutral-900">
-                {f.centro_codigo} — {f.centro_nombre}
-              </div>
+              <CambiarCentroFactura
+                facturaId={f.id}
+                centroActual={f.centro_costo_id}
+                centros={centros}
+              />
+              {f.estado === "confirmada" && (
+                <p className="mt-1 text-xs text-neutral-400">
+                  Reetiqueta el gasto sin cambiar montos ni el número de asiento.
+                </p>
+              )}
             </div>
           </div>
           {f.glosa && <p className="mt-3 text-neutral-600">{f.glosa}</p>}

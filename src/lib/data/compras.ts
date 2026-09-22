@@ -316,6 +316,7 @@ export interface FacturaDetalle {
   bodega_nombre: string | null;
   cuenta_gasto_codigo: string | null;
   cuenta_gasto_nombre: string | null;
+  centro_costo_id: string | null;
   centro_codigo: string | null;
   centro_nombre: string | null;
   subtotal: number; // base gravable (con impuestos específicos, sin IVA)
@@ -350,6 +351,7 @@ interface FacturaDetalleEmbebido {
   total: number;
   estado: FacturaEstado;
   asiento_id: string | null;
+  centro_costo_id: string | null;
   proveedor: { nombre: string; cedula_juridica: string } | null;
   bodega: { id: string; codigo: string; nombre: string } | null;
   cuenta_gasto: { codigo: string; nombre: string } | null;
@@ -378,7 +380,7 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
     .from("facturas_compra")
     .select(
       "id, tipo, fecha_emision, fecha_vencimiento, clave, condicion_venta, plazo_credito, glosa, " +
-        "subtotal, iva_total, total, estado, asiento_id, " +
+        "subtotal, iva_total, total, estado, asiento_id, centro_costo_id, " +
         "proveedor:proveedores(nombre, cedula_juridica), " +
         "bodega:bodegas(id, codigo, nombre), " +
         "cuenta_gasto:cuentas(codigo, nombre), centro:centros_costo(codigo, nombre), " +
@@ -451,6 +453,7 @@ export async function obtenerFactura(id: string): Promise<FacturaDetalle | null>
     bodega_nombre: f.bodega?.nombre ?? null,
     cuenta_gasto_codigo: f.cuenta_gasto?.codigo ?? null,
     cuenta_gasto_nombre: f.cuenta_gasto?.nombre ?? null,
+    centro_costo_id: f.centro_costo_id ?? null,
     centro_codigo: f.centro?.codigo ?? null,
     centro_nombre: f.centro?.nombre ?? null,
     subtotal: Number(f.subtotal),

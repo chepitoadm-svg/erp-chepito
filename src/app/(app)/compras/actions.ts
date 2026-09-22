@@ -961,3 +961,25 @@ export async function anularNotaCredito(_prev: FormState, formData: FormData): P
   revalidatePath(`/compras/notas-credito/${id}`);
   return { ok: "Nota de crédito anulada." };
 }
+
+// === CAMBIAR CENTRO DE COSTO DE UNA FACTURA DE GASTO =======================
+// Corrige a qué centro (sucursal/canal) se carga el gasto. No toca importes ni
+// cuentas del asiento; si ya está posteada, solo reetiqueta el centro de sus
+// líneas de resultado. Los montos del Diario/Mayor siguen inmutables.
+export async function cambiarCentroFactura(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const centro = String(formData.get("centro_costo_id") ?? "").trim();
+  if (!id) return { error: "Factura inválida." };
+  if (!centro) return { error: "Elegí el centro de costo." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_cambiar_centro_factura", {
+    p_factura: id,
+    p_centro: centro,
+  });
+  if (error) return { error: limpiar(error.message) };
+  revalidatePath(`/compras/facturas/${id}`);
+  revalidatePath("/compras/facturas");
+  return { ok: "Centro de costo actualizado." };
+}

@@ -2018,6 +2018,7 @@ export interface Database {
         Returns: string;
       };
       fn_anular_nota_credito: { Args: { p_nc: string; p_motivo: string }; Returns: undefined };
+      fn_cambiar_centro_factura: { Args: { p_factura: string; p_centro: string }; Returns: undefined };
       fn_editar_nota_credito: {
         Args: {
           p_nc: string;
