@@ -35,7 +35,7 @@ export default async function FacturaDetallePage({
   const f = await obtenerFactura(id);
   if (!f) notFound();
 
-  const centros = f.tipo === "gasto" ? await listarCentrosCosto() : [];
+  const centros = await listarCentrosCosto();
   const pagos = f.estado === "confirmada" ? await listarPagosDeFactura(f.id) : [];
   const abonado = pagos
     .filter((p) => p.estado !== "anulado")
@@ -75,9 +75,12 @@ export default async function FacturaDetallePage({
         </div>
       </div>
 
-      {f.tipo === "gasto" && (
-        <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-4 text-sm">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Centro de costo — editable en gasto e inventario. En gasto define a qué
+          canal se carga el gasto; en inventario, a qué centro atribuye la compra
+          el módulo de costeo. */}
+      <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-4 text-sm">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {f.tipo === "gasto" && (
             <div>
               <div className="text-xs uppercase tracking-wide text-neutral-500">Cuenta de gasto</div>
               <div className="mt-0.5 text-neutral-900">
@@ -85,25 +88,23 @@ export default async function FacturaDetallePage({
                 {f.cuenta_gasto_nombre}
               </div>
             </div>
-            <div>
-              <div className="text-xs uppercase tracking-wide text-neutral-500">
-                Centro de costo (negocio)
-              </div>
-              <CambiarCentroFactura
-                facturaId={f.id}
-                centroActual={f.centro_costo_id}
-                centros={centros}
-              />
-              {f.estado === "confirmada" && (
-                <p className="mt-1 text-xs text-neutral-400">
-                  Reetiqueta el gasto sin cambiar montos ni el número de asiento.
-                </p>
-              )}
+          )}
+          <div>
+            <div className="text-xs uppercase tracking-wide text-neutral-500">
+              Centro de costo (negocio)
             </div>
+            <CambiarCentroFactura facturaId={f.id} centroActual={f.centro_costo_id} centros={centros} />
+            <p className="mt-1 text-xs text-neutral-400">
+              {f.tipo === "inventario"
+                ? "A qué centro atribuye esta compra el costeo por período (no toca el asiento)."
+                : f.estado === "confirmada"
+                  ? "Reetiqueta el gasto sin cambiar montos ni el número de asiento."
+                  : "A qué sucursal/canal se carga este gasto."}
+            </p>
           </div>
-          {f.glosa && <p className="mt-3 text-neutral-600">{f.glosa}</p>}
         </div>
-      )}
+        {f.tipo === "gasto" && f.glosa && <p className="mt-3 text-neutral-600">{f.glosa}</p>}
+      </div>
 
       {f.asiento_id && (
         <p className="mb-4 text-sm text-neutral-600">
