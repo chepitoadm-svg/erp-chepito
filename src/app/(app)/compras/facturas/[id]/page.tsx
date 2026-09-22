@@ -8,6 +8,7 @@ import { numeroFactura } from "@/lib/compras/numeroFactura";
 import { confirmarFactura } from "../../actions";
 import AnularFactura from "@/components/AnularFactura";
 import CambiarCentroFactura from "@/components/CambiarCentroFactura";
+import VolverLink from "@/components/VolverLink";
 
 const PAGO_ESTADO_CLS: Record<string, string> = {
   borrador: "bg-neutral-100 text-neutral-600",
@@ -43,9 +44,7 @@ export default async function FacturaDetallePage({
 
   return (
     <div>
-      <Link href="/compras/facturas" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Facturas
-      </Link>
+      <VolverLink fallback="/compras/facturas">← Facturas</VolverLink>
 
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
