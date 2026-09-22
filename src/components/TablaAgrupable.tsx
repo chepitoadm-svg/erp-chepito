@@ -48,10 +48,15 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
   const [filtros, setFiltros] = useState<Record<string, Set<string> | null>>({});
 
   // Persistencia opcional en sessionStorage (para que "volver" no borre lo que
-  // el usuario agrupó / filtró / ordenó). Se hidrata una vez al montar.
-  const hidratado = useRef(!persistKey);
+  // el usuario agrupó / filtró / ordenó). Se hidrata una vez al montar y se
+  // guarda ante cada cambio. El guardado OMITE la primera corrida (el montaje)
+  // para no pisar con los valores por defecto lo que se acaba de restaurar.
+  const saltarGuardado = useRef(true);
   useEffect(() => {
-    if (!persistKey) return;
+    if (!persistKey) {
+      saltarGuardado.current = false;
+      return;
+    }
     try {
       const raw = sessionStorage.getItem(`tabla:${persistKey}`);
       if (raw) {
@@ -71,11 +76,15 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
         }
       }
     } catch {}
-    hidratado.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistKey]);
   useEffect(() => {
-    if (!persistKey || !hidratado.current) return;
+    // Omitir el montaje: recién guardar cuando el usuario cambia algo.
+    if (saltarGuardado.current) {
+      saltarGuardado.current = false;
+      return;
+    }
+    if (!persistKey) return;
     try {
       const filtrosSer: Record<string, string[] | null> = {};
       for (const k of Object.keys(filtros)) filtrosSer[k] = filtros[k] ? [...filtros[k]!] : null;
