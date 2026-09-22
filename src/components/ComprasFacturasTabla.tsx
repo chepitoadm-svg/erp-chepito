@@ -147,6 +147,7 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
       columnas={columnas}
       claveFila={(f) => f.id}
       minWidth="min-w-[820px]"
+      persistKey="compras-facturas"
       vacio="Ninguna factura coincide con los filtros."
     />
   );

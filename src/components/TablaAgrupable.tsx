@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import FiltroColumna from "@/components/FiltroColumna";
 
 const money = (n: number) => n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -32,9 +32,12 @@ interface Props<T> {
   claveFila: (row: T) => string;
   minWidth?: string;
   vacio?: React.ReactNode;
+  /** Si se pasa, se recuerda el agrupado / filtros / orden en la sesión del
+   *  navegador con esta clave, para que al volver la tabla se vea igual. */
+  persistKey?: string;
 }
 
-export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, claveFila, minWidth = "min-w-[720px]", vacio }: Props<T>) {
+export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, claveFila, minWidth = "min-w-[720px]", vacio, persistKey }: Props<T>) {
   const agrupables = columnas.filter((c) => c.grupo);
   const visibles = columnas.filter((c) => !c.soloGrupo);
   const [agrupado, setAgrupado] = useState<string[]>([]);
@@ -43,6 +46,45 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
   const [orden, setOrden] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
   // Filtro tipo Excel por columna agrupable: null = mostrar todos.
   const [filtros, setFiltros] = useState<Record<string, Set<string> | null>>({});
+
+  // Persistencia opcional en sessionStorage (para que "volver" no borre lo que
+  // el usuario agrupó / filtró / ordenó). Se hidrata una vez al montar.
+  const hidratado = useRef(!persistKey);
+  useEffect(() => {
+    if (!persistKey) return;
+    try {
+      const raw = sessionStorage.getItem(`tabla:${persistKey}`);
+      if (raw) {
+        const s = JSON.parse(raw) as {
+          agrupado?: string[];
+          orden?: { key: string; dir: "asc" | "desc" } | null;
+          expandidos?: string[];
+          filtros?: Record<string, string[] | null>;
+        };
+        if (Array.isArray(s.agrupado)) setAgrupado(s.agrupado);
+        if (s.orden !== undefined) setOrden(s.orden);
+        if (Array.isArray(s.expandidos)) setExpandidos(new Set(s.expandidos));
+        if (s.filtros) {
+          const f: Record<string, Set<string> | null> = {};
+          for (const k of Object.keys(s.filtros)) f[k] = s.filtros[k] === null ? null : new Set(s.filtros[k] as string[]);
+          setFiltros(f);
+        }
+      }
+    } catch {}
+    hidratado.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistKey]);
+  useEffect(() => {
+    if (!persistKey || !hidratado.current) return;
+    try {
+      const filtrosSer: Record<string, string[] | null> = {};
+      for (const k of Object.keys(filtros)) filtrosSer[k] = filtros[k] ? [...filtros[k]!] : null;
+      sessionStorage.setItem(
+        `tabla:${persistKey}`,
+        JSON.stringify({ agrupado, orden, expandidos: [...expandidos], filtros: filtrosSer }),
+      );
+    } catch {}
+  }, [persistKey, agrupado, orden, expandidos, filtros]);
 
   const colDe = (key: string) => columnas.find((c) => c.key === key)!;
   const noAgrupadas = agrupables.filter((c) => !agrupado.includes(c.key));
