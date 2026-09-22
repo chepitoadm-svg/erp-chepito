@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import FiltroColumna from "@/components/FiltroColumna";
 
 const money = (n: number) => n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -33,16 +34,35 @@ interface Props<T> {
   vacio?: React.ReactNode;
 }
 
-export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth = "min-w-[720px]", vacio }: Props<T>) {
+export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, claveFila, minWidth = "min-w-[720px]", vacio }: Props<T>) {
   const agrupables = columnas.filter((c) => c.grupo);
   const visibles = columnas.filter((c) => !c.soloGrupo);
   const [agrupado, setAgrupado] = useState<string[]>([]);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [arrastreOver, setArrastreOver] = useState(false);
   const [orden, setOrden] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  // Filtro tipo Excel por columna agrupable: null = mostrar todos.
+  const [filtros, setFiltros] = useState<Record<string, Set<string> | null>>({});
 
   const colDe = (key: string) => columnas.find((c) => c.key === key)!;
   const noAgrupadas = agrupables.filter((c) => !agrupado.includes(c.key));
+
+  // Aplica los filtros de columna a las filas antes de ordenar/agrupar.
+  const filas = useMemo(() => {
+    const activos = Object.entries(filtros).filter(([, sel]) => sel !== null) as [string, Set<string>][];
+    if (activos.length === 0) return todasLasFilas;
+    return todasLasFilas.filter((row) =>
+      activos.every(([key, sel]) => {
+        const c = colDe(key);
+        return c?.grupo ? sel.has(c.grupo(row) || "(vacío)") : true;
+      }),
+    );
+  }, [todasLasFilas, filtros, columnas]);
+  // Valores distintos de una columna agrupable, para el desplegable del filtro.
+  const valoresDe = (key: string) => {
+    const c = colDe(key);
+    return c?.grupo ? todasLasFilas.map((r) => c.grupo!(r) || "(vacío)") : [];
+  };
 
   // Una columna es ordenable si tiene un accesor de orden explícito o un monto.
   const esOrdenable = (c: ColumnaTabla<T>) => !!c.orden || !!c.monto;
@@ -203,6 +223,15 @@ export default function TablaAgrupable<T>({ filas, columnas, claveFila, minWidth
                       ) : (
                         <span className="ml-1 text-neutral-300">⇅</span>
                       ))}
+                    {c.grupo && (
+                      <span className="ml-1 inline-flex align-middle">
+                        <FiltroColumna
+                          valores={valoresDe(c.key)}
+                          seleccion={filtros[c.key] ?? null}
+                          onAplicar={(sel) => setFiltros((f) => ({ ...f, [c.key]: sel }))}
+                        />
+                      </span>
+                    )}
                   </th>
                 );
               })}
