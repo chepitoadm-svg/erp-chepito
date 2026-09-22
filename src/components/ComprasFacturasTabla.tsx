@@ -51,9 +51,14 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
     {
       key: "proveedor",
       titulo: "Proveedor",
+      th: "max-w-[220px]",
       grupo: (f) => f.proveedor_nombre || "—",
       celda: (f) => (
-        <Link href={`/compras/facturas/${f.id}`} className="font-medium text-neutral-900 hover:underline">
+        <Link
+          href={`/compras/facturas/${f.id}`}
+          title={f.proveedor_nombre}
+          className="block max-w-[220px] truncate font-medium text-neutral-900 hover:underline"
+        >
           {f.proveedor_nombre}
         </Link>
       ),
@@ -61,7 +66,11 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
     {
       key: "factura",
       titulo: "Factura",
-      celda: (f) => <span className="font-mono text-xs text-neutral-500">{numeroFactura(f.clave ?? "") ?? "—"}</span>,
+      celda: (f) => (
+        <span className="font-mono text-xs text-neutral-500" title={numeroFactura(f.clave ?? "") ?? ""}>
+          {numeroFactura(f.clave ?? "") ?? "—"}
+        </span>
+      ),
     },
     {
       key: "centro",
@@ -130,16 +139,6 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
       grupo: (f) => f.estado,
       celda: (f) => <span className={`rounded-full px-2 py-0.5 text-xs ${ESTADO_CLS[f.estado]}`}>{f.estado}</span>,
     },
-    {
-      key: "acciones",
-      titulo: "",
-      align: "right",
-      celda: (f) => (
-        <Link href={`/compras/facturas/${f.id}`} className="text-neutral-600 hover:text-neutral-900">
-          Ver
-        </Link>
-      ),
-    },
   ];
 
   return (
@@ -147,7 +146,7 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
       filas={facturas}
       columnas={columnas}
       claveFila={(f) => f.id}
-      minWidth="min-w-[980px]"
+      minWidth="min-w-[820px]"
       vacio="Ninguna factura coincide con los filtros."
     />
   );

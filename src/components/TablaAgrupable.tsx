@@ -209,7 +209,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
                     title={
                       c.grupo ? "Arrastrá o tocá para agrupar" : ordenable ? "Tocá para ordenar" : undefined
                     }
-                    className={`px-4 py-3 font-medium ${c.align === "right" ? "text-right" : ""} ${c.th ?? ""} ${
+                    className={`px-3 py-3 font-medium ${c.align === "right" ? "text-right" : ""} ${c.th ?? ""} ${
                       c.grupo ? "cursor-grab select-none hover:text-neutral-800" : ""
                     } ${ordenable ? "cursor-pointer select-none hover:text-neutral-800" : ""} ${
                       activa ? "text-neutral-800" : ""
@@ -241,7 +241,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
           <tbody className="divide-y divide-neutral-100">
             {filas.length === 0 ? (
               <tr>
-                <td colSpan={visibles.length} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={visibles.length} className="px-3 py-8 text-center text-neutral-400">
                   {vacio ?? "Sin datos."}
                 </td>
               </tr>
@@ -249,7 +249,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
               filasOrdenadas.map((row) => (
                 <tr key={claveFila(row)}>
                   {visibles.map((c) => (
-                    <td key={c.key} className={`px-4 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}>
+                    <td key={c.key} className={`px-3 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}>
                       {c.celda(row)}
                     </td>
                   ))}
@@ -262,7 +262,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
                     {visibles.map((c, ci) => (
                       <td
                         key={c.key}
-                        className={`px-4 py-2 text-sm ${c.align === "right" ? "text-right tabular-nums font-semibold text-neutral-900" : ""}`}
+                        className={`px-3 py-2 text-sm ${c.align === "right" ? "text-right tabular-nums font-semibold text-neutral-900" : ""}`}
                       >
                         {ci === 0 ? (
                           <button
@@ -285,7 +285,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
                     {visibles.map((c, ci) => (
                       <td
                         key={c.key}
-                        className={`px-4 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}
+                        className={`px-3 py-3 ${c.align === "right" ? "text-right tabular-nums" : ""}`}
                         style={ci === 0 ? { paddingLeft: e.nivel * 16 + 16 } : undefined}
                       >
                         {c.celda(e.row)}
@@ -301,7 +301,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
             <tfoot>
               <tr className="border-t-2 border-neutral-300 bg-neutral-50">
                 {visibles.map((c, ci) => (
-                  <td key={c.key} className={`px-4 py-2 text-sm ${c.align === "right" ? "text-right font-bold tabular-nums text-neutral-900" : ""}`}>
+                  <td key={c.key} className={`px-3 py-2 text-sm ${c.align === "right" ? "text-right font-bold tabular-nums text-neutral-900" : ""}`}>
                     {ci === 0 ? (
                       <span className="font-semibold text-neutral-700">Total ({filas.length})</span>
                     ) : c.monto ? (
