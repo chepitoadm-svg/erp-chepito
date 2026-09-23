@@ -52,13 +52,22 @@ export async function ingestarComprobante(
   const { data: empresa } = await supabase.from("empresa").select("cedula_juridica").limit(1).single();
   const nuestraCedula = empresa?.cedula_juridica ?? null;
 
-  // Proveedor por cédula del emisor.
+  // Proveedor por cédula del emisor: primero la cédula principal; si no calza,
+  // por cédula alias (mismo proveedor que factura con varias cédulas).
   const { data: prov } = await supabase
     .from("proveedores")
     .select("id, estado")
     .eq("cedula_juridica", comp.emisor_cedula)
     .maybeSingle();
-  const proveedorId = prov?.id ?? null;
+  let proveedorId = prov?.id ?? null;
+  if (!proveedorId && comp.emisor_cedula) {
+    const { data: alias } = await supabase
+      .from("proveedor_cedulas")
+      .select("proveedor_id")
+      .eq("cedula", comp.emisor_cedula)
+      .maybeSingle();
+    proveedorId = alias?.proveedor_id ?? null;
+  }
 
   // Mapeo de líneas por CodigoComercial (aprende con el uso).
   let mapa = new Map<string, { articulo_id: string; codigo: string }>();

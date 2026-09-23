@@ -465,6 +465,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["proveedor_articulos"]["Insert"]>;
         Relationships: [];
       };
+      proveedor_cedulas: {
+        Row: {
+          id: string;
+          proveedor_id: string;
+          cedula: string;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          proveedor_id: string;
+          cedula: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["proveedor_cedulas"]["Insert"]>;
+        Relationships: [];
+      };
       proveedor_alias_banco: {
         Row: {
           id: string;
