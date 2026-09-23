@@ -3,7 +3,12 @@ name: Jalar facturas del correo
 on:
   schedule:
     - cron: "*/15 * * * *" # cada 15 minutos
-  workflow_dispatch: {} # también se puede correr a mano desde la pestaña Actions
+  workflow_dispatch: # también se puede correr a mano desde la pestaña Actions
+    inputs:
+      reprocesar:
+        description: "Re-jalar TODO (ignora la etiqueta ERP_JALADO). Para recuperar correos saltados por error."
+        type: boolean
+        default: false
 
 # Evita que dos corridas se pisen.
 concurrency:
@@ -31,4 +36,5 @@ jobs:
           GMAIL_USER: chepitoadm@gmail.com
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           INGESTA_TOKEN: ${{ secrets.INGESTA_TOKEN }}
+          REPROCESAR: ${{ github.event.inputs.reprocesar }}
         run: node index.mjs

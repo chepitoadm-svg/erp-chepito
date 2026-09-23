@@ -13,6 +13,11 @@ const TOKEN = process.env.INGESTA_TOKEN;
 const USER = process.env.GMAIL_USER;
 const PASS = process.env.GMAIL_APP_PASSWORD;
 const LABEL = "ERP_JALADO";
+// Recuperación: si se corre a mano con reprocesar=true, IGNORA la etiqueta
+// ERP_JALADO y vuelve a jalar todo desde 'desde' (el ERP deduplica por clave,
+// así que no crea duplicados; sirve para recuperar correos que quedaron
+// marcados por error, p.ej. rechazados antes de permitir su cédula).
+const REPROCESAR = process.env.REPROCESAR === "true";
 
 if (!TOKEN || !USER || !PASS) {
   // Todavía no están los secretos (GMAIL_APP_PASSWORD / INGESTA_TOKEN). Salimos
@@ -84,7 +89,7 @@ async function main() {
       // de fetch, si no imapflow trata los números como secuencia (trae otros correos).
       const pendientes = [];
       for await (const msg of client.fetch(uids, { uid: true, flags: true, source: true }, { uid: true })) {
-        if (msg.flags && msg.flags.has(LABEL)) continue; // ya procesado
+        if (!REPROCESAR && msg.flags && msg.flags.has(LABEL)) continue; // ya procesado
         pendientes.push({ uid: msg.uid, source: msg.source });
       }
       // 2) PROCESAR (parse + subir al ERP) con la descarga ya terminada.
@@ -105,12 +110,25 @@ async function main() {
           body: JSON.stringify({ xmls, remitente: f.remitente }),
         });
         if (pRes.ok) {
-          ok++;
-          totalOk++;
-          try {
-            await client.messageFlagsAdd(m.uid, [LABEL], { uid: true });
-          } catch {
-            /* si Gmail no acepta el keyword, igual el ERP deduplica por clave */
+          // Solo marcar el correo como procesado si NO quedó rechazado únicamente
+          // por "emisor no permitido" (esos se reintentan cuando se agregue la
+          // cédula; marcarlos los saltaría para siempre).
+          const data = await pRes.json().catch(() => ({}));
+          const rs = Array.isArray(data.resultados) ? data.resultados : [];
+          const algunoOk = rs.some((r) => r && r.ok);
+          const soloNoPermitido = rs.length > 0 && rs.every((r) => r && !r.ok && r.code === "emisor_no_permitido");
+          if (algunoOk) {
+            ok++;
+            totalOk++;
+          }
+          if (soloNoPermitido && !algunoOk) {
+            console.log(`  emisor no permitido todavía; NO se marca (se reintenta luego).`);
+          } else {
+            try {
+              await client.messageFlagsAdd(m.uid, [LABEL], { uid: true });
+            } catch {
+              /* si Gmail no acepta el keyword, igual el ERP deduplica por clave */
+            }
           }
         } else {
           console.warn(`  /api/ingesta HTTP ${pRes.status}: ${(await pRes.text()).slice(0, 200)}`);
