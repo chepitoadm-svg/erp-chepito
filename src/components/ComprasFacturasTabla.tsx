@@ -35,6 +35,7 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
       key: "emision",
       titulo: "Emisión",
       grupo: (f) => fechaCR(f.fecha_emision),
+      orden: (f) => f.fecha_emision,
       celda: (f) => <span className="text-neutral-600">{fechaCR(f.fecha_emision)}</span>,
     },
     { key: "mes", titulo: "Mes", soloGrupo: true, grupo: (f) => f.fecha_emision.slice(0, 7), celda: () => null },
@@ -42,6 +43,7 @@ export default function ComprasFacturasTabla({ facturas }: { facturas: FacturaLi
     {
       key: "vence",
       titulo: "Vence",
+      orden: (f) => f.fecha_vencimiento ?? "",
       celda: (f) => (
         <span className={f.pago === "vencida" ? "font-medium text-red-600" : "text-neutral-500"}>
           {fechaCR(f.fecha_vencimiento ?? "") || "—"}

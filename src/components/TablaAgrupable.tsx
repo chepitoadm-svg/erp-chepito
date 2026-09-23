@@ -256,15 +256,23 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
                     key={c.key}
                     draggable={!!c.grupo}
                     onDragStart={(e) => c.grupo && e.dataTransfer.setData("text/col", c.key)}
-                    onClick={() => (c.grupo ? agregar(c.key) : ordenable ? alternarOrden(c.key) : undefined)}
+                    onClick={() => (ordenable ? alternarOrden(c.key) : c.grupo ? agregar(c.key) : undefined)}
                     title={
-                      c.grupo ? "Arrastrá o tocá para agrupar" : ordenable ? "Tocá para ordenar" : undefined
+                      ordenable
+                        ? c.grupo
+                          ? "Tocá para ordenar (arrastrá para agrupar)"
+                          : "Tocá para ordenar"
+                        : c.grupo
+                          ? "Arrastrá o tocá para agrupar"
+                          : undefined
                     }
                     className={`px-3 py-3 font-medium ${c.align === "right" ? "text-right" : ""} ${c.th ?? ""} ${
-                      c.grupo ? "cursor-grab select-none hover:text-neutral-800" : ""
-                    } ${ordenable ? "cursor-pointer select-none hover:text-neutral-800" : ""} ${
-                      activa ? "text-neutral-800" : ""
-                    }`}
+                      ordenable
+                        ? "cursor-pointer select-none hover:text-neutral-800"
+                        : c.grupo
+                          ? "cursor-grab select-none hover:text-neutral-800"
+                          : ""
+                    } ${activa ? "text-neutral-800" : ""}`}
                   >
                     {c.titulo}
                     {c.grupo && <span className="ml-1 text-neutral-300">⠿</span>}
