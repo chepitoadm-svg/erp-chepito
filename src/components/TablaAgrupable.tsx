@@ -66,12 +66,20 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
           expandidos?: string[];
           filtros?: Record<string, string[] | null>;
         };
-        if (Array.isArray(s.agrupado)) setAgrupado(s.agrupado);
-        if (s.orden !== undefined) setOrden(s.orden);
+        // Descartar claves que ya no existen como columna (estado guardado viejo),
+        // para no romper el render al buscarlas.
+        const esAgrupable = (k: string) => columnas.some((c) => c.key === k && c.grupo);
+        if (Array.isArray(s.agrupado)) setAgrupado(s.agrupado.filter(esAgrupable));
+        if (s.orden !== undefined) {
+          setOrden(s.orden && columnas.some((c) => c.key === s.orden!.key) ? s.orden : null);
+        }
         if (Array.isArray(s.expandidos)) setExpandidos(new Set(s.expandidos));
         if (s.filtros) {
           const f: Record<string, Set<string> | null> = {};
-          for (const k of Object.keys(s.filtros)) f[k] = s.filtros[k] === null ? null : new Set(s.filtros[k] as string[]);
+          for (const k of Object.keys(s.filtros)) {
+            if (!esAgrupable(k)) continue;
+            f[k] = s.filtros[k] === null ? null : new Set(s.filtros[k] as string[]);
+          }
           setFiltros(f);
         }
       }
@@ -116,7 +124,7 @@ export default function TablaAgrupable<T>({ filas: todasLasFilas, columnas, clav
   };
 
   // Una columna es ordenable si tiene un accesor de orden explícito o un monto.
-  const esOrdenable = (c: ColumnaTabla<T>) => !!c.orden || !!c.monto;
+  const esOrdenable = (c?: ColumnaTabla<T>) => !!c && (!!c.orden || !!c.monto);
   const valorOrden = (c: ColumnaTabla<T>, row: T) =>
     c.orden ? c.orden(row) : c.monto ? c.monto(row) : 0;
   // Al tocar el encabezado: 1er clic mayor→menor, 2º menor→mayor, 3º sin orden.
