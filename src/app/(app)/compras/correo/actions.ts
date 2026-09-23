@@ -54,12 +54,15 @@ export async function toggleFuenteCorreo(formData: FormData): Promise<void> {
 // Dispara el workflow "Jalar facturas del correo" en GitHub Actions, para jalar
 // on-demand sin esperar los 15 min. Necesita GITHUB_DISPATCH_TOKEN (PAT con
 // permiso Actions: read/write sobre el repo) en las env vars del ERP.
-export async function lanzarJalado(_prev: FormState, _formData: FormData): Promise<FormState> {
+export async function lanzarJalado(_prev: FormState, formData: FormData): Promise<FormState> {
   await requerirPermiso("compras.facturar");
   const token = process.env.GITHUB_DISPATCH_TOKEN;
   if (!token) {
     return { error: "Falta configurar GITHUB_DISPATCH_TOKEN en el servidor (Netlify)." };
   }
+  // reprocesar=true ignora la etiqueta ERP_JALADO y re-jala TODO desde la fecha
+  // 'desde' (recupera correos que quedaron saltados por error; el ERP no duplica).
+  const reprocesar = String(formData.get("reprocesar") ?? "") === "true";
   try {
     const res = await fetch(
       "https://api.github.com/repos/chepitoadm-svg/erp-chepito/actions/workflows/jalar-correo.yml/dispatches",
@@ -70,11 +73,15 @@ export async function lanzarJalado(_prev: FormState, _formData: FormData): Promi
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
         },
-        body: JSON.stringify({ ref: "main" }),
+        body: JSON.stringify({ ref: "main", inputs: { reprocesar: reprocesar ? "true" : "false" } }),
       },
     );
     if (res.status === 204) {
-      return { ok: "Lanzado. En ~1 minuto las facturas nuevas aparecen en el ingestor." };
+      return {
+        ok: reprocesar
+          ? "Re-jalado lanzado. En ~1-2 min reaparecen también los correos que estaban saltados."
+          : "Lanzado. En ~1 minuto las facturas nuevas aparecen en el ingestor.",
+      };
     }
     const txt = await res.text();
     return { error: `GitHub respondió ${res.status}. ${limpiar(txt).slice(0, 160)}` };
