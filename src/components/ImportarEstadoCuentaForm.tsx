@@ -34,7 +34,7 @@ export default function ImportarEstadoCuentaForm({ cuentas, hoy }: { cuentas: Cu
       </div>
 
       <label className="block">
-        <span className="text-xs uppercase tracking-wide text-neutral-500">Estado de cuenta (.xls del BAC o .pdf del Popular)</span>
+        <span className="text-xs uppercase tracking-wide text-neutral-500">Estado de cuenta (.xls del BAC o RIDIVI, o .pdf del Popular)</span>
         <input
           type="file"
           name="archivo"

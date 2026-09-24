@@ -24,7 +24,7 @@ export default function ImportarMasBanco({ conciliacionId }: { conciliacionId: s
       >
         <input type="hidden" name="id" value={conciliacionId} />
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
-          Estado de cuenta (.xls del BAC o .pdf del Popular) — podés subirlo por partes
+          Estado de cuenta (.xls del BAC o RIDIVI, o .pdf del Popular) — podés subirlo por partes
           <input
             type="file"
             name="archivo"

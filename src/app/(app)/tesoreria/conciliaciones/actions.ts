@@ -6,13 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 import { requerirPermiso } from "@/lib/auth/permisos";
 import { parseEstadoCuentaBAC, type EstadoCuentaBAC } from "@/lib/xls/bacEstadoCuenta";
 import { parseEstadoCuentaPopular } from "@/lib/pdf/popularEstadoCuenta";
+import { parseEstadoCuentaRidivi, esEstadoCuentaRidivi } from "@/lib/xls/ridiviEstadoCuenta";
 
-// Enruta al lector según el tipo de archivo: .pdf = Banco Popular, .xls/.xlsx = BAC.
+// Enruta al lector según el archivo: .pdf = Banco Popular; .xls/.xlsx = RIDIVI o
+// BAC (ambos Excel, se distinguen por contenido).
 async function leerEstadoCuenta(archivo: File): Promise<EstadoCuentaBAC> {
   const buf = new Uint8Array(await archivo.arrayBuffer());
   const nombre = (archivo.name || "").toLowerCase();
   const esPdf = nombre.endsWith(".pdf") || archivo.type === "application/pdf";
-  return esPdf ? parseEstadoCuentaPopular(buf) : parseEstadoCuentaBAC(buf);
+  if (esPdf) return parseEstadoCuentaPopular(buf);
+  if (esEstadoCuentaRidivi(buf)) return parseEstadoCuentaRidivi(buf);
+  return parseEstadoCuentaBAC(buf);
 }
 
 export interface FormState {
@@ -112,7 +116,7 @@ export async function importarEstadoCuenta(_prev: FormState, formData: FormData)
   if (!cuenta) return { error: "Elegí la cuenta bancaria." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCorte)) return { error: "Elegí la fecha de corte." };
   const archivo = formData.get("archivo");
-  if (!(archivo instanceof File) || archivo.size === 0) return { error: "Subí el estado de cuenta (.xls del BAC o .pdf del Popular)." };
+  if (!(archivo instanceof File) || archivo.size === 0) return { error: "Subí el estado de cuenta (.xls del BAC o RIDIVI, o .pdf del Popular)." };
 
   let ec;
   try {
@@ -147,7 +151,7 @@ export async function agregarEstadoCuenta(_prev: FormState, formData: FormData):
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Falta la conciliación." };
   const archivo = formData.get("archivo");
-  if (!(archivo instanceof File) || archivo.size === 0) return { error: "Subí el estado de cuenta (.xls del BAC o .pdf del Popular)." };
+  if (!(archivo instanceof File) || archivo.size === 0) return { error: "Subí el estado de cuenta (.xls del BAC o RIDIVI, o .pdf del Popular)." };
 
   let ec;
   try {
