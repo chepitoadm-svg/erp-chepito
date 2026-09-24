@@ -110,6 +110,8 @@ export default async function ConciliacionDetallePage({ params }: { params: Prom
         centros={centros}
         editable={editable}
         proveedores={proveedores}
+        saldoLibros={c.saldo_libros}
+        saldoBanco={c.saldo_final}
       />
 
       {editable && (

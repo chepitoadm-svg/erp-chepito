@@ -220,6 +220,8 @@ export default function ConciliadorPanel({
   centros,
   editable,
   proveedores,
+  saldoLibros,
+  saldoBanco,
 }: {
   conciliacionId: string;
   lineas: LineaBanco[];
@@ -229,8 +231,10 @@ export default function ConciliadorPanel({
   centros: Centro[];
   editable: boolean;
   proveedores: { id: string; nombre: string }[];
+  saldoLibros: number;
+  saldoBanco: number;
 }) {
-  const [tab, setTab] = useState<"pendientes" | "conciliados">("pendientes");
+  const [tab, setTab] = useState<"pendientes" | "conciliados" | "resumen">("pendientes");
   const [selBancos, setSelBancos] = useState<Set<string>>(new Set());
   const [selMovs, setSelMovs] = useState<Set<string>>(new Set());
   const [modoRegistrar, setModoRegistrar] = useState(false);
@@ -397,9 +401,23 @@ export default function ConciliadorPanel({
         >
           Conciliados ({conciliadas.length})
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("resumen")}
+          className={`-mb-px border-b-2 px-3 py-2 ${tab === "resumen" ? "border-neutral-900 font-medium text-neutral-900" : "border-transparent text-neutral-500 hover:text-neutral-800"}`}
+        >
+          Resumen
+        </button>
       </div>
 
-      {tab === "conciliados" ? (
+      {tab === "resumen" ? (
+        <ResumenConciliacion
+          saldoLibros={saldoLibros}
+          saldoBanco={saldoBanco}
+          movimientos={movimientos}
+          bancoPendientes={pendientes}
+        />
+      ) : tab === "conciliados" ? (
         <TablaConciliados lineas={conciliadas} editable={editable} proveedores={proveedores} />
       ) : (
         <>
@@ -894,6 +912,89 @@ export default function ConciliadorPanel({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Fila del resumen de conciliación (etiqueta a la izquierda, monto a la derecha).
+function FilaResumen({
+  etiqueta,
+  valor,
+  signo,
+  sub,
+  fuerte,
+}: {
+  etiqueta: string;
+  valor: number;
+  signo?: "+" | "−";
+  sub?: boolean;
+  fuerte?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between py-1.5 ${sub ? "pl-6 text-neutral-600" : "text-neutral-800"} ${
+        fuerte ? "border-t border-neutral-200 font-semibold text-neutral-900" : ""
+      }`}
+    >
+      <span>
+        {signo && <span className="mr-1 text-neutral-400">{signo}</span>}
+        {etiqueta}
+      </span>
+      <span className="tabular-nums">{money(valor)}</span>
+    </div>
+  );
+}
+
+// Resumen "puente" de la conciliación: del saldo en libros al saldo en bancos,
+// pasando por las partidas conciliatorias (lo que falta conciliar en cada lado).
+// Cuando todo está conciliado, las partidas quedan en 0 y libros = bancos.
+function ResumenConciliacion({
+  saldoLibros,
+  saldoBanco,
+  movimientos,
+  bancoPendientes,
+}: {
+  saldoLibros: number;
+  saldoBanco: number;
+  movimientos: MovimientoLibro[];
+  bancoPendientes: LineaBanco[];
+}) {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  // Libros pendientes: crédito = salida (retiro), débito = entrada (depósito).
+  const retirosLibros = r2(movimientos.reduce((s, m) => s + Number(m.credito || 0), 0));
+  const depositosLibros = r2(movimientos.reduce((s, m) => s + Number(m.debito || 0), 0));
+  const saldoAlCorte = r2(saldoLibros + retirosLibros - depositosLibros);
+  // Banco pendientes: crédito = entrada (depósito), débito = salida (retiro).
+  const depositosBanco = r2(bancoPendientes.reduce((s, l) => s + Number(l.credito || 0), 0));
+  const retirosBanco = r2(bancoPendientes.reduce((s, l) => s + Number(l.debito || 0), 0));
+  const saldoAjustado = r2(saldoAlCorte + depositosBanco - retirosBanco);
+  const diferencia = r2(saldoAjustado - saldoBanco);
+  const calza = Math.abs(diferencia) < 0.005;
+
+  return (
+    <div className="mx-auto max-w-xl rounded-lg border border-neutral-200 bg-white p-4 text-sm">
+      <h3 className="mb-2 text-sm font-medium text-neutral-800">Resumen — saldo en libros vs saldo en bancos</h3>
+      <FilaResumen etiqueta="Saldo en libros a la fecha de corte" valor={saldoLibros} fuerte />
+      <FilaResumen etiqueta="Retiros en libros no conciliados (cheques, ND, etc.)" valor={retirosLibros} signo="+" sub />
+      <FilaResumen etiqueta="Depósitos en libros no conciliados" valor={depositosLibros} signo="−" sub />
+      <FilaResumen etiqueta="Saldo al corte" valor={saldoAlCorte} fuerte />
+      <FilaResumen etiqueta="Depósitos del banco pendientes de registrar en libros" valor={depositosBanco} signo="+" sub />
+      <FilaResumen etiqueta="Retiros del banco pendientes de registrar en libros" valor={retirosBanco} signo="−" sub />
+      <FilaResumen etiqueta="Saldo ajustado" valor={saldoAjustado} fuerte />
+      <FilaResumen etiqueta="Saldo en bancos" valor={saldoBanco} />
+      <div
+        className={`mt-1 flex items-center justify-between border-t-2 border-neutral-300 py-2 font-bold ${
+          calza ? "text-green-700" : "text-red-600"
+        }`}
+      >
+        <span>DIFERENCIA</span>
+        <span className="tabular-nums">{money(diferencia)}</span>
+      </div>
+      <p className={`mt-1 text-xs ${calza ? "text-green-700" : "text-amber-700"}`}>
+        {calza
+          ? "✓ Cuadra: libros y bancos coinciden. La conciliación se puede cerrar."
+          : "La diferencia debe quedar en 0 para cerrar. Revisá lo que falta conciliar en cada lado."}
+      </p>
     </div>
   );
 }
