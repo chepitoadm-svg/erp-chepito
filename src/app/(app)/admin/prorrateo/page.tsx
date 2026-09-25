@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { listarPeriodos, estadoProrrateo, listarCentrosFinales } from "@/lib/data/admin";
+import {
+  listarPeriodos,
+  estadoProrrateo,
+  listarCentrosFinales,
+  centrosPorCuenta,
+  cuentasProrrateo,
+  type CuentaProrrateo,
+} from "@/lib/data/admin";
 import ProrrateoBases from "@/components/ProrrateoBases";
 import GenerarProrrateoBtn from "@/components/GenerarProrrateoBtn";
 
@@ -24,10 +31,21 @@ export default async function ProrrateoPage({
     periodos.find((p) => p.estado === "abierto") ??
     periodos[0];
 
-  const [centros, finales] = await Promise.all([
+  const [centros, finales, porCuentaIds] = await Promise.all([
     estadoProrrateo(periodoSel.id),
     listarCentrosFinales(),
+    centrosPorCuenta(),
   ]);
+  const porCuenta = new Set(porCuentaIds);
+  // Para los centros "por cuenta" (General), traer sus cuentas con saldo.
+  const cuentasPorCentro = new Map<string, CuentaProrrateo[]>();
+  await Promise.all(
+    centros
+      .filter((c) => porCuenta.has(c.centro_id))
+      .map(async (c) => {
+        cuentasPorCentro.set(c.centro_id, await cuentasProrrateo(periodoSel.id, c.centro_id));
+      }),
+  );
 
   return (
     <div>
@@ -67,8 +85,14 @@ export default async function ProrrateoPage({
           </div>
         )}
         {centros.map((c) => {
+          const esPorCuenta = porCuenta.has(c.centro_id);
+          const cuentas = cuentasPorCentro.get(c.centro_id) ?? [];
           const suma100 = Math.abs(Number(c.suma_bases) - 100) < 0.005;
-          const puedeGenerar = suma100 && Number(c.pool) !== 0 && periodoSel.estado === "abierto";
+          // Por cuenta: cada cuenta con saldo debe sumar 100. Centro: la suma del centro.
+          const todasCuadran = esPorCuenta
+            ? cuentas.every((q) => Math.abs(Number(q.suma_bases) - 100) < 0.005)
+            : suma100;
+          const puedeGenerar = todasCuadran && Number(c.pool) !== 0 && periodoSel.estado === "abierto";
           return (
             <div key={c.centro_id} className="rounded-lg border border-neutral-200 bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
@@ -81,6 +105,9 @@ export default async function ProrrateoPage({
                       se prorratea
                     </span>
                   )}
+                  {esPorCuenta && (
+                    <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">por cuenta</span>
+                  )}
                 </div>
                 <div className="text-sm text-neutral-500">
                   Pool acumulado:{" "}
@@ -88,12 +115,33 @@ export default async function ProrrateoPage({
                 </div>
               </div>
 
-              <ProrrateoBases
-                periodoId={periodoSel.id}
-                origenId={c.centro_id}
-                finales={finales}
-                inicial={c.bases}
-              />
+              {esPorCuenta ? (
+                cuentas.length === 0 ? (
+                  <p className="text-sm text-neutral-400">No hay cuentas con saldo en este centro este mes.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {cuentas.map((q) => (
+                      <div key={q.cuenta_id} className="rounded-md border border-neutral-100 bg-neutral-50/50 p-3">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-medium text-neutral-800">
+                            <span className="font-mono text-xs text-neutral-500">{q.codigo}</span> {q.nombre}
+                          </span>
+                          <span className="tabular-nums text-neutral-600">{money(Number(q.pool))}</span>
+                        </div>
+                        <ProrrateoBases
+                          periodoId={periodoSel.id}
+                          origenId={c.centro_id}
+                          cuentaId={q.cuenta_id}
+                          finales={finales}
+                          inicial={q.bases}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <ProrrateoBases periodoId={periodoSel.id} origenId={c.centro_id} finales={finales} inicial={c.bases} />
+              )}
 
               <div className="mt-3 border-t border-neutral-100 pt-3">
                 <GenerarProrrateoBtn
@@ -101,8 +149,10 @@ export default async function ProrrateoPage({
                   origenId={c.centro_id}
                   disabled={!puedeGenerar}
                   title={
-                    !suma100
-                      ? "Las bases deben sumar 100"
+                    !todasCuadran
+                      ? esPorCuenta
+                        ? "Cada cuenta debe sumar 100%"
+                        : "Las bases deben sumar 100"
                       : Number(c.pool) === 0
                         ? "No hay saldo que prorratear"
                         : periodoSel.estado !== "abierto"

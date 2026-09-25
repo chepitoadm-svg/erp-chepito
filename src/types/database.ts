@@ -251,6 +251,7 @@ export interface Database {
           sucursal_id: string | null;
           activo: boolean;
           requiere_prorrateo: boolean;
+          prorrateo_por_cuenta: boolean;
           creado_en: string;
           creado_por: string | null;
           actualizado_en: string | null;
@@ -264,6 +265,7 @@ export interface Database {
           sucursal_id?: string | null;
           activo?: boolean;
           requiere_prorrateo?: boolean;
+          prorrateo_por_cuenta?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["centros_costo"]["Insert"]>;
         Relationships: [];
@@ -1916,8 +1918,12 @@ export interface Database {
         }[];
       };
       app_guardar_bases_prorrateo: {
-        Args: { p_periodo: string; p_origen: string; p_bases: unknown };
+        Args: { p_periodo: string; p_origen: string; p_bases: unknown; p_cuenta?: string | null };
         Returns: undefined;
+      };
+      app_cuentas_prorrateo: {
+        Args: { p_periodo: string; p_origen: string };
+        Returns: unknown;
       };
       fn_cerrar_periodo: { Args: { p_periodo_id: string }; Returns: undefined };
       fn_reabrir_periodo: { Args: { p_periodo_id: string }; Returns: undefined };

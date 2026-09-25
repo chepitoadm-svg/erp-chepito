@@ -64,3 +64,34 @@ export async function listarCentrosFinales() {
   if (error) throw new Error(`No se pudieron cargar los centros: ${error.message}`);
   return data ?? [];
 }
+
+/** IDs de centros intermedios que se prorratean POR CUENTA (ej. General). */
+export async function centrosPorCuenta(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("centros_costo")
+    .select("id")
+    .eq("prorrateo_por_cuenta", true);
+  if (error) throw new Error(`No se pudieron cargar los centros: ${error.message}`);
+  return (data ?? []).map((c) => c.id as string);
+}
+
+export interface CuentaProrrateo {
+  cuenta_id: string;
+  codigo: string;
+  nombre: string;
+  pool: number;
+  suma_bases: number;
+  bases: { centro_destino_id: string; porcentaje: number }[];
+}
+
+/** Cuentas con saldo en un centro intermedio ese periodo, con sus bases por cuenta. */
+export async function cuentasProrrateo(periodoId: string, origenId: string): Promise<CuentaProrrateo[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("app_cuentas_prorrateo", {
+    p_periodo: periodoId,
+    p_origen: origenId,
+  });
+  if (error) throw new Error(`No se pudieron cargar las cuentas del centro: ${error.message}`);
+  return (data ?? []) as unknown as CuentaProrrateo[];
+}

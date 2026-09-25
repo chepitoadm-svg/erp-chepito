@@ -17,11 +17,13 @@ interface Props {
   origenId: string;
   finales: Final[];
   inicial: { centro_destino_id: string; porcentaje: number }[];
+  /** Si se pasa, las bases son de ESA cuenta (prorrateo por cuenta del General). */
+  cuentaId?: string;
 }
 
 const inicialState: FormState = {};
 
-export default function ProrrateoBases({ periodoId, origenId, finales, inicial }: Props) {
+export default function ProrrateoBases({ periodoId, origenId, finales, inicial, cuentaId }: Props) {
   const desdeInicial = (): Base[] =>
     inicial.length
       ? inicial.map((b) => ({
@@ -64,6 +66,7 @@ export default function ProrrateoBases({ periodoId, origenId, finales, inicial }
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="periodo" value={periodoId} />
       <input type="hidden" name="origen" value={origenId} />
+      {cuentaId && <input type="hidden" name="cuenta" value={cuentaId} />}
       <input type="hidden" name="bases" value={json} />
 
       {bases.map((b, i) => (

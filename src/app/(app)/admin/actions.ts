@@ -41,6 +41,7 @@ export async function guardarBases(
   await requerirPermiso("prorrateo.gestionar");
   const periodo = String(formData.get("periodo") ?? "");
   const origen = String(formData.get("origen") ?? "");
+  const cuenta = String(formData.get("cuenta") ?? "").trim() || null; // null = base del centro
   let bases: { centro_destino_id: string; porcentaje: number }[] = [];
   try {
     bases = JSON.parse(String(formData.get("bases") ?? "[]"));
@@ -54,6 +55,7 @@ export async function guardarBases(
     p_periodo: periodo,
     p_origen: origen,
     p_bases: bases,
+    p_cuenta: cuenta,
   });
   if (error) return { error: limpiar(error.message) };
 
