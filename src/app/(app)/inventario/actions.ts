@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requerirPermiso } from "@/lib/auth/permisos";
+import { requerirPermiso, tienePermiso } from "@/lib/auth/permisos";
 import {
   crearArticuloSchema,
   editarArticuloSchema,
@@ -58,6 +58,57 @@ export async function crearArticulo(
   }
   revalidatePath("/inventario/articulos");
   return { ok: "Artículo creado." };
+}
+
+// Crea un artículo y DEVUELVE el nuevo (no redirige). Sirve para agregar un
+// artículo al vuelo desde otra pantalla (ej. la factura manual) sin salir de
+// ella. Devuelve el artículo listo para meterlo al selector.
+export interface ArticuloRapido {
+  id: string;
+  codigo: string;
+  nombre: string;
+  iva_tarifa_id: string | null;
+}
+export async function crearArticuloRapido(input: {
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  unidad_stock_id: string;
+  iva_tarifa_id: string;
+  cuenta_inventario_id?: string | null;
+  cabys_codigo?: string | null;
+  inventariable?: boolean;
+}): Promise<{ ok: true; articulo: ArticuloRapido } | { error: string }> {
+  if (!(await tienePermiso("articulos.gestionar"))) {
+    return { error: "No tenés permiso para crear artículos." };
+  }
+  const parsed = crearArticuloSchema.safeParse({
+    codigo: (input.codigo ?? "").trim(),
+    nombre: (input.nombre ?? "").trim(),
+    tipo: input.tipo || "materia_prima",
+    unidad_stock_id: input.unidad_stock_id || "",
+    iva_tarifa_id: input.iva_tarifa_id || "",
+    cuenta_inventario_id: input.cuenta_inventario_id || null,
+    cabys_codigo: (input.cabys_codigo ?? "").trim() || null,
+    inventariable: input.inventariable ?? true,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("articulos")
+    .insert(parsed.data)
+    .select("id, codigo, nombre, iva_tarifa_id")
+    .single();
+  if (error) {
+    return {
+      error: error.message.includes("duplicate")
+        ? "Ya existe un artículo con ese código."
+        : limpiar(error.message),
+    };
+  }
+  revalidatePath("/inventario/articulos");
+  return { ok: true, articulo: data as ArticuloRapido };
 }
 
 export async function editarArticulo(

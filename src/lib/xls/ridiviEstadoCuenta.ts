@@ -39,8 +39,8 @@ function fechaISO(s: unknown): string | null {
   }
   // D/M/YY o D/M/YYYY (barras) → día primero.
   if ((m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))) {
-    let [, d, mo, y] = m;
-    if (y.length === 2) y = "20" + y;
+    const [, d, mo, yRaw] = m;
+    const y = yRaw.length === 2 ? "20" + yRaw : yRaw;
     return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
   return null;

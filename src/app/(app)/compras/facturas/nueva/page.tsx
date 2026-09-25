@@ -6,6 +6,8 @@ import {
   listarArticulosParaSelector,
   listarBodegas,
   listarTarifasIva,
+  listarUnidades,
+  listarCuentasInventario,
 } from "@/lib/data/inventario";
 import { listarCentrosCosto } from "@/lib/data/asientos";
 import FacturaForm from "@/components/FacturaForm";
@@ -18,13 +20,17 @@ export default async function NuevaFacturaPage({
   if (!(await tienePermiso("compras.facturar"))) redirect("/compras/facturas");
   const { recepcion } = await searchParams;
 
-  const [proveedores, bodegas, articulos, tarifas, centros] = await Promise.all([
-    listarProveedoresActivos(),
-    listarBodegas(),
-    listarArticulosParaSelector(),
-    listarTarifasIva(),
-    listarCentrosCosto(),
-  ]);
+  const [proveedores, bodegas, articulos, tarifas, centros, unidades, cuentasInv, puedeCrearArticulo] =
+    await Promise.all([
+      listarProveedoresActivos(),
+      listarBodegas(),
+      listarArticulosParaSelector(),
+      listarTarifasIva(),
+      listarCentrosCosto(),
+      listarUnidades(),
+      listarCuentasInventario(),
+      tienePermiso("articulos.gestionar"),
+    ]);
 
   // Modo caso B: la factura salda una recepción confirmada.
   if (recepcion) {
@@ -57,6 +63,9 @@ export default async function NuevaFacturaPage({
           bodegas={bodegas}
           articulos={articulos}
           tarifas={tarifas}
+          unidades={unidades}
+          cuentasInventario={cuentasInv}
+          puedeCrearArticulo={puedeCrearArticulo}
           recepcion={{
             id: r.id,
             proveedor_nombre: r.proveedor_nombre,
@@ -73,7 +82,8 @@ export default async function NuevaFacturaPage({
     );
   }
 
-  if (proveedores.length === 0 || articulos.length === 0) {
+  // Sin artículos solo bloquea si además no puede crearlos al vuelo.
+  if (proveedores.length === 0 || (articulos.length === 0 && !puedeCrearArticulo)) {
     return (
       <div>
         <Link href="/compras/facturas" className="text-sm text-neutral-500 hover:text-neutral-900">
@@ -116,6 +126,9 @@ export default async function NuevaFacturaPage({
         articulos={articulos}
         tarifas={tarifas}
         centros={centros}
+        unidades={unidades}
+        cuentasInventario={cuentasInv}
+        puedeCrearArticulo={puedeCrearArticulo}
       />
     </div>
   );

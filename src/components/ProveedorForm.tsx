@@ -38,14 +38,15 @@ export default function ProveedorForm({ modo, action, cuentasCxp, inicial }: Pro
 
       <div className="flex gap-3">
         <div className="w-48">
-          <label className="block text-sm font-medium text-neutral-700">Cédula jurídica</label>
+          <label className="block text-sm font-medium text-neutral-700">Cédula</label>
           <input
             name="cedula_juridica"
             required
             defaultValue={inicial?.cedula_juridica ?? ""}
-            placeholder="3101123456"
+            placeholder="Física o jurídica"
             className={inputCls}
           />
+          <p className="mt-1 text-xs text-neutral-500">Física (9), jurídica (10) o DIMEX.</p>
         </div>
         <div className="flex-1">
           <label className="block text-sm font-medium text-neutral-700">Nombre</label>

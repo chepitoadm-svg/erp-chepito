@@ -22,7 +22,7 @@ export default async function ProveedoresPage() {
       </Link>
       <h1 className="mt-1 text-lg font-semibold text-neutral-900">Proveedores</h1>
       <p className="mb-4 text-sm text-neutral-500">
-        Se identifican por cédula jurídica (así se matchea el emisor del XML).
+        Se identifican por cédula: física o jurídica (así se matchea el emisor del XML).
       </p>
 
       <details className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">

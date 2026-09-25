@@ -1,12 +1,13 @@
 // Esquemas Zod para proveedores y su mapeo de artículos.
 import { z } from "zod";
 
-// Cédula jurídica CR: 10 dígitos (3-101-XXXXXX). Se guarda solo dígitos.
+// Cédula CR: acepta FÍSICA (9 dígitos), JURÍDICA (10, 3-101-XXXXXX) y DIMEX
+// (11-12). Se guarda solo dígitos. Un proveedor puede ser persona física.
 const cedula = z
   .string()
   .trim()
   .transform((s) => s.replace(/\D/g, ""))
-  .refine((s) => s.length >= 9 && s.length <= 12, "Cédula jurídica inválida.");
+  .refine((s) => s.length >= 9 && s.length <= 12, "Cédula inválida (9 a 12 dígitos).");
 
 const base = {
   cedula_juridica: cedula,

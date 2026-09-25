@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { crearFactura, type FormState } from "@/app/(app)/compras/actions";
+import type { ArticuloRapido } from "@/app/(app)/inventario/actions";
 import SelectBuscable from "@/components/SelectBuscable";
+import NuevoArticuloInline from "@/components/NuevoArticuloInline";
 
 interface Articulo {
   id: string;
@@ -42,6 +44,10 @@ interface Props {
   articulos: Articulo[];
   tarifas: Tarifa[];
   centros?: { id: string; codigo: string; nombre: string }[];
+  // Para crear un artículo al vuelo desde la factura.
+  unidades?: { id: string; codigo: string; nombre: string }[];
+  cuentasInventario?: { id: string; codigo: string; nombre: string }[];
+  puedeCrearArticulo?: boolean;
   // Modo "salda una recepción" (caso B): proveedor y bodega fijos, líneas
   // precargadas desde la recepción (el costo se puede ajustar por diferencia).
   recepcion?: { id: string; proveedor_nombre: string; bodega_codigo: string };
@@ -68,15 +74,22 @@ const estadoInicial: FormState = {};
 export default function FacturaForm({
   proveedores,
   bodegas,
-  articulos,
+  articulos: articulosProp,
   tarifas,
   centros = [],
+  unidades = [],
+  cuentasInventario = [],
+  puedeCrearArticulo = false,
   recepcion,
   lineasIniciales,
 }: Props) {
   const [state, formAction, pending] = useActionState(crearFactura, estadoInicial);
   const ivaDefault = tarifas.find((t) => t.porcentaje === 13)?.id ?? tarifas[0]?.id ?? "";
   const modoRecepcion = !!recepcion;
+
+  // Los artículos viven en estado para poder agregar uno nuevo al vuelo.
+  const [articulos, setArticulos] = useState<Articulo[]>(articulosProp);
+  const [creando, setCreando] = useState(false);
 
   const [proveedor, setProveedor] = useState("");
   const [bodega, setBodega] = useState("");
@@ -115,6 +128,29 @@ export default function FacturaForm({
       setCondicion(p.condicion_venta_default ?? "");
       setPlazo(p.plazo_credito_default != null ? String(p.plazo_credito_default) : "");
     }
+  }
+
+  // Al crear un artículo: lo agrega a la lista y lo mete en la primera línea
+  // vacía (o crea una nueva línea con él).
+  function onArticuloCreado(a: ArticuloRapido) {
+    const nuevo: Articulo = {
+      id: a.id,
+      codigo: a.codigo,
+      nombre: a.nombre,
+      iva_tarifa_id: a.iva_tarifa_id ?? undefined,
+    };
+    setArticulos((prev) => [...prev, nuevo].sort((x, y) => x.codigo.localeCompare(y.codigo)));
+    setLineas((prev) => {
+      const idx = prev.findIndex((l) => !l.articulo_id);
+      const conIva = { iva_tarifa_id: nuevo.iva_tarifa_id || ivaDefault };
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], articulo_id: nuevo.id, ...conIva };
+        return next;
+      }
+      return [...prev, { ...lineaVacia(ivaDefault), articulo_id: nuevo.id, ...conIva }];
+    });
+    setCreando(false);
   }
 
   function setLinea(i: number, campo: keyof Linea, valor: string) {
@@ -337,13 +373,24 @@ export default function FacturaForm({
           <tfoot className="bg-neutral-50">
             <tr>
               <td className="px-3 py-2" colSpan={4}>
-                <button
-                  type="button"
-                  onClick={() => setLineas((p) => [...p, lineaVacia(ivaDefault)])}
-                  className="text-neutral-700 hover:text-neutral-900"
-                >
-                  + Agregar línea
-                </button>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setLineas((p) => [...p, lineaVacia(ivaDefault)])}
+                    className="text-neutral-700 hover:text-neutral-900"
+                  >
+                    + Agregar línea
+                  </button>
+                  {puedeCrearArticulo && !creando && (
+                    <button
+                      type="button"
+                      onClick={() => setCreando(true)}
+                      className="text-neutral-700 hover:text-neutral-900"
+                    >
+                      + Nuevo artículo
+                    </button>
+                  )}
+                </div>
               </td>
               <td className="px-3 py-2 text-right font-medium tabular-nums">{money(subtotal)}</td>
               <td className="px-3 py-2 text-right font-medium tabular-nums">{money(ivaTotal)}</td>
@@ -352,6 +399,17 @@ export default function FacturaForm({
           </tfoot>
         </table>
       </div>
+
+      {creando && (
+        <NuevoArticuloInline
+          unidades={unidades}
+          tarifas={tarifas}
+          cuentas={cuentasInventario}
+          ivaDefault={ivaDefault}
+          onCreado={onArticuloCreado}
+          onCerrar={() => setCreando(false)}
+        />
+      )}
 
       <div className="flex justify-end">
         <div className="w-64 space-y-1 text-sm">
