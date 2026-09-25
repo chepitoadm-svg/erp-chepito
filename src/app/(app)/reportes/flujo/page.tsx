@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { flujoCaja, compromisos, type FlujoCategoria } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
+import ExportarExcel, { type FilaExcel } from "@/components/ExportarExcel";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -54,6 +55,40 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
   // Negativo = tarjetas cobradas que el banco aún no deposita (pendientes).
   const tarjetasPendientes = flujo.tarjetas_neto < 0 ? -flujo.tarjetas_neto : 0;
   const tarjetasCobradas = flujo.tarjetas_neto > 0 ? flujo.tarjetas_neto : 0;
+
+  // Filas para exportar a Excel: mismo contenido que la pantalla (resumen,
+  // entradas/salidas con sus categorías y líneas, tarjetas y compromisos).
+  const catFilas = (cats: FlujoCategoria[]): FilaExcel[] =>
+    cats.flatMap((c) => [
+      { celdas: [c.categoria, c.total], estilo: "subtotal" as const },
+      ...c.lineas.map((l) => ({ celdas: [`    ${l.cuenta_nombre}`, l.monto], estilo: "dato" as const })),
+    ]);
+  const excel: FilaExcel[] = [
+    { celdas: ["Saldo inicial", flujo.saldo_inicial], estilo: "dato" },
+    { celdas: ["Entró en el mes", flujo.total_entradas], estilo: "dato" },
+    { celdas: ["Salió en el mes", flujo.total_salidas], estilo: "dato" },
+    { celdas: ["Saldo final", flujo.saldo_final], estilo: "total" },
+    { celdas: [null, null] },
+    { celdas: ["ENTRADAS (de dónde entra)", flujo.total_entradas], estilo: "seccion" },
+    ...catFilas(flujo.entradas),
+    { celdas: [null, null] },
+    { celdas: ["SALIDAS (en qué se va)", flujo.total_salidas], estilo: "seccion" },
+    ...catFilas(flujo.salidas),
+    ...(flujo.tarjetas_neto !== 0
+      ? [{ celdas: ["Tarjetas por depositar (plata en camino)", flujo.tarjetas_neto], estilo: "dato" as const }]
+      : []),
+    { celdas: [null, null] },
+    { celdas: ["Movimiento neto del mes", neto], estilo: "total" },
+    { celdas: [null, null] },
+    { celdas: [`¿Cuánto me queda de verdad? — al ${hasta}`, null], estilo: "seccion" },
+    { celdas: ["Tengo (caja + bancos)", comp.disponible], estilo: "dato" },
+    { celdas: ["Debo (compromisos)", comp.total_debo], estilo: "dato" },
+    { celdas: ["Me quedaría si pago todo", comp.neto], estilo: "total" },
+    ...comp.categorias.flatMap((c): FilaExcel[] => [
+      { celdas: [c.categoria, c.total], estilo: "subtotal" as const },
+      ...c.lineas.map((l) => ({ celdas: [`    ${l.cuenta_nombre}`, l.saldo], estilo: "dato" as const })),
+    ]),
+  ];
 
   const Seccion = ({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[]; signo: "+" | "-" }) => (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -126,6 +161,18 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
         >
           {etiqueta(mover(mes, 1))} →
         </Link>
+        <ExportarExcel
+          className="ml-auto rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          nombre={`flujo-caja-${mes}.xlsx`}
+          hoja="Flujo de caja"
+          titulo="Flujo de caja"
+          subtitulo={`Panaderías Chepito · ${etiqueta(mes)} (${desde} a ${hasta})`}
+          columnas={[
+            { titulo: "Concepto", ancho: 46 },
+            { titulo: "Monto", money: true, ancho: 18 },
+          ]}
+          filas={excel}
+        />
       </div>
 
       {/* Resumen */}
