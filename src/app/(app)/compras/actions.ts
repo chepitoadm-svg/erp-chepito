@@ -500,6 +500,39 @@ export async function crearProveedorDesdeIngesta(formData: FormData): Promise<vo
   revalidatePath("/compras/ingestor");
 }
 
+// Liga la cédula del emisor del comprobante a un proveedor QUE YA EXISTE (alias
+// en proveedor_cedulas), para el caso en que el mismo proveedor factura con otra
+// cédula (ej. su cédula física). Luego reprocesa para que la ingesta lo matchee.
+export async function ligarCedulaProveedorIngesta(formData: FormData): Promise<void> {
+  await requerirPermiso("proveedores.gestionar");
+  const id = String(formData.get("id") ?? "");
+  const proveedorId = String(formData.get("proveedor_id") ?? "").trim();
+  if (!proveedorId) throw new Error("Elegí el proveedor existente al que se liga la cédula.");
+  const supabase = await createClient();
+
+  const { data: row } = await supabase
+    .from("comprobantes_ingesta")
+    .select("emisor_cedula")
+    .eq("id", id)
+    .single();
+  if (!row?.emisor_cedula) throw new Error("El comprobante no trae la cédula del emisor.");
+
+  const { error } = await supabase
+    .from("proveedor_cedulas")
+    .insert({ proveedor_id: proveedorId, cedula: row.emisor_cedula });
+  if (error) {
+    throw new Error(
+      /duplicate|unique/i.test(error.message)
+        ? "Esa cédula ya está ligada a un proveedor."
+        : limpiar(error.message),
+    );
+  }
+
+  await reprocesarIngesta(supabase, id);
+  revalidatePath(`/compras/ingestor/${id}`);
+  revalidatePath("/compras/ingestor");
+}
+
 // Vuelve a leer el XML guardado con el parser actual (útil tras corregir el
 // parser) y recalcula montos, líneas, mapeo y estado.
 export async function reparsearIngesta(formData: FormData): Promise<void> {

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { fechaCR } from "@/lib/fecha";
 import { notFound, redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { obtenerIngesta } from "@/lib/data/compras";
+import { obtenerIngesta, listarProveedoresActivos } from "@/lib/data/compras";
 import {
   listarArticulosParaSelector,
   listarUnidades,
@@ -14,6 +14,7 @@ import { descartarIngesta, crearProveedorDesdeIngesta, reparsearIngesta } from "
 import MapearLinea from "@/components/MapearLinea";
 import CrearFacturaIngesta from "@/components/CrearFacturaIngesta";
 import CrearNotaCreditoIngesta from "@/components/CrearNotaCreditoIngesta";
+import LigarProveedorIngesta from "@/components/LigarProveedorIngesta";
 import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 const fmt = (n: number | null) =>
@@ -73,6 +74,11 @@ export default async function IngestaDetallePage({
     : [[], [], [], [], [], []];
   const cuentaNcDefault = cuentas.find((x) => x.codigo === "51-20-01-00-00")?.id;
 
+  // Si el emisor no calza con ningún proveedor, ofrecemos también ligarlo a uno
+  // existente (mismo proveedor con otra cédula), no solo crear uno nuevo.
+  const proveedoresParaLigar =
+    c.estado === "error" && !c.proveedor_id && c.emisor_cedula ? await listarProveedoresActivos() : [];
+
   // Etiqueta de estado sensible al tipo (una NC no "crea factura").
   const estadoLbl =
     c.estado === "validado"
@@ -130,18 +136,21 @@ export default async function IngestaDetallePage({
         >
           {c.error_detalle}
           {c.estado === "error" && !c.proveedor_id && c.emisor_cedula && (
-            <form action={crearProveedorDesdeIngesta} className="mt-3 flex flex-wrap items-center gap-3">
-              <input type="hidden" name="id" value={c.id} />
-              <button
-                type="submit"
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
-              >
-                Crear proveedor con los datos del XML
-              </button>
-              <span className="text-xs text-red-700/80">
-                {c.emisor_nombre} · céd. {c.emisor_cedula}
-              </span>
-            </form>
+            <>
+              <form action={crearProveedorDesdeIngesta} className="mt-3 flex flex-wrap items-center gap-3">
+                <input type="hidden" name="id" value={c.id} />
+                <button
+                  type="submit"
+                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
+                >
+                  Crear proveedor nuevo con los datos del XML
+                </button>
+                <span className="text-xs text-red-700/80">
+                  {c.emisor_nombre} · céd. {c.emisor_cedula}
+                </span>
+              </form>
+              <LigarProveedorIngesta id={c.id} proveedores={proveedoresParaLigar} />
+            </>
           )}
         </div>
       )}
