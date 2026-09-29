@@ -49,9 +49,9 @@ export default async function IngestaDetallePage({
 
   const sinMapear = c.lineas.filter((l) => !l.mapeado);
 
-  // Notas de crédito/débito: se registran de cabecera, no como factura.
-  const esNota =
-    c.tipo_documento === "NotaCreditoElectronica" || c.tipo_documento === "NotaDebitoElectronica";
+  // Una nota de crédito se registra de cabecera, no como factura.
+  const esNotaCredito = c.tipo_documento === "NotaCreditoElectronica";
+  const esNota = esNotaCredito || c.tipo_documento === "NotaDebitoElectronica";
   const docLbl =
     c.tipo_documento === "NotaCreditoElectronica"
       ? "Nota de crédito"
@@ -68,7 +68,7 @@ export default async function IngestaDetallePage({
         listarTarifasIva(),
         listarBodegas(),
         listarCentrosCosto(),
-        esNota ? listarCuentasPosteables() : Promise.resolve([] as { id: string; codigo: string; nombre: string }[]),
+        esNotaCredito ? listarCuentasPosteables() : Promise.resolve([] as { id: string; codigo: string; nombre: string }[]),
       ])
     : [[], [], [], [], [], []];
   const cuentaNcDefault = cuentas.find((x) => x.codigo === "51-20-01-00-00")?.id;
@@ -76,11 +76,11 @@ export default async function IngestaDetallePage({
   // Etiqueta de estado sensible al tipo (una NC no "crea factura").
   const estadoLbl =
     c.estado === "validado"
-      ? esNota
+      ? esNotaCredito
         ? "listo para registrar nota de crédito"
         : "listo para crear factura"
       : c.estado === "procesado"
-        ? esNota
+        ? esNotaCredito
           ? "nota de crédito registrada"
           : "factura creada"
         : ESTADO_LBL[c.estado];
@@ -234,7 +234,7 @@ export default async function IngestaDetallePage({
         </div>
       )}
 
-      {c.estado === "validado" && esNota && (
+      {c.estado === "validado" && esNotaCredito && (
         <div className="mt-6 rounded-lg border border-purple-200 bg-purple-50 p-4">
           <h2 className="mb-1 text-sm font-medium text-purple-800">
             {docLbl} del proveedor — registrala como nota de crédito
@@ -252,7 +252,7 @@ export default async function IngestaDetallePage({
         </div>
       )}
 
-      {c.estado === "validado" && !esNota && (
+      {c.estado === "validado" && !esNotaCredito && (
         <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4">
           <h2 className="mb-1 text-sm font-medium text-green-800">
             Todo mapeado — listo para crear la factura

@@ -668,8 +668,8 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
     .eq("id", id)
     .single();
   if (!ing) throw new Error("Comprobante inexistente.");
-  if (ing.tipo_documento === "NotaCreditoElectronica" || ing.tipo_documento === "NotaDebitoElectronica") {
-    throw new Error("Este comprobante es una nota de crédito/débito; registralo como nota de crédito, no como factura.");
+  if (ing.tipo_documento === "NotaCreditoElectronica") {
+    throw new Error("Este comprobante es una nota de crédito; registralo como nota de crédito, no como factura.");
   }
   if (ing.estado !== "validado") {
     throw new Error("El comprobante no está listo (faltan mapeos o tiene error).");
@@ -775,7 +775,7 @@ export async function crearNotaCreditoDesdeIngesta(formData: FormData): Promise<
     .eq("id", id)
     .single();
   if (!ing) throw new Error("Comprobante inexistente.");
-  if (ing.tipo_documento !== "NotaCreditoElectronica" && ing.tipo_documento !== "NotaDebitoElectronica") {
+  if (ing.tipo_documento !== "NotaCreditoElectronica") {
     throw new Error("Este comprobante no es una nota de crédito; usá el flujo de factura.");
   }
   if (ing.estado !== "validado") throw new Error("El comprobante no está listo (revisá el proveedor).");
