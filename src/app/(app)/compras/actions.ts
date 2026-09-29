@@ -517,15 +517,18 @@ export async function ligarCedulaProveedorIngesta(formData: FormData): Promise<v
     .single();
   if (!row?.emisor_cedula) throw new Error("El comprobante no trae la cédula del emisor.");
 
-  const { error } = await supabase
-    .from("proveedor_cedulas")
-    .insert({ proveedor_id: proveedorId, cedula: row.emisor_cedula });
-  if (error) {
-    throw new Error(
-      /duplicate|unique/i.test(error.message)
-        ? "Esa cédula ya está ligada a un proveedor."
-        : limpiar(error.message),
-    );
+  // Idempotente: si la cédula ya está ligada (alias) o ya es la cédula principal
+  // de un proveedor, no re-insertamos (evita el error de "ya ligada"); solo
+  // reprocesamos para que la ingesta matchee al proveedor que corresponde.
+  const [{ data: yaAlias }, { data: yaMain }] = await Promise.all([
+    supabase.from("proveedor_cedulas").select("proveedor_id").eq("cedula", row.emisor_cedula).maybeSingle(),
+    supabase.from("proveedores").select("id").eq("cedula_juridica", row.emisor_cedula).maybeSingle(),
+  ]);
+  if (!yaAlias && !yaMain) {
+    const { error } = await supabase
+      .from("proveedor_cedulas")
+      .insert({ proveedor_id: proveedorId, cedula: row.emisor_cedula });
+    if (error && !/duplicate|unique/i.test(error.message)) throw new Error(limpiar(error.message));
   }
 
   await reprocesarIngesta(supabase, id);
