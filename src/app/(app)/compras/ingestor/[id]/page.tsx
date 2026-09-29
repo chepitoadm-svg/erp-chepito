@@ -9,10 +9,11 @@ import {
   listarTarifasIva,
   listarBodegas,
 } from "@/lib/data/inventario";
-import { listarCentrosCosto } from "@/lib/data/asientos";
+import { listarCentrosCosto, listarCuentasPosteables } from "@/lib/data/asientos";
 import { descartarIngesta, crearProveedorDesdeIngesta, reparsearIngesta } from "../../actions";
 import MapearLinea from "@/components/MapearLinea";
 import CrearFacturaIngesta from "@/components/CrearFacturaIngesta";
+import CrearNotaCreditoIngesta from "@/components/CrearNotaCreditoIngesta";
 import { numeroFactura } from "@/lib/compras/numeroFactura";
 
 const fmt = (n: number | null) =>
@@ -48,17 +49,41 @@ export default async function IngestaDetallePage({
 
   const sinMapear = c.lineas.filter((l) => !l.mapeado);
 
+  // Notas de crédito/débito: se registran de cabecera, no como factura.
+  const esNota =
+    c.tipo_documento === "NotaCreditoElectronica" || c.tipo_documento === "NotaDebitoElectronica";
+  const docLbl =
+    c.tipo_documento === "NotaCreditoElectronica"
+      ? "Nota de crédito"
+      : c.tipo_documento === "NotaDebitoElectronica"
+        ? "Nota de débito"
+        : "Factura";
+
   // Selectores para mapear / crear la factura (solo si aplica).
   const necesitaSelectores = c.estado === "requiere_mapeo" || c.estado === "validado";
-  const [articulos, unidades, tarifas, bodegas, centros] = necesitaSelectores
+  const [articulos, unidades, tarifas, bodegas, centros, cuentas] = necesitaSelectores
     ? await Promise.all([
         listarArticulosParaSelector(),
         listarUnidades(),
         listarTarifasIva(),
         listarBodegas(),
         listarCentrosCosto(),
+        esNota ? listarCuentasPosteables() : Promise.resolve([] as { id: string; codigo: string; nombre: string }[]),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
+  const cuentaNcDefault = cuentas.find((x) => x.codigo === "51-20-01-00-00")?.id;
+
+  // Etiqueta de estado sensible al tipo (una NC no "crea factura").
+  const estadoLbl =
+    c.estado === "validado"
+      ? esNota
+        ? "listo para registrar nota de crédito"
+        : "listo para crear factura"
+      : c.estado === "procesado"
+        ? esNota
+          ? "nota de crédito registrada"
+          : "factura creada"
+        : ESTADO_LBL[c.estado];
 
   return (
     <div>
@@ -68,7 +93,14 @@ export default async function IngestaDetallePage({
 
       <div className="mt-1 mb-4 flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-neutral-900">{c.emisor_nombre ?? "Comprobante"}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-neutral-900">{c.emisor_nombre ?? "Comprobante"}</h1>
+            {esNota && (
+              <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                {docLbl}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-neutral-500">
             {fechaCR(c.fecha_emision) || "—"}
             {c.condicion_venta ? ` · ${COND[c.condicion_venta] ?? c.condicion_venta}` : ""}
@@ -80,7 +112,7 @@ export default async function IngestaDetallePage({
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className={`rounded-full px-2.5 py-1 text-xs ${ESTADO_CLS[c.estado]}`}>
-            {ESTADO_LBL[c.estado]}
+            {estadoLbl}
           </span>
           {c.estado_hacienda && (
             <span className="text-xs text-neutral-500">Hacienda: {c.estado_hacienda}</span>
@@ -202,7 +234,25 @@ export default async function IngestaDetallePage({
         </div>
       )}
 
-      {c.estado === "validado" && (
+      {c.estado === "validado" && esNota && (
+        <div className="mt-6 rounded-lg border border-purple-200 bg-purple-50 p-4">
+          <h2 className="mb-1 text-sm font-medium text-purple-800">
+            {docLbl} del proveedor — registrala como nota de crédito
+          </h2>
+          <p className="mb-3 text-sm text-purple-700">
+            Es un crédito a tu favor ({fmt(c.total)}): baja lo que le debés al proveedor. Elegí la
+            cuenta contra la que se registra. Queda en CxP y se aplica al pagar sus facturas.
+          </p>
+          <CrearNotaCreditoIngesta
+            id={c.id}
+            cuentas={cuentas}
+            centros={centros}
+            cuentaDefault={cuentaNcDefault}
+          />
+        </div>
+      )}
+
+      {c.estado === "validado" && !esNota && (
         <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4">
           <h2 className="mb-1 text-sm font-medium text-green-800">
             Todo mapeado — listo para crear la factura

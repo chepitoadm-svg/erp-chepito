@@ -664,10 +664,13 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
   const supabase = await createClient();
   const { data: ing } = await supabase
     .from("comprobantes_ingesta")
-    .select("estado, proveedor_id, clave, fecha_emision, condicion_venta, plazo_credito, lineas")
+    .select("estado, tipo_documento, proveedor_id, clave, fecha_emision, condicion_venta, plazo_credito, lineas")
     .eq("id", id)
     .single();
   if (!ing) throw new Error("Comprobante inexistente.");
+  if (ing.tipo_documento === "NotaCreditoElectronica" || ing.tipo_documento === "NotaDebitoElectronica") {
+    throw new Error("Este comprobante es una nota de crédito/débito; registralo como nota de crédito, no como factura.");
+  }
   if (ing.estado !== "validado") {
     throw new Error("El comprobante no está listo (faltan mapeos o tiene error).");
   }
@@ -754,6 +757,49 @@ export async function crearFacturaDesdeIngesta(formData: FormData): Promise<void
   revalidatePath(`/compras/ingestor/${id}`);
   revalidatePath("/compras/ingestor");
   redirect(`/compras/facturas/${facturaId}`);
+}
+
+// Registra un comprobante de la bandeja que es NOTA DE CRÉDITO/DÉBITO como nota
+// de crédito (cabecera: subtotal + IVA contra una cuenta), NO como factura.
+export async function crearNotaCreditoDesdeIngesta(formData: FormData): Promise<void> {
+  await requerirPermiso("compras.facturar");
+  const id = String(formData.get("id") ?? "");
+  const cuenta = String(formData.get("cuenta_id") ?? "").trim();
+  const centro = String(formData.get("centro_costo_id") ?? "").trim();
+  if (!cuenta) throw new Error("Elegí la cuenta de la nota de crédito.");
+
+  const supabase = await createClient();
+  const { data: ing } = await supabase
+    .from("comprobantes_ingesta")
+    .select("estado, tipo_documento, proveedor_id, clave, consecutivo, fecha_emision, subtotal, iva_total")
+    .eq("id", id)
+    .single();
+  if (!ing) throw new Error("Comprobante inexistente.");
+  if (ing.tipo_documento !== "NotaCreditoElectronica" && ing.tipo_documento !== "NotaDebitoElectronica") {
+    throw new Error("Este comprobante no es una nota de crédito; usá el flujo de factura.");
+  }
+  if (ing.estado !== "validado") throw new Error("El comprobante no está listo (revisá el proveedor).");
+  if (!ing.proveedor_id) throw new Error("Falta el proveedor del comprobante.");
+
+  const { data: ncId, error } = await supabase.rpc("fn_crear_nota_credito", {
+    p_proveedor: ing.proveedor_id as string,
+    p_fecha: ing.fecha_emision as string,
+    p_cuenta: cuenta,
+    p_centro: centro || null,
+    p_subtotal: Number(ing.subtotal ?? 0),
+    p_iva: Number(ing.iva_total ?? 0),
+    p_referencia: ing.consecutivo ?? ing.clave ?? null,
+    p_glosa: "Nota de crédito del proveedor (jalada del correo)",
+  });
+  if (error || !ncId) {
+    throw new Error(limpiar(error?.message ?? "No se pudo crear la nota de crédito."));
+  }
+
+  await supabase.from("comprobantes_ingesta").update({ estado: "procesado" }).eq("id", id);
+  revalidatePath(`/compras/ingestor/${id}`);
+  revalidatePath("/compras/ingestor");
+  revalidatePath("/compras/cxp");
+  redirect("/compras/cxp");
 }
 
 // === RECEPCIONES (D2) ======================================================

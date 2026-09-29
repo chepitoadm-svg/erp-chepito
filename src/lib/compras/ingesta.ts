@@ -105,6 +105,12 @@ export async function ingestarComprobante(
     };
   });
 
+  // Las notas de crédito/débito se registran de cabecera (subtotal + IVA contra
+  // una cuenta), NO como factura con líneas de inventario. Por eso no exigen
+  // mapeo de artículos: pasan directo a "validado" para registrarse como NC.
+  const esNota =
+    comp.tipo === "NotaCreditoElectronica" || comp.tipo === "NotaDebitoElectronica";
+
   // Estado y diagnóstico.
   let estado = "validado";
   let errorDetalle: string | null = null;
@@ -117,7 +123,7 @@ export async function ingestarComprobante(
   } else if (!proveedorId) {
     estado = "error";
     errorDetalle = `No hay proveedor registrado con la cédula ${comp.emisor_cedula} (${comp.emisor_nombre}).`;
-  } else if (lineas.some((l) => !l.mapeado)) {
+  } else if (!esNota && lineas.some((l) => !l.mapeado)) {
     estado = "requiere_mapeo";
     errorDetalle = "Faltan artículos por mapear antes de crear la factura.";
   }
