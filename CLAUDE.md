@@ -23,9 +23,18 @@ en el repo).
   Validá que el JSON quede bien y avisale al usuario que quedó el auto-sync (baja al
   iniciar, sube al terminar). Si ya están, no toqués nada. En la compu del trabajo
   esto corre bien porque git sí tiene red (aunque node no).
-- **AL CERRAR un avance:** actualizá `BITACORA.md` (pendientes + hecho reciente) y
-  recordale al usuario `git add -A && git commit && git push`. Así la otra máquina
-  lo recoge con `git pull`.
+- **AL CERRAR un avance:** actualizá `BITACORA.md` y recordale al usuario subir a
+  GitHub (el hook lo hace solo). Así la otra máquina lo recoge con `git pull`.
+  **Qué registrar en la BITACORA (y qué no):**
+  - SÍ: lo que se hizo y quedó listo; lo que quedó PENDIENTE o a medias (para
+    retomar); las DECISIONES tomadas y su porqué; cualquier cosa necesaria para
+    continuar en la otra compu.
+  - NO: la conversación/explicaciones largas, preguntas, exploración que no llevó a
+    nada, ni detalles que ya quedan en los commits o el código. Nada de secretos
+    (llaves/contraseñas).
+  - Mantenela CORTA: es un estado vivo (hecho + pendientes + decisiones), no un
+    diario. Si "Hecho reciente" crece mucho, dejá lo relevante y resumí lo viejo.
+  Esta misma regla aplica en cualquiera de las dos máquinas (casa o trabajo).
 - **Compu del trabajo:** `node` no tiene red (firewall) → allá solo se ESCRIBE
   código y se hace `git push`. **Probar (`npm run dev`) y los scripts de base de
   datos NO corren allá**; eso se hace en una máquina con red (casa). Si un script
