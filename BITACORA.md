@@ -62,10 +62,20 @@ Claude lee `CLAUDE.md` y este `BITACORA.md` solo al arrancar, así sabe en qué 
 
 ## Pendientes (lo que falta)
 
-- [ ] **Duplicación de compras (Excel vs electrónicas) — DECISIÓN GRANDE.** Al importar el
-      Excel de QuPOS se crearon facturas que ya existían electrónicas (jaladas del correo)
-      → duplicadas → compras/CxP inflados (la importación metió 377 facturas, ₡26,8M).
-      Falta decidir la fuente de verdad (recomendado: electrónicas) y de-duplicar con cuidado.
+- [ ] **Duplicación de compras (Excel vs electrónicas) — DECISIÓN GRANDE (RETOMAR AQUÍ).**
+      Al importar el Excel de QuPOS se crearon facturas que ya existían electrónicas
+      (jaladas del correo) → duplicadas → compras/CxP inflados. La importación de Excel
+      metió **377 facturas, ₡26,8M** (facturas con glosa `Import Excel%`). Ejemplo probado:
+      huevo ₡22.220 del 29-sep estaba 2 veces (electrónica en Taller + Excel en CH2).
+      **Falta que el usuario decida:**
+      - Opción A (recomendada): quedarse con las ELECTRÓNICAS (legales de Hacienda) y quitar
+        las duplicadas del Excel; las del Excel SIN gemela electrónica se quedan.
+      - Opción B: quedarse con las del Excel (QuPOS) y quitar las electrónicas duplicadas.
+      - Pregunta abierta: ¿el Excel se importó a propósito para cargar compras, o solo para
+        comparar? (si fue solo comparar → quizás deshacer toda la importación).
+      **Próximo paso cuando responda:** análisis completo del alcance (cuántas duplicadas
+      exactas, por mes/centro) y de-duplicar con ensayo en rollback primero. Matchear por
+      proveedor+total es ambiguo (montos se repiten); usar clave/consecutivo donde se pueda.
 - [ ] **Reactivar deploys de Netlify** (topados por minutos de build) para publicar lo de
       estos días: NC del ingestor, ligar cédula a proveedor existente, export de flujo a
       Excel, cédula física en proveedores, artículo nuevo en factura manual.
