@@ -58,6 +58,22 @@ Claude lee `CLAUDE.md` y este `BITACORA.md` solo al arrancar, así sabe en qué 
   **probar** (`npm run dev`) ni correr los **scripts de base de datos**.
 - Probar y las operaciones de base de datos se hacen en una compu con red (la de casa).
 
+### Al correr LOCAL en CASA (después del `git pull`)
+
+Cuando bajes lo último en casa y quieras correr el sistema local con `npm run dev`:
+
+1. `git pull` — trae el código nuevo de GitHub.
+2. **Si el pull tocó `package.json` o `package-lock.json`** → corré **`npm install`** una
+   vez. (Se agregó o cambió alguna "pieza"/librería que el proyecto usa; viven en
+   `node_modules`, que NO está en GitHub, así que cada compu baja las suyas. Sin
+   `npm install`, el `npm run dev` falla con "cannot find module ...".)
+3. `npm run dev`.
+
+**Regla fácil (si no querés fijarte):** después de cada `git pull`, corré igual `npm install`
+y luego `npm run dev`. Si no cambió nada, `npm install` no hace daño y termina rápido; si
+cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify ese
+`npm install` lo hacen ellos en su nube, no te preocupa.)
+
 ---
 
 ## Pendientes (lo que falta)
