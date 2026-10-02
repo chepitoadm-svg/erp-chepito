@@ -25,6 +25,22 @@ Si una compu se daña o tu mamá la usa, **no pasa nada**: todo está en GitHub 
   medias, igual lo commiteás (ej. `git commit -m "WIP: a medias X"`) y lo subís; en la
   otra compu `git pull` y seguís donde quedaste.
 
+### Cómo arrancar en la compu del TRABAJO (con Claude Code)
+
+No hace falta escribir comandos: se le pide a Claude en palabras normales.
+
+**Primera vez (si el proyecto no está bajado allá):**
+1. Abrir la app de Claude Code y empezar en cualquier carpeta (ej. Documentos).
+2. Decirle a Claude: `cloná https://github.com/chepitoadm-svg/erp-chepito.git en esta carpeta`
+3. Queda la carpeta `erp-chepito`. Abrirla como proyecto (o "trabajemos en erp-chepito").
+
+**Siguientes veces (ya bajado):**
+1. Abrir Claude Code → abrir la carpeta `erp-chepito` (sale en recientes).
+2. Decir: **"traé lo último"** (git pull).
+3. Bretear. Al terminar: **"subí todo"** (git push).
+
+Claude lee `CLAUDE.md` y este `BITACORA.md` solo al arrancar, así sabe en qué vamos.
+
 ### Ojo con la compu del TRABAJO
 
 - Ahí `node` NO tiene salida a internet (firewall). PowerShell y git SÍ.
