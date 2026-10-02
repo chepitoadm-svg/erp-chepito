@@ -106,6 +106,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Fix conciliación bancaria (2026-10-02).** Los movimientos ya conciliados reaparecían
+  como "pendientes" en la lista de libros cuando el total conciliado pasaba de 1.000
+  (PostgREST corta en 1.000, la lista de "ya casados" quedaba incompleta). Arreglado
+  paginando de 1000 en 1000 en `src/lib/data/conciliaciones.ts` (movimientos y conciliados).
+  Puro código, sin migración. Verificado en Vercel. **OJO: Netlify sigue con el código viejo
+  hasta que se reactiven sus deploys.**
 - **Vercel como destino de deploy (2026-10-02).** Repo conectado a Vercel (cuenta Hobby de
   `chepitoadm-svg`), env vars de Supabase puestas (las 3: URL, ANON, SERVICE_ROLE; NO va
   `SUPABASE_DB_URL`), primer deploy OK en `erp-chepito.vercel.app`. Cada push a `main`
