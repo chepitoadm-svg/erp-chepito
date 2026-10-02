@@ -76,9 +76,12 @@ Claude lee `CLAUDE.md` y este `BITACORA.md` solo al arrancar, así sabe en qué 
       **Próximo paso cuando responda:** análisis completo del alcance (cuántas duplicadas
       exactas, por mes/centro) y de-duplicar con ensayo en rollback primero. Matchear por
       proveedor+total es ambiguo (montos se repiten); usar clave/consecutivo donde se pueda.
-- [ ] **Reactivar deploys de Netlify** (topados por minutos de build) para publicar lo de
-      estos días: NC del ingestor, ligar cédula a proveedor existente, export de flujo a
-      Excel, cédula física en proveedores, artículo nuevo en factura manual.
+- [ ] **Deploys de Netlify PAUSADOS por créditos** (plan gratis, "operational credits": el
+      sitio sigue en línea pero no publica cambios nuevos). Workaround ya montado: **Vercel**
+      como destino de deploy (ver "Hecho reciente"). Falta decidir: ¿Vercel pasa a principal,
+      se espera el próximo ciclo de Netlify, o se sube de plan? Lo que quedaba por publicar:
+      NC del ingestor, ligar cédula a proveedor existente, export de flujo a Excel, cédula
+      física en proveedores, artículo nuevo en factura manual.
 - [ ] **Prorrateo agosto — General**: regenerar por cuenta en /admin/prorrateo.
 - [ ] **Prorrateos septiembre** (Taller y General) cuando se cierre el mes.
 - [ ] **¿Fusionar "Quesos el Trebol Avicola Chumo"** con Avícola Chumo? (preguntado, sin responder)
@@ -87,6 +90,12 @@ Claude lee `CLAUDE.md` y este `BITACORA.md` solo al arrancar, así sabe en qué 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Vercel como destino de deploy (2026-10-02).** Repo conectado a Vercel (cuenta Hobby de
+  `chepitoadm-svg`), env vars de Supabase puestas (las 3: URL, ANON, SERVICE_ROLE; NO va
+  `SUPABASE_DB_URL`), primer deploy OK en `erp-chepito.vercel.app`. Cada push a `main`
+  deploya en Vercel. **Se puede deployar desde la compu del TRABAJO** (git sí sale a
+  internet aunque node siga bloqueado por el EDR). Netlify sigue conectado pero con deploys
+  pausados por créditos. Vercel pega a la MISMA Supabase (no es copia aislada).
 - Prorrateo por cuenta del centro General + arreglos (pool sin reversiones, cuentas
   siempre visibles, botón que rehace solo). Julio verificado.
 - Saldo inicial BAC corregido a ₡313.488,03; pago TEF re-fechado a julio; conciliación OK.
