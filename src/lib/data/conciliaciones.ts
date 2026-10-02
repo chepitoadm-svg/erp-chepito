@@ -236,13 +236,14 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
   }
 
   const movimientos_sin_conciliar: MovimientoLibro[] = movs
-    // Los ajustes de redondeo y las líneas de SALDO INICIAL (apertura de la
-    // cuenta) no son movimientos a casar contra el banco: cuentan en el saldo de
-    // libros pero no se muestran como pendientes (un saldo inicial no tiene
-    // contrapartida en el estado de cuenta).
+    // Los ajustes de redondeo, los asientos de APERTURA y las líneas de SALDO
+    // INICIAL (saldos iniciales de la cuenta) no son movimientos a casar contra el
+    // banco: cuentan en el saldo de libros pero NO se muestran como pendientes (una
+    // apertura / saldo inicial no tiene contrapartida en el estado de cuenta).
     .filter(
       (m) =>
         !matched.has(m.id) &&
+        m.asiento.tipo !== "apertura" &&
         m.asiento.origen_tipo !== "conciliacion_redondeo" &&
         !(m.asiento.origen_tipo ?? "").startsWith("saldo_inicial"),
     )
