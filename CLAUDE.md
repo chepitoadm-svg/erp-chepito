@@ -5,6 +5,25 @@ inicio de cada sesión** antes de proponer o escribir código.
 
 ---
 
+## Cómo trabajamos entre dos computadoras (casa y trabajo)
+
+El usuario usa **Claude Code en dos máquinas** (casa y trabajo) y quiere continuar
+sin perder nada. El repo de GitHub + Supabase son la memoria compartida (la
+auto-memoria de Claude NO se sincroniza entre máquinas; por eso el estado vivo va
+en el repo).
+
+- **AL INICIO de cada sesión, en cualquier máquina:** leé `BITACORA.md` (estado
+  vivo: qué se hizo y qué falta). El usuario debe hacer `git pull` antes de arrancar.
+- **AL CERRAR un avance:** actualizá `BITACORA.md` (pendientes + hecho reciente) y
+  recordale al usuario `git add -A && git commit && git push`. Así la otra máquina
+  lo recoge con `git pull`.
+- **Compu del trabajo:** `node` no tiene red (firewall) → allá solo se ESCRIBE
+  código y se hace `git push`. **Probar (`npm run dev`) y los scripts de base de
+  datos NO corren allá**; eso se hace en una máquina con red (casa). Si un script
+  falla con `fetch failed`/TLS, es esto.
+
+---
+
 ## Qué es este proyecto
 
 ERP a la medida para **Panaderías Chepito** (razón social COMERCIALIZADORA Y
