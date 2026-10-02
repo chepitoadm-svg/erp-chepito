@@ -172,14 +172,11 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
   // ensucia la conciliación e infla el saldo en libros. Al excluir ambos, la
   // conciliación refleja solo el asiento neto vigente: si el gasto se corrigió,
   // se ve el valor corregido; si se eliminó, no se ve nada.
-  const { data: movsData } = await supabase
-    .from("asientos_lineas")
-    .select("id, debito, credito, asiento:asientos!inner(id, fecha, numero, tipo, glosa, estado, origen_tipo, origen_id)")
-    .eq("cuenta_id", c.cuenta_id)
-    .eq("asiento.estado", "confirmado")
-    .neq("asiento.tipo", "reversion")
-    .lte("asiento.fecha", c.fecha_corte);
-  const movs = (movsData ?? []) as unknown as {
+  // NOTA: PostgREST corta cada consulta en 1000 filas por defecto. Sin paginar,
+  // con más de 1000 movimientos conciliados en total la lista de "ya conciliados"
+  // quedaba incompleta y los movimientos ya casados volvían a salir como
+  // pendientes. Por eso aquí se traen TODAS las filas, de 1000 en 1000.
+  type MovRow = {
     id: string;
     debito: number;
     credito: number;
@@ -192,18 +189,51 @@ export async function obtenerConciliacion(id: string): Promise<ConciliacionDetal
       origen_tipo: string | null;
       origen_id: string | null;
     };
-  }[];
+  };
+  const movs: MovRow[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase
+      .from("asientos_lineas")
+      .select("id, debito, credito, asiento:asientos!inner(id, fecha, numero, tipo, glosa, estado, origen_tipo, origen_id)")
+      .eq("cuenta_id", c.cuenta_id)
+      .eq("asiento.estado", "confirmado")
+      .neq("asiento.tipo", "reversion")
+      .lte("asiento.fecha", c.fecha_corte)
+      .order("id")
+      .range(desde, desde + 999);
+    if (error) throw new Error(`No se pudieron cargar los movimientos: ${error.message}`);
+    const filas = (data ?? []) as unknown as MovRow[];
+    movs.push(...filas);
+    if (filas.length < 1000) break;
+  }
 
-  const [{ data: matchedData }, { data: extraData }] = await Promise.all([
-    supabase.from("estado_cuenta_lineas").select("asiento_linea_id").not("asiento_linea_id", "is", null),
-    supabase.from("conciliacion_lineas_extra").select("asiento_linea_id"),
-  ]);
-  // "matched" incluye tanto el movimiento principal (asiento_linea_id de la línea
-  // del banco) como los movimientos "extra" ligados en la conciliación 1 banco : N
-  // libros, para que ninguno de ellos siga apareciendo como pendiente.
+  // "matched" = movimientos de libros ya casados: el principal (asiento_linea_id de
+  // la línea del banco) y los "extra" de la conciliación 1 banco : N libros. Ambos
+  // se traen paginados para que ninguno se pierda y siga apareciendo como pendiente.
   const matched = new Set<string>();
-  for (const m of matchedData ?? []) if (m.asiento_linea_id) matched.add(m.asiento_linea_id);
-  for (const m of extraData ?? []) if (m.asiento_linea_id) matched.add(m.asiento_linea_id);
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase
+      .from("estado_cuenta_lineas")
+      .select("asiento_linea_id")
+      .not("asiento_linea_id", "is", null)
+      .order("asiento_linea_id")
+      .range(desde, desde + 999);
+    if (error) throw new Error(`No se pudieron cargar los conciliados: ${error.message}`);
+    const filas = (data ?? []) as unknown as { asiento_linea_id: string | null }[];
+    for (const m of filas) if (m.asiento_linea_id) matched.add(m.asiento_linea_id);
+    if (filas.length < 1000) break;
+  }
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase
+      .from("conciliacion_lineas_extra")
+      .select("asiento_linea_id")
+      .order("asiento_linea_id")
+      .range(desde, desde + 999);
+    if (error) throw new Error(`No se pudieron cargar los conciliados extra: ${error.message}`);
+    const filas = (data ?? []) as unknown as { asiento_linea_id: string | null }[];
+    for (const m of filas) if (m.asiento_linea_id) matched.add(m.asiento_linea_id);
+    if (filas.length < 1000) break;
+  }
 
   const movimientos_sin_conciliar: MovimientoLibro[] = movs
     // Los ajustes de redondeo y las líneas de SALDO INICIAL (apertura de la
