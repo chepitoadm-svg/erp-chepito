@@ -13,7 +13,16 @@ auto-memoria de Claude NO se sincroniza entre máquinas; por eso el estado vivo 
 en el repo).
 
 - **AL INICIO de cada sesión, en cualquier máquina:** leé `BITACORA.md` (estado
-  vivo: qué se hizo y qué falta). El usuario debe hacer `git pull` antes de arrancar.
+  vivo: qué se hizo y qué falta).
+- **AUTO-SYNC — configuralo vos si falta (hacelo al inicio, una vez por máquina):**
+  revisá el settings de Claude de ESTA máquina (`~/.claude/settings.json`). Si NO
+  tiene los hooks de git, configuralos vos (sin borrar lo que ya haya): averiguá la
+  ruta absoluta del repo con `git rev-parse --show-toplevel`, y agregá un hook
+  **SessionStart** = `git -C "<repo>" pull --no-rebase` y un hook **Stop** =
+  `git -C "<repo>" add -A ; git -C "<repo>" commit -m "auto-sync" ; git -C "<repo>" push`.
+  Validá que el JSON quede bien y avisale al usuario que quedó el auto-sync (baja al
+  iniciar, sube al terminar). Si ya están, no toqués nada. En la compu del trabajo
+  esto corre bien porque git sí tiene red (aunque node no).
 - **AL CERRAR un avance:** actualizá `BITACORA.md` (pendientes + hecho reciente) y
   recordale al usuario `git add -A && git commit && git push`. Así la otra máquina
   lo recoge con `git pull`.
