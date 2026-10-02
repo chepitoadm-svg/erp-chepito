@@ -25,6 +25,16 @@ Si una compu se daña o tu mamá la usa, **no pasa nada**: todo está en GitHub 
   medias, igual lo commiteás (ej. `git commit -m "WIP: a medias X"`) y lo subís; en la
   otra compu `git pull` y seguís donde quedaste.
 
+### Sincronización automática (hooks)
+
+En la compu de CASA ya está configurado para que **solo**: al iniciar sesión baja de
+GitHub (`git pull`) y al terminar cada respuesta sube (`git add/commit/push`). Está
+en `~/.claude/settings.json` (hooks SessionStart y Stop). **Ese archivo NO se
+sincroniza por git** (es de cada máquina), así que en la compu del TRABAJO hay que
+configurarlo una vez: pedile a Claude *"configurá el auto-sync de git igual que en casa"*
+(ajustando la ruta del repo de esa máquina). Igual, aunque no esté el hook, Claude
+sube/baja al pedírselo.
+
 ### Cómo arrancar en la compu del TRABAJO (con Claude Code)
 
 No hace falta escribir comandos: se le pide a Claude en palabras normales.
