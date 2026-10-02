@@ -112,6 +112,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   paginando de 1000 en 1000 en `src/lib/data/conciliaciones.ts` (movimientos y conciliados).
   Puro código, sin migración. Verificado en Vercel. **OJO: Netlify sigue con el código viejo
   hasta que se reactiven sus deploys.**
+- **Lectores de estado de cuenta: Popular CSV + fix fechas RIDIVI (2026-10-02).** Se agregó un
+  lector del estado de cuenta del Banco Popular en **CSV** (`src/lib/csv/popularEstadoCuentaCsv.ts`,
+  enganchado en `conciliaciones/actions.ts`; los forms de importar/agregar aceptan `.csv`). Y se
+  arregló el lector de **RIDIVI**: sus fechas con guiones vienen en DD-MM-YYYY en unos export y
+  MM-DD en otros, y reventaba con días > 12 (ej. `30-09-2026` → mes 30). Ahora desambigua por
+  validez (número > 12 = día) + convención detectada del archivo. Ambos verificados en Vercel.
 - **Vercel como destino de deploy (2026-10-02).** Repo conectado a Vercel (cuenta Hobby de
   `chepitoadm-svg`), env vars de Supabase puestas (las 3: URL, ANON, SERVICE_ROLE; NO va
   `SUPABASE_DB_URL`), primer deploy OK en `erp-chepito.vercel.app`. Cada push a `main`
