@@ -43,6 +43,7 @@ export const NAV: NavEntry[] = [
       { label: "Compras", href: "/compras", desc: "Facturas, recepciones y cuentas por pagar.", icon: "compras" },
       { label: "Ventas", href: "/ventas", desc: "Ventas del día por sucursal y mayoreo.", icon: "ventas" },
       { label: "Inventario", href: "/inventario", desc: "Existencias, kardex y transferencias.", icon: "inventario" },
+      { label: "Producción", href: "/produccion", desc: "Recetas, costos (BOM) y producción.", icon: "costos" },
       { label: "Tesorería", href: "/tesoreria/conciliaciones", desc: "Conciliación bancaria y datáfono.", icon: "tesoreria" },
       { label: "Gastos", href: "/gastos", desc: "Gastos del mes por centro de costo.", icon: "gastos" },
     ],
