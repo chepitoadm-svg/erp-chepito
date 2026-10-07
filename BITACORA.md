@@ -78,6 +78,35 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Pendientes (lo que falta)
 
+- [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). EN CURSO — RETOMAR AQUÍ (2026-10-07).**
+      - **Decisión:** hacerlo **NATIVO** dentro del ERP (NO embeber), **integrado** con el
+        inventario (costo por promedio ponderado) **+ costo manual de respaldo** para insumos que
+        todavía no estén en inventario. **NO tocar la app viva** que usan los dependientes:
+        GitHub Pages `chepitoadm-svg/produccion-diaria-chepito-`
+        (link: https://chepitoadm-svg.github.io/produccion-diaria-chepito-/produccion-chepito.html),
+        Supabase vieja **`fqwxhrxjphvqjtosxizb`** (aparte del ERP `iwtbfdrchzqcrewiaiua`).
+      - **Plan por fases:** 1) Recetas/Costos (BOM) [en curso] · 2) Producción diaria · 3) explosión
+        de materiales + costeo + posteo contable (Debe Inv PT / Haber Inv MP) · 4) horneadas y
+        cálculo de receta · 5) cutover + crear usuarios a los dependientes + retirar la vieja.
+      - **HECHO y subido (Fase 4-1):** migración `20261007100001_produccion_recetas.sql`
+        (tablas `insumos_manuales`, `recetas`, `recetas_lineas`; `fn_costo_receta` recursivo con
+        guardia circular; vista `v_recetas`; RLS por permiso `produccion.ver`/`produccion.gestionar`);
+        `src/lib/data/recetas.ts`; pantalla `/produccion` (lista, blindada si falta la migración) +
+        entrada de menú.
+      - **PRIMER PASO EN CASA:** `git pull` + **`supabase db push`** (aplicar la migración). Luego
+        verificar que el build de Vercel (commit `6d40d6e`) salió verde; si rojo, pasar el error.
+      - **FALTA en Fase 4-1:** (a) **editor** crear/editar recetas y productos con sus líneas
+        (elegir artículo del inventario / insumo manual / otra receta anidada) + costo en vivo;
+        (b) gestión de **insumos manuales**; (c) **MIGRAR datos** de la Supabase vieja.
+      - **Para migrar datos:** leer `config.valor` donde `clave='costos_state'` de la Supabase vieja
+        (`fqwxhrxjphvqjtosxizb`, llave publishable incrustada en el HTML). Forma del JSON:
+        `insumos[]{nombre,costo,cantCompra,unidad,proveedor}`,
+        `recetas[]{nombre,tipo,rendCant,rendUnidad,componentes[]}`,
+        `productos[]{nombre,precio,componentes[]}`,
+        `componentes[]{tipoRef:'insumo'|'receta',refId,cantidad,unidad}`.
+        Unidades: g/kg/ml/L/unidad/porción. Emparejar insumos con artículos del ERP por nombre;
+        los que no calcen entran como insumos manuales.
+
 - [ ] **Duplicación de compras (Excel vs electrónicas) — DECISIÓN GRANDE (RETOMAR AQUÍ).**
       Al importar el Excel de QuPOS se crearon facturas que ya existían electrónicas
       (jaladas del correo) → duplicadas → compras/CxP inflados. La importación de Excel
@@ -106,6 +135,10 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Saldo inicial Banco Popular Cuenta 1 (`11-10-15-01-01`) registrado** (2026-10): apertura al
+  30/06/2026 = **₡3.316.689,04** (asiento tipo Apertura contra Depuración `31-11`). La conciliación
+  de julio quedó cuadrada. Además, los asientos de **Apertura** ahora se **excluyen** de la lista de
+  pendientes de conciliación (cuentan en el saldo de libros, no se casan contra el banco).
 - **Fix conciliación bancaria (2026-10-02).** Los movimientos ya conciliados reaparecían
   como "pendientes" en la lista de libros cuando el total conciliado pasaba de 1.000
   (PostgREST corta en 1.000, la lista de "ya casados" quedaba incompleta). Arreglado
