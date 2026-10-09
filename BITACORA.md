@@ -127,9 +127,16 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         "Nueva receta" y acciones Editar/Desactivar en la lista. Capa de datos: `obtenerReceta`,
         `listarFuentesReceta` (con costo por unidad base). Tipos: `fn_guardar_receta` agregada a
         `database.ts`. Verificado con `npm run build`.
-      - **FALTA en Fase 4-1:** (c) **ligar** insumos manuales a artículos del inventario para usar el
-        costo real por promedio ponderado (hoy en el editor ya se puede elegir un artículo del
-        inventario como línea; falta el botón para "convertir" un insumo manual existente en artículo).
+      - **EDITOR — entrega 3/3 HECHA (2026-10-08): convertir insumo manual → artículo de inventario.**
+        Botón "Convertir" en cada insumo manual activo → `/produccion/insumos/[id]/convertir` (muestra
+        costo a mano vs costo del artículo, y cuántas recetas lo usan). RPC `fn_convertir_insumo`
+        (migración `20261008100002`, aplicada): reapunta las líneas `insumo_manual`→`articulo` y
+        desactiva el insumo manual. **Bug arreglado de paso** (migración `20261008100003`):
+        `recetas_lineas` tenía el trigger `trg_set_actualizado` (de `fn_adjuntar_auditoria`) que
+        reventaba cualquier UPDATE porque la tabla no tiene columna `actualizado_en`; se quitó.
+      - **FASE 4-1 (Recetas/Costos BOM): COMPLETA.** Datos migrados + editor completo (insumos, recetas,
+        productos, convertir). **Siguiente: Fase 4-2 (Producción diaria)** → explosión de materiales,
+        consumo de MP / ingreso de PT con posteo contable (Debe Inv PT / Haber Inv MP).
 
 - [ ] **⚠️ KNOWN ISSUE — HISTORIAL DE MIGRACIONES DESAJUSTADO (NO correr `supabase db push` a ciegas).**
       El `schema_migrations` del remoto solo tiene registradas las migraciones **hasta
@@ -181,8 +188,9 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   en `database.ts`, daba 404) y **datos migrados** de la app vieja: 38 insumos (manuales), 8 recetas,
   67 productos, 178 líneas; costos verificados al céntimo (75/75). `/produccion` ya muestra las fichas.
   **Editor de Producción:** entrega 1 (CRUD insumos manuales) y entrega 2 (editor de recetas/productos
-  con líneas, costo/margen en vivo, precio; RPC `fn_guardar_receta`) hechas y subidas. Falta entrega 3
-  (convertir un insumo manual en artículo de inventario).
+  con líneas, costo/margen en vivo, precio; RPC `fn_guardar_receta`) y entrega 3 (convertir insumo
+  manual → artículo de inventario; RPC `fn_convertir_insumo` + fix del trigger de `recetas_lineas`)
+  hechas y subidas. **Fase 4-1 completa**; sigue Fase 4-2 (producción diaria + posteo contable).
 - **Saldo inicial Banco Popular Cuenta 1 (`11-10-15-01-01`) registrado** (2026-10): apertura al
   30/06/2026 = **₡3.316.689,04** (asiento tipo Apertura contra Depuración `31-11`). La conciliación
   de julio quedó cuadrada. Además, los asientos de **Apertura** ahora se **excluyen** de la lista de

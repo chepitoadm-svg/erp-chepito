@@ -1,0 +1,12 @@
+-- =============================================================================
+-- Fix: quitar trg_set_actualizado de recetas_lineas.
+--
+-- La migración de Fase 4-1 adjuntó la auditoría completa a recetas_lineas con
+-- fn_adjuntar_auditoria, que incluye el trigger BEFORE UPDATE `trg_set_actualizado`
+-- (fn_set_actualizado escribe NEW.actualizado_en / actualizado_por). Pero
+-- recetas_lineas NO tiene esas columnas (es tabla de líneas: se reemplazan, no se
+-- "tocan"), así que cualquier UPDATE sobre ella reventaba con
+-- «record "new" has no field "actualizado_en"» (p. ej. al convertir un insumo).
+-- Quitamos solo ese trigger; el log de auditoría (trg_auditoria, AFTER) se queda.
+-- =============================================================================
+drop trigger if exists trg_set_actualizado on public.recetas_lineas;

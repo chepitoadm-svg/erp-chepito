@@ -149,6 +149,26 @@ export async function obtenerReceta(id: string): Promise<RecetaEdit | null> {
   };
 }
 
+// Recetas/productos que usan un insumo manual (para avisar el impacto al convertir).
+export async function usoInsumoEnRecetas(
+  insumoId: string,
+): Promise<{ count: number; nombres: string[] }> {
+  const supabase = await createClient();
+  const { data: ls, error } = await supabase
+    .from("recetas_lineas")
+    .select("receta_id")
+    .eq("insumo_manual_id", insumoId)
+    .eq("tipo_ref", "insumo_manual");
+  if (error) throw new Error(`No se pudo contar el uso del insumo: ${error.message}`);
+  const ids = Array.from(new Set((ls ?? []).map((l) => l.receta_id as string)));
+  if (!ids.length) return { count: 0, nombres: [] };
+
+  const { data: recs, error: e2 } = await supabase.from("recetas").select("nombre").in("id", ids);
+  if (e2) throw new Error(`No se pudieron cargar las recetas: ${e2.message}`);
+  const nombres = (recs ?? []).map((r) => r.nombre as string).sort((a, b) => a.localeCompare(b, "es"));
+  return { count: ids.length, nombres };
+}
+
 // === Fuentes para las líneas (artículo de inventario | insumo manual | receta)
 export interface FuenteReceta {
   key: string; // "articulo:<id>" | "insumo_manual:<id>" | "receta:<id>"

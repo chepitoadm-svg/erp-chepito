@@ -163,3 +163,20 @@ export async function alternarRecetaEstado(formData: FormData): Promise<void> {
   await supabase.from("recetas").update({ estado: nuevo }).eq("id", id);
   revalidatePath("/produccion");
 }
+
+// Convierte un insumo manual en un artículo del inventario: reapunta las líneas
+// de receta que lo usaban al artículo y desactiva el insumo manual.
+export async function convertirInsumo(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("produccion.gestionar");
+  const insumoId = String(formData.get("id") ?? "").trim();
+  const articuloId = String(formData.get("articulo_id") ?? "").trim();
+  if (!insumoId) return { error: "Falta el insumo." };
+  if (!articuloId) return { error: "Elegí el artículo del inventario." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_convertir_insumo", { p_insumo: insumoId, p_articulo: articuloId });
+  if (error) return { error: limpiar(error.message) };
+
+  revalidatePath("/produccion");
+  redirect("/produccion");
+}

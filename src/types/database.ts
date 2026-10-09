@@ -1469,6 +1469,7 @@ export interface Database {
     };
     Functions: {
       fn_guardar_receta: { Args: { p: unknown }; Returns: string };
+      fn_convertir_insumo: { Args: { p_insumo: string; p_articulo: string }; Returns: number };
       fn_registrar_liquidacion_datafono: {
         Args: {
           p_centro: string;

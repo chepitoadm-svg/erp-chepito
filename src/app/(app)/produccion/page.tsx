@@ -267,6 +267,14 @@ export default async function ProduccionPage() {
                       >
                         Editar
                       </Link>
+                      {i.estado === "activo" && (
+                        <Link
+                          href={`/produccion/insumos/${i.id}/convertir`}
+                          className="text-xs text-neutral-600 hover:text-neutral-900"
+                        >
+                          Convertir
+                        </Link>
+                      )}
                       <form action={alternarInsumoEstado}>
                         <input type="hidden" name="id" value={i.id} />
                         <input type="hidden" name="estado" value={i.estado} />
