@@ -60,7 +60,7 @@ export interface ConsumoInsumo {
   base_qty: number; // en unidad base (g / ml / u)
   proveedor: string;
   colones: number; // costo del consumo (base_qty × costo por unidad base del insumo)
-  productos: { nombre: string; base_qty: number; colones: number }[]; // en qué productos se gastó
+  productos: { nombre: string; unidades: number; base_qty: number; colones: number }[]; // en qué productos se gastó
 }
 export interface GastoProducto {
   nombre: string;
@@ -250,7 +250,12 @@ export function calcularConsumo(
       const ins = getInsumo(id);
       const cp = cpb[id] ?? 0;
       const productos = Object.entries(perIP[id] || {})
-        .map(([nombre, base]) => ({ nombre, base_qty: base, colones: Math.round(base * cp * 100) / 100 }))
+        .map(([nombre, base]) => ({
+          nombre,
+          unidades: prodAcc[normp(nombre)]?.unidades ?? 0,
+          base_qty: base,
+          colones: Math.round(base * cp * 100) / 100,
+        }))
         .sort((a, b) => b.base_qty - a.base_qty);
       return {
         insumo_id: id,

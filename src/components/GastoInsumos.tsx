@@ -9,7 +9,7 @@ interface InsumoGasto {
   base_qty: number;
   unidad: string;
   colones: number;
-  productos: { nombre: string; base_qty: number; colones: number }[];
+  productos: { nombre: string; unidades: number; base_qty: number; colones: number }[];
 }
 
 const money = (n: number) => "₡" + n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -71,7 +71,9 @@ export default function GastoInsumos({ insumos }: { insumos: InsumoGasto[] }) {
                         <tbody>
                           {i.productos.map((p) => (
                             <tr key={p.nombre} className="border-t border-neutral-200/70">
-                              <td className="py-1.5 pl-6 text-neutral-700">{p.nombre}</td>
+                              <td className="py-1.5 pl-6 text-neutral-700">
+                                {p.nombre} <span className="text-neutral-400">({p.unidades.toLocaleString("es-CR")} u)</span>
+                              </td>
                               <td className="py-1.5 text-right tabular-nums text-neutral-600">{fmtQty(p.base_qty, i.unidad)}</td>
                               <td className="py-1.5 text-right tabular-nums text-neutral-700">{money(p.colones)}</td>
                             </tr>
