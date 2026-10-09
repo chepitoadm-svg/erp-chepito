@@ -79,6 +79,14 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 ## Pendientes (lo que falta)
 
 - [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). Fase 4-1 ✅ + Fase 4-2 Opción 1 ✅ (act. 2026-10-09).**
+      - **👉 RETOMAR AQUÍ:** dos frentes posibles.
+        (a) **USAR la Opción 1** (se puede desde cualquier lado, solo navegador, no necesita red de node):
+        en `/produccion` **Convertir** los insumos clave (harina, huevos…) a artículos del inventario, y en
+        `/produccion/aplicar` **Descontar** un período para verlo bajar el stock. Pendiente: hacer una
+        prueba real con el usuario.
+        (b) **CONSTRUIR la Opción 2** (pantalla nativa para DIGITAR producción en el ERP, para el cutover):
+        ⚠️ lleva **migración + pruebas** → es de **CASA** (en el trabajo node no tiene red). En el trabajo
+        solo diseñar/escribir código y push.
       - **FASE 4-2 — PRODUCCIÓN DIARIA, decisión del usuario:** dos opciones. **Opción 1 (HECHA):** el ERP
         JALA la producción que las dependientas anotan en la app vieja y, con un botón, **descuenta la
         materia prima del inventario** (sin digitar nada dos veces, sin asiento). **Opción 2 (PENDIENTE,
