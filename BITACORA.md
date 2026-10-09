@@ -79,6 +79,22 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 ## Pendientes (lo que falta)
 
 - [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). Fase 4-1 ✅ + Fase 4-2 Opción 1 ✅ (act. 2026-10-09).**
+      - **⚠️⚠️ OJO GRAVE (2026-10-09): NO usar "Convertir" ni `/produccion/aplicar` todavía.** Los
+        artículos de MP del inventario están **mal rotulados en su unidad** (ej. HARINA FLORES 25K tiene
+        unidad "G" pero su costo promedio es **por saco** ₡17.318; ACEITE tiene costo **negativo**). Al
+        convertir un insumo, las recetas pasan a costear por ese artículo y `fn_costo_receta` cobró harina
+        a ₡17.318 **por gramo** → los costos de TODAS las recetas explotaron (baguette ₡2,77 M). **Ya se
+        revirtieron las 2 conversiones** (harina, aceite) con un script (recetas_lineas de vuelta a
+        insumo_manual + reactivar insumo + limpiar `articulo_id`); costos correctos de nuevo (baguette
+        ₡133,78). **Antes de volver a convertir/descontar hay que ARREGLAR el inventario de MP:** que cada
+        artículo tenga unidad y costo coherentes (ej. harina en KG con costo/kg, o una "contenido base"
+        por artículo = gramos por unidad de stock) + cargar existencias iniciales. Mientras tanto, los
+        insumos quedan MANUALES (costos correctos). El puente bueno sería guardar "base por unidad de
+        stock" en el artículo y que `fn_costo_receta` y `/aplicar` lo usen (pendiente de diseño).
+      - **👉 PRÓXIMO más útil y SEGURO: reporte "Gasto de materia prima" en el ERP** (lo pidió el user:
+        "veo cuánto se gastó pero no en qué"). Desglose por producto (unidades×receta) y por insumo, por
+        día/semana/mes/rango y por sucursal, igual que la app vieja. Usa recetas (correctas) + producción
+        de la app vieja (`consumoMateriaPrima`/`costoDeConsumo`); NO toca inventario ni conversiones → seguro.
       - **👉 RETOMAR AQUÍ:** dos frentes posibles.
         (a) **USAR la Opción 1** (se puede desde cualquier lado, solo navegador, no necesita red de node):
         en `/produccion` **Convertir** los insumos clave (harina, huevos…) a artículos del inventario, y en
