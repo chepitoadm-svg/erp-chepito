@@ -1468,6 +1468,7 @@ export interface Database {
       };
     };
     Functions: {
+      fn_guardar_receta: { Args: { p: unknown }; Returns: string };
       fn_registrar_liquidacion_datafono: {
         Args: {
           p_centro: string;

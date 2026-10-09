@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarRecetas, listarInsumosManuales } from "@/lib/data/recetas";
-import { alternarInsumoEstado } from "./actions";
+import { alternarInsumoEstado, alternarRecetaEstado } from "./actions";
 
 const money = (n: number | null) =>
   n == null ? "—" : "₡" + Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -44,9 +44,19 @@ export default async function ProduccionPage() {
       </p>
 
       {/* PRODUCTOS FINALES */}
-      <h2 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-        Productos ({productos.length})
-      </h2>
+      <div className="mt-6 mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          Productos ({productos.length})
+        </h2>
+        {puedeGestionar && (
+          <Link
+            href="/produccion/recetas/nuevo?tipo=producto"
+            className="shrink-0 rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800"
+          >
+            ＋ Nuevo producto
+          </Link>
+        )}
+      </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
@@ -58,13 +68,14 @@ export default async function ProduccionPage() {
               <th className="px-4 py-3 text-right font-medium">Margen</th>
               <th className="px-4 py-3 text-right font-medium">%</th>
               <th className="px-4 py-3 font-medium">Estado</th>
+              {puedeGestionar && <th className="px-4 py-3 font-medium">Acciones</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {productos.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
-                  Todavía no hay productos. (Crear/editar llega en el próximo incremento.)
+                <td colSpan={puedeGestionar ? 8 : 7} className="px-4 py-8 text-center text-neutral-400">
+                  Todavía no hay productos.
                 </td>
               </tr>
             )}
@@ -96,6 +107,22 @@ export default async function ProduccionPage() {
                     {p.estado}
                   </span>
                 </td>
+                {puedeGestionar && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Link href={`/produccion/recetas/${p.id}`} className="text-xs text-neutral-600 hover:text-neutral-900">
+                        Editar
+                      </Link>
+                      <form action={alternarRecetaEstado}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="estado" value={p.estado} />
+                        <button type="submit" className="text-xs text-neutral-500 hover:text-neutral-900">
+                          {p.estado === "activo" ? "Desactivar" : "Activar"}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -103,9 +130,19 @@ export default async function ProduccionPage() {
       </div>
 
       {/* RECETAS INTERMEDIAS */}
-      <h2 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-        Recetas intermedias ({intermedias.length})
-      </h2>
+      <div className="mt-8 mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          Recetas intermedias ({intermedias.length})
+        </h2>
+        {puedeGestionar && (
+          <Link
+            href="/produccion/recetas/nuevo?tipo=intermedia"
+            className="shrink-0 rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800"
+          >
+            ＋ Nueva receta
+          </Link>
+        )}
+      </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
@@ -115,12 +152,13 @@ export default async function ProduccionPage() {
               <th className="px-4 py-3 text-right font-medium">Rinde</th>
               <th className="px-4 py-3 text-right font-medium">Costo total</th>
               <th className="px-4 py-3 font-medium">Estado</th>
+              {puedeGestionar && <th className="px-4 py-3 font-medium">Acciones</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {intermedias.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={puedeGestionar ? 6 : 5} className="px-4 py-8 text-center text-neutral-400">
                   Todavía no hay recetas intermedias.
                 </td>
               </tr>
@@ -144,6 +182,22 @@ export default async function ProduccionPage() {
                     {r.estado}
                   </span>
                 </td>
+                {puedeGestionar && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Link href={`/produccion/recetas/${r.id}`} className="text-xs text-neutral-600 hover:text-neutral-900">
+                        Editar
+                      </Link>
+                      <form action={alternarRecetaEstado}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="estado" value={r.estado} />
+                        <button type="submit" className="text-xs text-neutral-500 hover:text-neutral-900">
+                          {r.estado === "activo" ? "Desactivar" : "Activar"}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

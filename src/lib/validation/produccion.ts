@@ -23,3 +23,31 @@ export const editarInsumoSchema = z.object({ id: z.string().uuid(), ...insumoBas
 
 export type CrearInsumoInput = z.infer<typeof crearInsumoSchema>;
 export type EditarInsumoInput = z.infer<typeof editarInsumoSchema>;
+
+// === Recetas / productos ===================================================
+const lineaRecetaSchema = z.object({
+  tipo_ref: z.enum(["articulo", "insumo_manual", "receta"]),
+  ref_id: z.string().uuid("Falta elegir el ingrediente en alguna línea."),
+  cantidad: z
+    .number({ invalid_type_error: "Cantidad inválida en alguna línea." })
+    .positive("La cantidad de cada línea debe ser mayor que cero."),
+  unidad: z.enum(UNIDADES, { errorMap: () => ({ message: "Unidad inválida en alguna línea." }) }),
+});
+
+export const guardarRecetaSchema = z
+  .object({
+    id: z.string().uuid().nullable().optional(),
+    nombre: z.string().trim().min(2, "El nombre es obligatorio.").max(200),
+    es_producto: z.boolean(),
+    clasificacion: z.string().trim().max(120).nullable().optional(),
+    rinde_cantidad: z.number().positive("El rendimiento debe ser mayor que cero.").nullable().optional(),
+    rinde_unidad: z.enum(UNIDADES).nullable().optional(),
+    precio_venta: z.number().min(0, "El precio no puede ser negativo.").nullable().optional(),
+    lineas: z.array(lineaRecetaSchema),
+  })
+  .refine(
+    (d) => d.es_producto || (d.rinde_cantidad != null && d.rinde_cantidad > 0 && d.rinde_unidad != null),
+    { message: "Una receta intermedia necesita rendimiento (cantidad y unidad).", path: ["rinde_cantidad"] },
+  );
+
+export type GuardarRecetaInput = z.infer<typeof guardarRecetaSchema>;

@@ -117,11 +117,19 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         acciones Editar/Desactivar), solo con permiso `produccion.gestionar`. Sin migración.
         Archivos: `src/lib/validation/produccion.ts`, `produccion/actions.ts`, `InsumoManualForm.tsx`,
         `produccion/insumos/{nuevo,[id]}/page.tsx`, `obtenerInsumoManual` en `data/recetas.ts`.
-      - **FALTA en Fase 4-1:** (a) **editor** crear/editar recetas y productos con sus líneas
-        (elegir artículo del inventario / insumo manual / otra receta anidada) + precio + costo en vivo
-        — necesita una migración chica (`fn_guardar_receta` para guardar receta+líneas atómico);
-        (c) **ligar** insumos manuales a artículos del inventario para usar el costo real por promedio
-        ponderado (se hará desde el editor).
+      - **EDITOR — entrega 2/3 HECHA (2026-10-08): editor de recetas y productos.**
+        Migración `20261008100001_fn_guardar_receta` (RPC que guarda receta+líneas atómico, SECURITY
+        INVOKER → RLS exige `produccion.gestionar`) **aplicada a producción** (método manual seguro,
+        registrada en historial). Probada crear+editar contra la base (rollback). UI:
+        `/produccion/recetas/{nuevo,[id]}` con `RecetaForm` (toggle producto/intermedia, líneas
+        dinámicas con buscador que elige artículo de inventario / insumo manual / otra receta, **costo
+        y margen en vivo**, precio para productos, rinde para intermedias). Botones "Nuevo producto" /
+        "Nueva receta" y acciones Editar/Desactivar en la lista. Capa de datos: `obtenerReceta`,
+        `listarFuentesReceta` (con costo por unidad base). Tipos: `fn_guardar_receta` agregada a
+        `database.ts`. Verificado con `npm run build`.
+      - **FALTA en Fase 4-1:** (c) **ligar** insumos manuales a artículos del inventario para usar el
+        costo real por promedio ponderado (hoy en el editor ya se puede elegir un artículo del
+        inventario como línea; falta el botón para "convertir" un insumo manual existente en artículo).
 
 - [ ] **⚠️ KNOWN ISSUE — HISTORIAL DE MIGRACIONES DESAJUSTADO (NO correr `supabase db push` a ciegas).**
       El `schema_migrations` del remoto solo tiene registradas las migraciones **hasta
@@ -172,6 +180,9 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   creados y `v_recetas` corre contra el inventario real. **Build de Vercel arreglado** (faltaban tipos
   en `database.ts`, daba 404) y **datos migrados** de la app vieja: 38 insumos (manuales), 8 recetas,
   67 productos, 178 líneas; costos verificados al céntimo (75/75). `/produccion` ya muestra las fichas.
+  **Editor de Producción:** entrega 1 (CRUD insumos manuales) y entrega 2 (editor de recetas/productos
+  con líneas, costo/margen en vivo, precio; RPC `fn_guardar_receta`) hechas y subidas. Falta entrega 3
+  (convertir un insumo manual en artículo de inventario).
 - **Saldo inicial Banco Popular Cuenta 1 (`11-10-15-01-01`) registrado** (2026-10): apertura al
   30/06/2026 = **₡3.316.689,04** (asiento tipo Apertura contra Depuración `31-11`). La conciliación
   de julio quedó cuadrada. Además, los asientos de **Apertura** ahora se **excluyen** de la lista de
