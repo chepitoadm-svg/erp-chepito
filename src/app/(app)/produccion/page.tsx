@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { listarRecetas, listarInsumosManuales } from "@/lib/data/recetas";
+import { alternarInsumoEstado } from "./actions";
 
 const money = (n: number | null) =>
   n == null ? "—" : "₡" + Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -10,6 +12,7 @@ const qty = (c: number | null, u: string | null) =>
 
 export default async function ProduccionPage() {
   if (!(await tienePermiso("produccion.ver"))) redirect("/");
+  const puedeGestionar = await tienePermiso("produccion.gestionar");
 
   // Si la migración de la Fase 4-1 todavía no se aplicó (tablas/vistas no existen),
   // mostramos un aviso en vez de reventar (admin pasa el guard por bypass).
@@ -148,12 +151,22 @@ export default async function ProduccionPage() {
       </div>
 
       {/* INSUMOS MANUALES */}
-      <h2 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-        Insumos manuales ({insumos.length})
-        <span className="ml-2 font-normal normal-case tracking-normal text-neutral-400">
-          — MP que todavía no está en el inventario
-        </span>
-      </h2>
+      <div className="mt-8 mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          Insumos manuales ({insumos.length})
+          <span className="ml-2 font-normal normal-case tracking-normal text-neutral-400">
+            — MP que todavía no está en el inventario
+          </span>
+        </h2>
+        {puedeGestionar && (
+          <Link
+            href="/produccion/insumos/nuevo"
+            className="shrink-0 rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800"
+          >
+            ＋ Nuevo insumo
+          </Link>
+        )}
+      </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
@@ -162,12 +175,13 @@ export default async function ProduccionPage() {
               <th className="px-4 py-3 font-medium">Proveedor</th>
               <th className="px-4 py-3 text-right font-medium">Compra</th>
               <th className="px-4 py-3 font-medium">Estado</th>
+              {puedeGestionar && <th className="px-4 py-3 font-medium">Acciones</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {insumos.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={puedeGestionar ? 5 : 4} className="px-4 py-8 text-center text-neutral-400">
                   Sin insumos manuales. (Los de inventario se usan directo como artículo.)
                 </td>
               </tr>
@@ -190,6 +204,25 @@ export default async function ProduccionPage() {
                     {i.estado}
                   </span>
                 </td>
+                {puedeGestionar && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/produccion/insumos/${i.id}`}
+                        className="text-xs text-neutral-600 hover:text-neutral-900"
+                      >
+                        Editar
+                      </Link>
+                      <form action={alternarInsumoEstado}>
+                        <input type="hidden" name="id" value={i.id} />
+                        <input type="hidden" name="estado" value={i.estado} />
+                        <button type="submit" className="text-xs text-neutral-500 hover:text-neutral-900">
+                          {i.estado === "activo" ? "Desactivar" : "Activar"}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -71,3 +71,24 @@ export async function listarInsumosManuales(): Promise<InsumoManual[]> {
     estado: r.estado as string,
   }));
 }
+
+export async function obtenerInsumoManual(id: string): Promise<InsumoManual | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("insumos_manuales")
+    .select("id, nombre, costo_compra, cantidad_compra, unidad, proveedor, estado")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudo cargar el insumo: ${error.message}`);
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: r.id as string,
+    nombre: r.nombre as string,
+    costo_compra: Number(r.costo_compra ?? 0),
+    cantidad_compra: Number(r.cantidad_compra ?? 0),
+    unidad: r.unidad as string,
+    proveedor: (r.proveedor as string | null) ?? null,
+    estado: r.estado as string,
+  };
+}
