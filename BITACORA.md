@@ -96,15 +96,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         en qué productos se gastó, con cantidad + colones — igual que la app vieja "materia prima que se
         gasta"), con selector desde/hasta. Reusa `calcularConsumo` (extendido: ahora devuelve `colones` por insumo,
         `por_producto` y `total_colones`). NO toca inventario ni conversiones → seguro.
-      - **⚠️ OJO — NO cuadra 100% con la app todavía (2026-10-09).** Para el 9-oct el ERP da ₡67.479/427u
-        y la app ₡84.534/598u. Investigado a fondo: catálogo, merge de overrides, `variantPorFila`,
-        `unitsInRange`, `costoBaseInsumo` y `dowOf` del port **son fieles** (corrí la `calcularConsumo` real
-        con `npx tsx` sobre los datos viejos → idéntico al ERP). La diferencia es la **lógica de CLIENTES**:
-        la app suma **pedidos fijos** (`clientes_extra[].pedidoFijo` / `filas` / activo-baja) que NO están en
-        la tabla `produccion` (ej. Arnoldo sale inactivo desde ago pero la app lo muestra con 50u el 9-oct;
-        clientes app=164 vs tabla=139). **Para replicar EXACTO falta portar la lógica completa de
-        clientes/pedidos fijos** de `produccion-chepito.html` (`clientesExtraG`, `pedidoFijo`, cómo arma las
-        unidades de cada cli_ por día). Trabajo dedicado. Por ahora la pantalla lleva aviso "en construcción".
+      - **✅ RESUELTO (2026-10-09): el descuadre era un BUG DE LA APP VIEJA, no del ERP.** El ERP calculaba
+        bien (corrí la `calcularConsumo` real con `npx tsx` → fiel a la regla base-entre-semana y omite
+        clientes inactivos). La app vieja contaba de más: (1) un cliente **inactivo** (Arnoldo, baja ago)
+        que seguía sumando, y (2) variantes **sábado/domingo** en días de semana. **El usuario corrigió la
+        app** (ver `Downloads/correcion produccion diaria chepito/ISSUE-gasto-materia-prima.md`) y **ahora el
+        ERP y la app CUADRAN**. Se quitó el aviso "en construcción" de `/produccion/gasto`.
         **MEJORAS (2026-10-09):** ahora `/produccion/gasto` tiene **tarjetas por sucursal/cliente**
         (Chepito 1, Chepito 2 y cada cliente con producción) que filtran el detalle, y **botones de período**
         (Hoy/Ayer/Esta semana/Este mes) + rango. `gastoCompleto(ini,fin,suc)` en `data/produccion.ts` lee

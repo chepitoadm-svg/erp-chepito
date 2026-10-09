@@ -70,10 +70,6 @@ export default async function GastoMpPage({
         Cuánto costó en materia prima producir, y <b>en qué se gastó</b> — por sucursal, por producto y por
         insumo. Sale de la producción (app vieja) × las recetas del ERP. Informativo, no toca inventario.
       </p>
-      <div className="mb-4 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
-        ⚠️ Puede diferir un poco de la app en algunos clientes o fines de semana (la app maneja pedidos
-        fijos de clientes aparte). Si ves una diferencia, compará por sucursal con las tarjetas de abajo.
-      </div>
 
       {/* Período */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
