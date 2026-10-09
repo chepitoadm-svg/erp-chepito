@@ -101,6 +101,14 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         ahora guarda `insumos_manuales.articulo_id`, que es el puente insumo→artículo). Probado contra la
         base (aplicar+anular, rollback). **El consumo se calcula con `consumoMateriaPrima` (recetas de la
         app vieja), que es lo correcto porque la producción viene de la app vieja.**
+      - **FIX de unidades (2026-10-09):** la conversión NO usa la unidad del artículo (varios están mal
+        rotulados: ej. HARINA FLORES 25K tiene unidad "G" pero se lleva por sacos, costo ₡17.318/saco →
+        daba ₡34 mil millones). Ahora convierte con el **tamaño de compra del insumo** (1 saco = 25 kg):
+        paquetes = consumo_base ÷ tamaño_paquete; valor = paquetes × costo_promedio. Además **excluye**
+        artículos con costo promedio ≤ 0 (ej. ACEITE con saldo negativo) y los lista como "problema de
+        inventario" para que el usuario los arregle. **PENDIENTE del usuario:** arreglar en inventario los
+        artículos con saldo/costo raro (aceite negativo) y cargar existencias iniciales de la MP (la harina
+        quedaría negativa porque solo hay 28 sacos cargados vs lo consumido).
       - **FLUJO para que descuente de verdad:** 1) en `/produccion`, **Convertir** los insumos clave
         (harina, huevos…) a artículos del inventario (eso setea el enlace); 2) en `/produccion/aplicar`,
         elegir el período y **Descontar**. Solo baja stock de lo convertido; lo demás sale en "no ligados".

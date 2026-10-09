@@ -95,19 +95,18 @@ export default async function AplicarProduccionPage({
             Se descontará ({prev.lineas.length} artículos)
           </h2>
           <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[480px] text-sm">
               <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Artículo</th>
-                  <th className="px-4 py-3 text-right font-medium">Cantidad</th>
-                  <th className="px-4 py-3 text-right font-medium">Costo prom.</th>
+                  <th className="px-4 py-3 text-right font-medium">Consumo</th>
                   <th className="px-4 py-3 text-right font-medium">Valor</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {prev.lineas.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-neutral-400">
+                    <td colSpan={3} className="px-4 py-8 text-center text-neutral-400">
                       Nada ligado al inventario en este período (convertí insumos a artículos para que se descuenten).
                     </td>
                   </tr>
@@ -116,9 +115,8 @@ export default async function AplicarProduccionPage({
                   <tr key={l.articulo_id}>
                     <td className="px-4 py-3 text-neutral-900">{l.articulo_nombre}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-800">
-                      {num(l.cantidad)} {l.unidad_stock.toLowerCase()}
+                      {num(l.consumo_base)} {l.consumo_unidad}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-500">{money(l.costo_promedio)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-800">{money(l.valor)}</td>
                   </tr>
                 ))}
@@ -126,13 +124,21 @@ export default async function AplicarProduccionPage({
               {prev.lineas.length > 0 && (
                 <tfoot>
                   <tr className="border-t border-neutral-200 bg-neutral-50 font-semibold">
-                    <td className="px-4 py-3" colSpan={3}>Total</td>
+                    <td className="px-4 py-3" colSpan={2}>Total</td>
                     <td className="px-4 py-3 text-right tabular-nums">{money(totalValor)}</td>
                   </tr>
                 </tfoot>
               )}
             </table>
           </div>
+
+          {prev.problemas.length > 0 && (
+            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+              <b>{prev.problemas.length} con problema de inventario</b> (no se descuentan hasta arreglar el artículo):{" "}
+              {prev.problemas.slice(0, 8).map((p) => `${p.nombre} (${p.motivo})`).join("; ")}
+              {prev.problemas.length > 8 ? "…" : ""}.
+            </div>
+          )}
 
           {prev.noLigados.length > 0 && (
             <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
