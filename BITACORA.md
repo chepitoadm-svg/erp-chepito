@@ -78,14 +78,23 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Pendientes (lo que falta)
 
-- [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). EN CURSO — RETOMAR AQUÍ (2026-10-07).**
+- [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). Fase 4-1 COMPLETA; RETOMAR EN FASE 4-2 (act. 2026-10-08).**
+      - **👉 RETOMAR AQUÍ (próximo paso): FASE 4-2 — PRODUCCIÓN DIARIA.** Pantalla nueva en el ERP para
+        anotar lo que se produce cada día: elegís fecha + centro (Taller), ponés cuántas unidades se
+        hicieron de cada producto, y el ERP usa las recetas (ya cargadas) para **descontar la materia
+        prima del inventario**, **ingresar el producto terminado** y hacer el **asiento contable**
+        (Debe Inv PT / Haber Inv MP). Hoy esto se sigue registrando en la app VIEJA; el ERP todavía no
+        tiene esa pantalla. **Antes de codear: proponer diseño + aprobación (convención #1).**
+        ⚠️ **Lleva migración (tablas de producción diaria + RPC de explosión/posteo) y hay que PROBARLO
+        contra la base** → eso es de CASA (con red). En el TRABAJO solo se puede diseñar/escribir código
+        y hacer push; aplicar la migración y probar queda para casa.
       - **Decisión:** hacerlo **NATIVO** dentro del ERP (NO embeber), **integrado** con el
         inventario (costo por promedio ponderado) **+ costo manual de respaldo** para insumos que
         todavía no estén en inventario. **NO tocar la app viva** que usan los dependientes:
         GitHub Pages `chepitoadm-svg/produccion-diaria-chepito-`
         (link: https://chepitoadm-svg.github.io/produccion-diaria-chepito-/produccion-chepito.html),
         Supabase vieja **`fqwxhrxjphvqjtosxizb`** (aparte del ERP `iwtbfdrchzqcrewiaiua`).
-      - **Plan por fases:** 1) Recetas/Costos (BOM) [en curso] · 2) Producción diaria · 3) explosión
+      - **Plan por fases:** 1) Recetas/Costos (BOM) ✅ HECHA · 2) Producción diaria ⬅️ SIGUE · 3) explosión
         de materiales + costeo + posteo contable (Debe Inv PT / Haber Inv MP) · 4) horneadas y
         cálculo de receta · 5) cutover + crear usuarios a los dependientes + retirar la vieja.
       - **HECHO y subido (Fase 4-1):** migración `20261007100001_produccion_recetas.sql`
