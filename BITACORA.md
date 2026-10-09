@@ -105,7 +105,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         clientes app=164 vs tabla=139). **Para replicar EXACTO falta portar la lógica completa de
         clientes/pedidos fijos** de `produccion-chepito.html` (`clientesExtraG`, `pedidoFijo`, cómo arma las
         unidades de cada cli_ por día). Trabajo dedicado. Por ahora la pantalla lleva aviso "en construcción".
-        FALTA/opcional además: filtro por sucursal y botones rápidos día/semana/mes.
+        **MEJORAS (2026-10-09):** ahora `/produccion/gasto` tiene **tarjetas por sucursal/cliente**
+        (Chepito 1, Chepito 2 y cada cliente con producción) que filtran el detalle, y **botones de período**
+        (Hoy/Ayer/Esta semana/Este mes) + rango. `gastoCompleto(ini,fin,suc)` en `data/produccion.ts` lee
+        todo una vez y corre `calcularConsumo` por sucursal. Verificado que las exclusiones sáb/dom son
+        correctas (cada fila excluida es una variante de fin de semana). El residual vs la app sigue siendo
+        la lógica de clientes/pedidos fijos (pendiente de portar si se quiere exactitud total).
       - **👉 RETOMAR AQUÍ:** dos frentes posibles.
         (a) **USAR la Opción 1** (se puede desde cualquier lado, solo navegador, no necesita red de node):
         en `/produccion` **Convertir** los insumos clave (harina, huevos…) a artículos del inventario, y en

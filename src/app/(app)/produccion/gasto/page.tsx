@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { consumoMateriaPrima } from "@/lib/data/produccion";
+import { gastoCompleto } from "@/lib/data/produccion";
 import GastoInsumos from "@/components/GastoInsumos";
 
 const money = (n: number) => "₡" + n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -10,11 +10,30 @@ const money0 = (n: number) => "₡" + n.toLocaleString("es-CR", { maximumFractio
 function hoyCR(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
 }
+function addDays(iso: string, n: number): string {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function rangos(hoy: string) {
+  const d = new Date(hoy + "T12:00:00Z");
+  const y = d.getUTCFullYear(), m = d.getUTCMonth();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const finMes = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const dow = d.getUTCDay(); // 0=dom
+  const lunes = addDays(hoy, dow === 0 ? -6 : 1 - dow);
+  return {
+    hoy: { desde: hoy, hasta: hoy },
+    ayer: { desde: addDays(hoy, -1), hasta: addDays(hoy, -1) },
+    semana: { desde: lunes, hasta: addDays(lunes, 6) },
+    mes: { desde: `${y}-${pad(m + 1)}-01`, hasta: `${y}-${pad(m + 1)}-${pad(finMes)}` },
+  };
+}
 
 export default async function GastoMpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ desde?: string; hasta?: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string; suc?: string }>;
 }) {
   if (!(await tienePermiso("produccion.ver"))) redirect("/produccion");
   const sp = await searchParams;
@@ -22,15 +41,24 @@ export default async function GastoMpPage({
   const hoy = hoyCR();
   const desde = re.test(sp.desde ?? "") ? sp.desde! : hoy;
   const hasta = re.test(sp.hasta ?? "") ? sp.hasta! : desde;
+  const suc = sp.suc || "todos";
+  const r = rangos(hoy);
+  const qs = (d: string, h: string, s = suc) => `?desde=${d}&hasta=${h}&suc=${s}`;
+  const esRango = (x: { desde: string; hasta: string }) => x.desde === desde && x.hasta === hasta;
 
-  let data: Awaited<ReturnType<typeof consumoMateriaPrima>> | null = null;
+  let data: Awaited<ReturnType<typeof gastoCompleto>> | null = null;
   let error: string | null = null;
   try {
-    data = await consumoMateriaPrima(desde, hasta);
+    data = await gastoCompleto(desde, hasta, suc);
   } catch (e) {
     error = e instanceof Error ? e.message : "No se pudo leer la producción.";
   }
-  const unidades = data ? data.por_producto.reduce((a, p) => a + p.unidades, 0) : 0;
+  const det = data?.detalle;
+  const unidades = det ? det.por_producto.reduce((a, p) => a + p.unidades, 0) : 0;
+
+  const btn = "rounded-md border px-3 py-1.5 text-xs font-medium";
+  const btnOn = btn + " border-neutral-900 bg-neutral-900 text-white";
+  const btnOff = btn + " border-neutral-300 text-neutral-700 hover:bg-neutral-50";
 
   return (
     <div>
@@ -39,16 +67,23 @@ export default async function GastoMpPage({
       </Link>
       <h1 className="mt-1 mb-1 text-lg font-semibold text-neutral-900">Gasto en materia prima</h1>
       <p className="mb-3 max-w-2xl text-sm text-neutral-500">
-        Cuánto costó en materia prima producir, y <b>en qué se gastó</b> — por producto y por insumo.
-        Sale de la producción (app vieja) × las recetas del ERP. Es informativo, no toca inventario.
+        Cuánto costó en materia prima producir, y <b>en qué se gastó</b> — por sucursal, por producto y por
+        insumo. Sale de la producción (app vieja) × las recetas del ERP. Informativo, no toca inventario.
       </p>
-      <div className="mb-4 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-        ⚠️ <b>En construcción — todavía no cuadra 100% con la app.</b> Por ahora la cifra oficial es la de
-        la app de producción. El ERP aún no replica la lógica de <b>clientes/pedidos fijos</b> (la app suma
-        pedidos de clientes que no están en la tabla de producción), por eso el total sale más bajo.
+      <div className="mb-4 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+        ⚠️ Puede diferir un poco de la app en algunos clientes o fines de semana (la app maneja pedidos
+        fijos de clientes aparte). Si ves una diferencia, compará por sucursal con las tarjetas de abajo.
       </div>
 
+      {/* Período */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Link href={qs(r.hoy.desde, r.hoy.hasta)} className={esRango(r.hoy) ? btnOn : btnOff}>Hoy</Link>
+        <Link href={qs(r.ayer.desde, r.ayer.hasta)} className={esRango(r.ayer) ? btnOn : btnOff}>Ayer</Link>
+        <Link href={qs(r.semana.desde, r.semana.hasta)} className={esRango(r.semana) ? btnOn : btnOff}>Esta semana</Link>
+        <Link href={qs(r.mes.desde, r.mes.hasta)} className={esRango(r.mes) ? btnOn : btnOff}>Este mes</Link>
+      </div>
       <form method="get" className="mb-5 flex flex-wrap items-end gap-3">
+        <input type="hidden" name="suc" value={suc} />
         <label className="block">
           <span className="text-xs uppercase tracking-wide text-neutral-500">Desde</span>
           <input type="date" name="desde" defaultValue={desde} className="mt-1 block rounded-md border border-neutral-300 px-3 py-2 text-sm" />
@@ -57,25 +92,38 @@ export default async function GastoMpPage({
           <span className="text-xs uppercase tracking-wide text-neutral-500">Hasta</span>
           <input type="date" name="hasta" defaultValue={hasta} className="mt-1 block rounded-md border border-neutral-300 px-3 py-2 text-sm" />
         </label>
-        <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800">
-          Ver
-        </button>
+        <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800">Ver</button>
       </form>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
-      {data && (
+      {data && det && (
         <>
-          <div className="mb-5 inline-flex flex-wrap gap-6 rounded-lg border border-neutral-200 bg-neutral-50 px-5 py-4">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-neutral-500">Gasto de materia prima</div>
-              <div className="text-2xl font-bold text-amber-800">{money0(data.total_colones)}</div>
-            </div>
-            <div>
-              <div className="text-xs uppercase tracking-wide text-neutral-500">Unidades producidas</div>
-              <div className="text-2xl font-bold text-neutral-800">{unidades.toLocaleString("es-CR")}</div>
-            </div>
+          {/* Tarjetas por sucursal/cliente */}
+          <div className="mb-5 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {data.cards.map((c) => {
+              const activa = (c.key === "todos" && !data.suc) || c.key === data.suc;
+              return (
+                <Link
+                  key={c.key}
+                  href={qs(desde, hasta, c.key)}
+                  className={
+                    "rounded-lg border px-4 py-3 " +
+                    (activa ? "border-neutral-900 bg-neutral-50" : "border-neutral-200 bg-white hover:bg-neutral-50")
+                  }
+                >
+                  <div className="text-xs uppercase tracking-wide text-neutral-500">{c.label}</div>
+                  <div className="text-lg font-bold text-amber-800">{money0(c.total_colones)}</div>
+                  <div className="text-xs text-neutral-500">{c.unidades.toLocaleString("es-CR")} unidades</div>
+                </Link>
+              );
+            })}
           </div>
+
+          <p className="mb-3 text-sm text-neutral-500">
+            Mostrando: <b className="text-neutral-800">{data.sucLabel}</b> · {money0(det.total_colones)} en materia prima ·{" "}
+            {unidades.toLocaleString("es-CR")} unidades con receta
+          </p>
 
           {/* POR PRODUCTO */}
           <h2 className="mt-2 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
@@ -92,12 +140,10 @@ export default async function GastoMpPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {data.por_producto.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-neutral-400">No hay producción en ese rango.</td>
-                  </tr>
+                {det.por_producto.length === 0 && (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-neutral-400">No hay producción en ese rango.</td></tr>
                 )}
-                {data.por_producto.map((p) => (
+                {det.por_producto.map((p) => (
                   <tr key={p.nombre}>
                     <td className="px-4 py-3 text-neutral-900">{p.nombre}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-700">{p.unidades.toLocaleString("es-CR")}</td>
@@ -109,17 +155,17 @@ export default async function GastoMpPage({
             </table>
           </div>
 
-          {/* POR INSUMO (expandible: tocá para ver en qué productos se gastó) */}
+          {/* POR INSUMO (expandible) */}
           <h2 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
             En qué se gastó (por insumo)
           </h2>
           <p className="mb-2 text-xs text-neutral-400">Tocá una materia prima para ver en cuáles productos se gastó.</p>
-          <GastoInsumos insumos={data.insumos} />
+          <GastoInsumos insumos={det.insumos} />
 
           <p className="mt-3 text-xs text-neutral-400">
-            {data.filas_leidas.toLocaleString("es-CR")} filas de producción leídas
-            {data.sin_receta.length > 0 && (
-              <> · {data.sin_receta.length} productos sin receta (excluidos): {data.sin_receta.slice(0, 6).map((s) => s.nombre).join(", ")}{data.sin_receta.length > 6 ? "…" : ""}</>
+            {det.filas_leidas.toLocaleString("es-CR")} filas de producción leídas
+            {det.sin_receta.length > 0 && (
+              <> · {det.sin_receta.length} productos sin receta (excluidos): {det.sin_receta.slice(0, 6).map((s) => s.nombre).join(", ")}{det.sin_receta.length > 6 ? "…" : ""}</>
             )}
           </p>
         </>
