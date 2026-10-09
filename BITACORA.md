@@ -79,8 +79,20 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 ## Pendientes (lo que falta)
 
 - [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). Fase 4-1 ✅ + Fase 4-2 Opción 1 ✅ (act. 2026-10-09).**
-      - **⚠️⚠️ OJO GRAVE (2026-10-09): NO usar "Convertir" ni `/produccion/aplicar` todavía.** Los
-        artículos de MP del inventario están **mal rotulados en su unidad** (ej. HARINA FLORES 25K tiene
+      - **✅ PILOTO HARINA — inventario de MP arreglado (2026-10-09).** La harina (art. `108008`) estaba
+        en unidad "G" pero costeada por saco. Se arregló con script (sesión): unidad → **KG**;
+        `proveedor_articulos.factor_a_stock` = **25** (1 saco = 25 kg) en los 2 proveedores; **reset del
+        kardex** (solo cantidades; la contabilidad periódica NO se toca) + **saldo_inicial 1-oct = 25 kg**
+        (1 saco) @ ₡689,18/kg; **insumo harina convertido** al artículo. Recetas correctas (baguette
+        ₡131,98). **Modelo de unidades:** el artículo se lleva en **kg** (el puente): se COMPRA en saco
+        (factor 25 → 25 kg) y las RECETAS piden gramos (1 kg = 1000 g), todo automático. **Patrón para las
+        otras MP** (aceite, margarina, azúcar…): unidad base correcta (kg/L/unidad) → arreglar
+        `factor_a_stock` → resetear/arrancar existencia real a la fecha de corte → convertir el insumo.
+        **OJO aceite:** saldo NEGATIVO (dañado), resetearlo igual antes de convertir. **PENDIENTE harina:**
+        decidir si sumamos las compras de octubre ya registradas (21 sacos) para que el stock refleje el
+        mes, y luego descontar producción en `/produccion/aplicar`.
+      - **⚠️ (histórico) OJO que era GRAVE: no convertir con artículos de MP mal rotulados.** Los
+        artículos de MP del inventario estaban **mal rotulados en su unidad** (ej. HARINA FLORES 25K tenía
         unidad "G" pero su costo promedio es **por saco** ₡17.318; ACEITE tiene costo **negativo**). Al
         convertir un insumo, las recetas pasan a costear por ese artículo y `fn_costo_receta` cobró harina
         a ₡17.318 **por gramo** → los costos de TODAS las recetas explotaron (baguette ₡2,77 M). **Ya se
