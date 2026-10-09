@@ -97,19 +97,25 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         base de producción (transacción + registrada en el historial). Verificado: tablas, funciones,
         vista `v_recetas` (corre contra el inventario real) y permisos creados. **OJO: NO se corrió
         `supabase db push`** por el desajuste de historial (ver KNOWN ISSUE abajo); se aplicó solo esa
-        migración a mano, de forma segura. Falta aún: confirmar que el build de Vercel (commit
-        `6d40d6e`) salió verde.
+        migración a mano, de forma segura.
+      - **BUILD DE VERCEL ARREGLADO (2026-10-08, commit `60cabbb`).** Estaba en ROJO (y `/produccion`
+        daba 404) porque faltaban en `src/types/database.ts` los tipos de las tablas nuevas
+        (`insumos_manuales`/`recetas`/`recetas_lineas`) y la vista `v_recetas`. Se agregaron a mano;
+        `npm run build` pasa y `/produccion` carga en Vercel. (Recordatorio: los tipos de Database se
+        mantienen a mano; toda tabla/vista nueva hay que agregarla ahí o el build de Vercel se cae.)
+      - **DATOS MIGRADOS de la app vieja (2026-10-08).** Copiados (solo lectura de la vieja, sin tocarla)
+        desde `config.clave='costos_state'` de la Supabase vieja → ERP: **38 insumos (como INSUMOS
+        MANUALES con su costo), 8 recetas intermedias, 67 productos, 178 líneas.** Costos **verificados
+        al céntimo** contra cálculo independiente (75/75 coinciden). Decisión práctica: TODOS los insumos
+        entraron como manuales (los costos calzan exacto con la app vieja); ligarlos al inventario
+        (promedio ponderado) se hará después, uno por uno, con el editor. Nota: *Budin*, *gato blanco* y
+        *tajada de queque vainilla* existen como receta intermedia Y como producto (nombres repetidos a
+        propósito, costos distintos, está bien). El script de migración está blindado: aborta si las
+        tablas ya tienen datos (no duplica).
       - **FALTA en Fase 4-1:** (a) **editor** crear/editar recetas y productos con sus líneas
         (elegir artículo del inventario / insumo manual / otra receta anidada) + costo en vivo;
-        (b) gestión de **insumos manuales**; (c) **MIGRAR datos** de la Supabase vieja.
-      - **Para migrar datos:** leer `config.valor` donde `clave='costos_state'` de la Supabase vieja
-        (`fqwxhrxjphvqjtosxizb`, llave publishable incrustada en el HTML). Forma del JSON:
-        `insumos[]{nombre,costo,cantCompra,unidad,proveedor}`,
-        `recetas[]{nombre,tipo,rendCant,rendUnidad,componentes[]}`,
-        `productos[]{nombre,precio,componentes[]}`,
-        `componentes[]{tipoRef:'insumo'|'receta',refId,cantidad,unidad}`.
-        Unidades: g/kg/ml/L/unidad/porción. Emparejar insumos con artículos del ERP por nombre;
-        los que no calcen entran como insumos manuales.
+        (b) gestión de **insumos manuales**; (c) **ligar** insumos manuales a artículos del inventario
+        para usar el costo real por promedio ponderado (se hará desde el editor).
 
 - [ ] **⚠️ KNOWN ISSUE — HISTORIAL DE MIGRACIONES DESAJUSTADO (NO correr `supabase db push` a ciegas).**
       El `schema_migrations` del remoto solo tiene registradas las migraciones **hasta
@@ -157,7 +163,9 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   vista `v_recetas`, permisos `produccion.*`). Como el `schema_migrations` está desajustado (ver KNOWN
   ISSUE en Pendientes), NO se usó `db push`: se aplicó solo esa migración dentro de una transacción
   (script node con `pg`) y se registró a mano en el historial. Verificado contra la base: objetos
-  creados y `v_recetas` corre contra el inventario real.
+  creados y `v_recetas` corre contra el inventario real. **Build de Vercel arreglado** (faltaban tipos
+  en `database.ts`, daba 404) y **datos migrados** de la app vieja: 38 insumos (manuales), 8 recetas,
+  67 productos, 178 líneas; costos verificados al céntimo (75/75). `/produccion` ya muestra las fichas.
 - **Saldo inicial Banco Popular Cuenta 1 (`11-10-15-01-01`) registrado** (2026-10): apertura al
   30/06/2026 = **₡3.316.689,04** (asiento tipo Apertura contra Depuración `31-11`). La conciliación
   de julio quedó cuadrada. Además, los asientos de **Apertura** ahora se **excluyen** de la lista de
