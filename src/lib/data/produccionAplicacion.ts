@@ -32,88 +32,76 @@ export interface PreviewAplicacion {
   problemas: { nombre: string; articulo: string; motivo: string }[];
 }
 
-const famOf = (u: string) => (u === "g" || u === "kg" ? "peso" : u === "ml" || u === "L" ? "volumen" : "conteo");
-function amigable(base: number, unidadInsumo: string): { v: number; u: string } {
-  const f = famOf(unidadInsumo);
-  if (f === "peso") return { v: base / 1000, u: "kg" };
-  if (f === "volumen") return { v: base / 1000, u: "L" };
-  return { v: base, u: "u" };
-}
+// factor de la unidad de stock del artículo a su unidad base (g/ml/unidad)
+const FACT_ART: Record<string, number> = { G: 1, KG: 1000, ML: 1, L: 1000, UN: 1, UNIDAD: 1 };
 
 export async function calcularAplicacionProduccion(desde: string, hasta: string): Promise<PreviewAplicacion> {
   const supabase = await createClient();
   const consumo = await consumoMateriaPrima(desde, hasta);
 
-  // insumo (por nombre) → artículo ligado + su TAMAÑO DE COMPRA (ese es el puente
-  // confiable: 1 unidad de stock del artículo = 1 paquete del insumo, ej. 1 saco = 25 kg).
-  const { data: ims, error: e1 } = await supabase
-    .from("insumos_manuales")
-    .select("nombre, unidad, cantidad_compra, articulo_id");
+  // insumo (por nombre) → artículo ligado (lo dejó "Convertir")
+  const { data: ims, error: e1 } = await supabase.from("insumos_manuales").select("nombre, articulo_id");
   if (e1) throw new Error(`No se pudieron leer los insumos: ${e1.message}`);
-  const porNombre = new Map<string, { articulo_id: string; unidad: string; cantidad_compra: number }>();
+  const artPorNombre = new Map<string, string>();
   (ims ?? []).forEach((i) => {
-    if (i.articulo_id) {
-      porNombre.set(norm(i.nombre as string), {
-        articulo_id: i.articulo_id as string,
-        unidad: i.unidad as string,
-        cantidad_compra: Number(i.cantidad_compra) || 0,
-      });
-    }
+    if (i.articulo_id) artPorNombre.set(norm(i.nombre as string), i.articulo_id as string);
   });
 
-  // costo promedio + nombre de los artículos ligados
-  const artIds = Array.from(new Set(Array.from(porNombre.values()).map((v) => v.articulo_id)));
-  const artNombre = new Map<string, string>();
+  // info de los artículos ligados: unidad de stock (→ factor a base) + costo promedio
+  const artIds = Array.from(new Set(artPorNombre.values()));
+  const artInfo = new Map<string, { nombre: string; unidad: string; factor: number | null }>();
   const costoProm = new Map<string, number>();
   if (artIds.length) {
-    const [arts, sal] = await Promise.all([
-      supabase.from("articulos").select("id, nombre").in("id", artIds),
+    const [arts, unis, sal] = await Promise.all([
+      supabase.from("articulos").select("id, nombre, unidad_stock_id").in("id", artIds),
+      supabase.from("unidades").select("id, codigo"),
       supabase.from("articulos_saldos").select("articulo_id, costo_promedio").in("articulo_id", artIds),
     ]);
-    (arts.data ?? []).forEach((a) => artNombre.set(a.id as string, a.nombre as string));
+    const uni = new Map((unis.data ?? []).map((u) => [u.id as string, ((u.codigo as string) ?? "").toUpperCase()]));
+    (arts.data ?? []).forEach((a) => {
+      const code = uni.get(a.unidad_stock_id as string) || "";
+      artInfo.set(a.id as string, { nombre: a.nombre as string, unidad: code, factor: FACT_ART[code] ?? null });
+    });
     (sal.data ?? []).forEach((s) => costoProm.set(s.articulo_id as string, Number(s.costo_promedio) || 0));
   }
 
-  // acumular por artículo: cantidad en paquetes (unidad de stock) y consumo físico base
-  const acc = new Map<string, { paquetes: number; base: number; unidadInsumo: string }>();
+  // acumular por artículo: cantidad en UNIDAD DE STOCK del artículo (ej. kg)
+  const acc = new Map<string, number>();
   const noLigados: NoLigado[] = [];
   const problemas: { nombre: string; articulo: string; motivo: string }[] = [];
   for (const ins of consumo.insumos) {
-    const m = porNombre.get(norm(ins.nombre));
-    if (!m) {
+    const art = artPorNombre.get(norm(ins.nombre));
+    if (!art) {
       noLigados.push({ nombre: ins.nombre, base_qty: ins.base_qty, unidad: ins.unidad, motivo: "sin convertir a inventario" });
       continue;
     }
-    const paqueteBase = m.cantidad_compra * ({ g: 1, kg: 1000, ml: 1, L: 1000, unidad: 1, porcion: 1 }[m.unidad] ?? 1);
-    const artNom = artNombre.get(m.articulo_id) ?? "(artículo)";
-    if (paqueteBase <= 0) {
-      problemas.push({ nombre: ins.nombre, articulo: artNom, motivo: "el insumo no tiene tamaño de compra (cantidad)" });
+    const info = artInfo.get(art);
+    const artNom = info?.nombre ?? "(artículo)";
+    if (!info || info.factor == null) {
+      problemas.push({ nombre: ins.nombre, articulo: artNom, motivo: "el artículo usa una unidad que no sirve para recetas (ej. saco/caja) — arreglar a kg/L/unidad" });
       continue;
     }
-    const cp = costoProm.get(m.articulo_id) ?? 0;
+    const cp = costoProm.get(art) ?? 0;
     if (cp <= 0) {
       problemas.push({ nombre: ins.nombre, articulo: artNom, motivo: "el artículo tiene costo promedio inválido o negativo en el inventario (revisar)" });
       continue;
     }
-    const prev = acc.get(m.articulo_id) ?? { paquetes: 0, base: 0, unidadInsumo: ins.unidad };
-    prev.paquetes += ins.base_qty / paqueteBase;
-    prev.base += ins.base_qty;
-    acc.set(m.articulo_id, prev);
+    acc.set(art, (acc.get(art) ?? 0) + ins.base_qty / info.factor);
   }
 
   const lineas: LineaAplicacion[] = Array.from(acc.entries())
-    .map(([articulo_id, v]) => {
+    .map(([articulo_id, cantidad]) => {
+      const info = artInfo.get(articulo_id)!;
       const cp = costoProm.get(articulo_id) ?? 0;
-      const paquetes = Math.round(v.paquetes * 10000) / 10000;
-      const am = amigable(v.base, v.unidadInsumo);
+      const cant = Math.round(cantidad * 1000) / 1000;
       return {
         articulo_id,
-        articulo_nombre: artNombre.get(articulo_id) ?? "(artículo)",
-        consumo_base: Math.round(am.v * 1000) / 1000,
-        consumo_unidad: am.u,
-        cantidad: paquetes,
+        articulo_nombre: info.nombre,
+        consumo_base: cant,
+        consumo_unidad: info.unidad.toLowerCase(),
+        cantidad: cant,
         costo_promedio: cp,
-        valor: Math.round(paquetes * cp * 100) / 100,
+        valor: Math.round(cant * cp * 100) / 100,
       };
     })
     .sort((a, b) => b.valor - a.valor);
