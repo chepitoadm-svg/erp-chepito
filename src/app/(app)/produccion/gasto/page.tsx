@@ -38,10 +38,15 @@ export default async function GastoMpPage({
         ← Producción
       </Link>
       <h1 className="mt-1 mb-1 text-lg font-semibold text-neutral-900">Gasto en materia prima</h1>
-      <p className="mb-4 max-w-2xl text-sm text-neutral-500">
+      <p className="mb-3 max-w-2xl text-sm text-neutral-500">
         Cuánto costó en materia prima producir, y <b>en qué se gastó</b> — por producto y por insumo.
         Sale de la producción (app vieja) × las recetas del ERP. Es informativo, no toca inventario.
       </p>
+      <div className="mb-4 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        ⚠️ <b>En construcción — todavía no cuadra 100% con la app.</b> Por ahora la cifra oficial es la de
+        la app de producción. El ERP aún no replica la lógica de <b>clientes/pedidos fijos</b> (la app suma
+        pedidos de clientes que no están en la tabla de producción), por eso el total sale más bajo.
+      </div>
 
       <form method="get" className="mb-5 flex flex-wrap items-end gap-3">
         <label className="block">
