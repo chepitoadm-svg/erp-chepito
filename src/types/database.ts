@@ -1304,6 +1304,96 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["comprobantes_ingesta"]["Insert"]>;
         Relationships: [];
       };
+      insumos_manuales: {
+        Row: {
+          id: string;
+          nombre: string;
+          costo_compra: number;
+          cantidad_compra: number;
+          unidad: string;
+          proveedor: string | null;
+          estado: string;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          id?: string;
+          nombre: string;
+          costo_compra: number;
+          cantidad_compra: number;
+          unidad: string;
+          proveedor?: string | null;
+          estado?: string;
+          creado_en?: string;
+          creado_por?: string | null;
+          actualizado_en?: string | null;
+          actualizado_por?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["insumos_manuales"]["Insert"]>;
+        Relationships: [];
+      };
+      recetas: {
+        Row: {
+          id: string;
+          nombre: string;
+          es_producto: boolean;
+          clasificacion: string | null;
+          rinde_cantidad: number | null;
+          rinde_unidad: string | null;
+          precio_venta: number | null;
+          articulo_id: string | null;
+          estado: string;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          id?: string;
+          nombre: string;
+          es_producto?: boolean;
+          clasificacion?: string | null;
+          rinde_cantidad?: number | null;
+          rinde_unidad?: string | null;
+          precio_venta?: number | null;
+          articulo_id?: string | null;
+          estado?: string;
+          creado_en?: string;
+          creado_por?: string | null;
+          actualizado_en?: string | null;
+          actualizado_por?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["recetas"]["Insert"]>;
+        Relationships: [];
+      };
+      recetas_lineas: {
+        Row: {
+          id: string;
+          receta_id: string;
+          linea: number;
+          tipo_ref: string;
+          articulo_id: string | null;
+          insumo_manual_id: string | null;
+          receta_ref_id: string | null;
+          cantidad: number;
+          unidad: string;
+        };
+        Insert: {
+          id?: string;
+          receta_id: string;
+          linea: number;
+          tipo_ref: string;
+          articulo_id?: string | null;
+          insumo_manual_id?: string | null;
+          receta_ref_id?: string | null;
+          cantidad: number;
+          unidad: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["recetas_lineas"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       v_existencias_valoradas: {
@@ -1355,6 +1445,24 @@ export interface Database {
           cantidad_enviada: number;
           cantidad_recibida: number;
           en_transito: number;
+        };
+        Relationships: [];
+      };
+      v_recetas: {
+        Row: {
+          id: string;
+          nombre: string;
+          es_producto: boolean;
+          clasificacion: string | null;
+          rinde_cantidad: number | null;
+          rinde_unidad: string | null;
+          precio_venta: number | null;
+          articulo_id: string | null;
+          estado: string;
+          creado_en: string;
+          costo: number;
+          margen: number | null;
+          margen_pct: number | null;
         };
         Relationships: [];
       };
