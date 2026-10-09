@@ -93,8 +93,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         guardia circular; vista `v_recetas`; RLS por permiso `produccion.ver`/`produccion.gestionar`);
         `src/lib/data/recetas.ts`; pantalla `/produccion` (lista, blindada si falta la migración) +
         entrada de menú.
-      - **PRIMER PASO EN CASA:** `git pull` + **`supabase db push`** (aplicar la migración). Luego
-        verificar que el build de Vercel (commit `6d40d6e`) salió verde; si rojo, pasar el error.
+      - **PRIMER PASO EN CASA: HECHO (2026-10-08).** La migración `20261007100001` se aplicó a la
+        base de producción (transacción + registrada en el historial). Verificado: tablas, funciones,
+        vista `v_recetas` (corre contra el inventario real) y permisos creados. **OJO: NO se corrió
+        `supabase db push`** por el desajuste de historial (ver KNOWN ISSUE abajo); se aplicó solo esa
+        migración a mano, de forma segura. Falta aún: confirmar que el build de Vercel (commit
+        `6d40d6e`) salió verde.
       - **FALTA en Fase 4-1:** (a) **editor** crear/editar recetas y productos con sus líneas
         (elegir artículo del inventario / insumo manual / otra receta anidada) + costo en vivo;
         (b) gestión de **insumos manuales**; (c) **MIGRAR datos** de la Supabase vieja.
@@ -106,6 +110,19 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         `componentes[]{tipoRef:'insumo'|'receta',refId,cantidad,unidad}`.
         Unidades: g/kg/ml/L/unidad/porción. Emparejar insumos con artículos del ERP por nombre;
         los que no calcen entran como insumos manuales.
+
+- [ ] **⚠️ KNOWN ISSUE — HISTORIAL DE MIGRACIONES DESAJUSTADO (NO correr `supabase db push` a ciegas).**
+      El `schema_migrations` del remoto solo tiene registradas las migraciones **hasta
+      `20260724100035`**. El tramo **`...036`–`...116`** está APLICADO en la base (todas esas features
+      viven y funcionan: ventas externas, prorrateo por cuenta, clasificación de costo, etc.) pero
+      **NO quedó registrado** en el historial. Causa probable: se aplicaron en su momento sin pasar por
+      el CLI. **Consecuencia:** un `supabase db push` normal intentaría RE-EJECUTAR `036`–`116` sobre
+      objetos que ya existen → revienta. Por eso la migración de Fase 4 se aplicó a mano (transacción)
+      y se registró solo ella. **Remedios (cuando se quiera limpiar, con calma):** marcar el tramo como
+      aplicado con `supabase migration repair --status applied <versión> --db-url "$SUPABASE_DB_URL"`
+      (036→116), verificando antes que cada objeto exista; luego `db push` ya funcionaría limpio.
+      Mientras tanto, **cada migración nueva se aplica a mano** (patrón: script node con `pg`,
+      `NODE_PATH` al `node_modules` del repo, en transacción, + insert en `schema_migrations`).
 
 - [ ] **Duplicación de compras (Excel vs electrónicas) — DECISIÓN GRANDE (RETOMAR AQUÍ).**
       Al importar el Excel de QuPOS se crearon facturas que ya existían electrónicas
@@ -135,6 +152,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Fase 4-1 aplicada a producción (2026-10-08).** La migración `20261007100001_produccion_recetas`
+  se aplicó a la base real (tablas `insumos_manuales`/`recetas`/`recetas_lineas`, funciones de costeo,
+  vista `v_recetas`, permisos `produccion.*`). Como el `schema_migrations` está desajustado (ver KNOWN
+  ISSUE en Pendientes), NO se usó `db push`: se aplicó solo esa migración dentro de una transacción
+  (script node con `pg`) y se registró a mano en el historial. Verificado contra la base: objetos
+  creados y `v_recetas` corre contra el inventario real.
 - **Saldo inicial Banco Popular Cuenta 1 (`11-10-15-01-01`) registrado** (2026-10): apertura al
   30/06/2026 = **₡3.316.689,04** (asiento tipo Apertura contra Depuración `31-11`). La conciliación
   de julio quedó cuadrada. Además, los asientos de **Apertura** ahora se **excluyen** de la lista de
