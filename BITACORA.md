@@ -112,10 +112,16 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         *tajada de queque vainilla* existen como receta intermedia Y como producto (nombres repetidos a
         propósito, costos distintos, está bien). El script de migración está blindado: aborta si las
         tablas ya tienen datos (no duplica).
+      - **EDITOR — entrega 1/3 HECHA (2026-10-08, commit `6d6cf8f`): CRUD de insumos manuales.**
+        `/produccion` permite crear/editar/activar-desactivar insumos manuales (botón "Nuevo insumo",
+        acciones Editar/Desactivar), solo con permiso `produccion.gestionar`. Sin migración.
+        Archivos: `src/lib/validation/produccion.ts`, `produccion/actions.ts`, `InsumoManualForm.tsx`,
+        `produccion/insumos/{nuevo,[id]}/page.tsx`, `obtenerInsumoManual` en `data/recetas.ts`.
       - **FALTA en Fase 4-1:** (a) **editor** crear/editar recetas y productos con sus líneas
-        (elegir artículo del inventario / insumo manual / otra receta anidada) + costo en vivo;
-        (b) gestión de **insumos manuales**; (c) **ligar** insumos manuales a artículos del inventario
-        para usar el costo real por promedio ponderado (se hará desde el editor).
+        (elegir artículo del inventario / insumo manual / otra receta anidada) + precio + costo en vivo
+        — necesita una migración chica (`fn_guardar_receta` para guardar receta+líneas atómico);
+        (c) **ligar** insumos manuales a artículos del inventario para usar el costo real por promedio
+        ponderado (se hará desde el editor).
 
 - [ ] **⚠️ KNOWN ISSUE — HISTORIAL DE MIGRACIONES DESAJUSTADO (NO correr `supabase db push` a ciegas).**
       El `schema_migrations` del remoto solo tiene registradas las migraciones **hasta
