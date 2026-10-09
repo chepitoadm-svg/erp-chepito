@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requerirPermiso } from "@/lib/auth/permisos";
 import { crearInsumoSchema, editarInsumoSchema, guardarRecetaSchema } from "@/lib/validation/produccion";
+import { calcularAplicacionProduccion, haySolapeAplicacion } from "@/lib/data/produccionAplicacion";
 
 export interface FormState {
   error?: string;
@@ -179,4 +180,48 @@ export async function convertirInsumo(_prev: FormState, formData: FormData): Pro
 
   revalidatePath("/produccion");
   redirect("/produccion");
+}
+
+// === Aplicar producción (de la app vieja) al inventario ====================
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function aplicarProduccion(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requerirPermiso("produccion.gestionar");
+  const desde = String(formData.get("desde") ?? "").trim();
+  const hasta = String(formData.get("hasta") ?? "").trim();
+  const bodega = String(formData.get("bodega_id") ?? "").trim();
+  if (!FECHA.test(desde) || !FECHA.test(hasta)) return { error: "Fechas inválidas." };
+  if (hasta < desde) return { error: "La fecha 'hasta' no puede ser menor que 'desde'." };
+  if (!bodega) return { error: "Elegí la bodega de materia prima." };
+
+  if (await haySolapeAplicacion(desde, hasta)) {
+    return { error: "Ya hay una aplicación activa que se traslapa con ese período. Si querés rehacerla, anulala primero." };
+  }
+
+  const prev = await calcularAplicacionProduccion(desde, hasta);
+  const lineas = prev.lineas
+    .filter((l) => l.cantidad > 0)
+    .map((l) => ({ articulo_id: l.articulo_id, cantidad: l.cantidad }));
+  if (!lineas.length) {
+    return { error: "No hay materia prima ligada al inventario para descontar en ese período. Convertí primero los insumos (harina, etc.) a artículos del inventario." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("fn_aplicar_produccion", {
+    p_desde: desde, p_hasta: hasta, p_bodega: bodega, p_lineas: lineas,
+  });
+  if (error) return { error: limpiar(error.message) };
+
+  revalidatePath("/produccion/aplicar");
+  revalidatePath("/inventario");
+  redirect("/produccion/aplicar?ok=1");
+}
+
+export async function anularAplicacion(formData: FormData): Promise<void> {
+  await requerirPermiso("produccion.gestionar");
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  await supabase.rpc("fn_anular_aplicacion", { p_id: id });
+  revalidatePath("/produccion/aplicar");
+  revalidatePath("/inventario");
 }

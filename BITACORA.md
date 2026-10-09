@@ -78,25 +78,36 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Pendientes (lo que falta)
 
-- [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). Fase 4-1 COMPLETA; RETOMAR EN FASE 4-2 (act. 2026-10-08).**
-      - **👉 RETOMAR AQUÍ (próximo paso): FASE 4-2 — PRODUCCIÓN DIARIA.** Pantalla nueva en el ERP para
-        anotar lo que se produce cada día: elegís fecha + centro (Taller), ponés cuántas unidades se
-        hicieron de cada producto, y el ERP usa las recetas (ya cargadas) para **descontar la materia
-        prima del inventario**, **ingresar el producto terminado** y hacer el **asiento contable**
-        (Debe Inv PT / Haber Inv MP). Hoy esto se sigue registrando en la app VIEJA; el ERP todavía no
-        tiene esa pantalla. **Antes de codear: proponer diseño + aprobación (convención #1).**
-        ⚠️ **Lleva migración (tablas de producción diaria + RPC de explosión/posteo) y hay que PROBARLO
-        contra la base** → eso es de CASA (con red). En el TRABAJO solo se puede diseñar/escribir código
-        y hacer push; aplicar la migración y probar queda para casa.
+- [ ] **FASE 4 — PRODUCCIÓN (integrar la app de producción al ERP). Fase 4-1 ✅ + Fase 4-2 Opción 1 ✅ (act. 2026-10-09).**
+      - **FASE 4-2 — PRODUCCIÓN DIARIA, decisión del usuario:** dos opciones. **Opción 1 (HECHA):** el ERP
+        JALA la producción que las dependientas anotan en la app vieja y, con un botón, **descuenta la
+        materia prima del inventario** (sin digitar nada dos veces, sin asiento). **Opción 2 (PENDIENTE,
+        para cuando se migre a las dependientas):** pantalla nativa en el ERP para DIGITAR la producción.
+      - **Opción 1 — cómo quedó (2026-10-09):** pantalla `/produccion/aplicar`. Elegís período + bodega
+        de MP (Taller), ve la vista previa de lo que se descontaría (artículo, cantidad, valor) y avisa
+        qué insumos NO se descuentan por no estar ligados al inventario. Botón **"Descontar del
+        inventario"** → movimientos `produccion_consumo` (salida al promedio). **Anular** devuelve el
+        stock (`ajuste_pos`). Idempotente (no deja duplicar un período que se traslape). **No postea
+        asiento** (costo periódico ya contado al comprar). Migración `20261009100001` (tabla
+        `produccion_aplicaciones` + `fn_aplicar_produccion` + `fn_anular_aplicacion`; y `fn_convertir_insumo`
+        ahora guarda `insumos_manuales.articulo_id`, que es el puente insumo→artículo). Probado contra la
+        base (aplicar+anular, rollback). **El consumo se calcula con `consumoMateriaPrima` (recetas de la
+        app vieja), que es lo correcto porque la producción viene de la app vieja.**
+      - **FLUJO para que descuente de verdad:** 1) en `/produccion`, **Convertir** los insumos clave
+        (harina, huevos…) a artículos del inventario (eso setea el enlace); 2) en `/produccion/aplicar`,
+        elegir el período y **Descontar**. Solo baja stock de lo convertido; lo demás sale en "no ligados".
+      - **OJO paralelo:** mientras la app vieja siga en uso, NO anotar el mismo período en las dos y NO
+        descontar dos veces el mismo período (la pantalla bloquea traslapes activos).
       - **Decisión:** hacerlo **NATIVO** dentro del ERP (NO embeber), **integrado** con el
         inventario (costo por promedio ponderado) **+ costo manual de respaldo** para insumos que
         todavía no estén en inventario. **NO tocar la app viva** que usan los dependientes:
         GitHub Pages `chepitoadm-svg/produccion-diaria-chepito-`
         (link: https://chepitoadm-svg.github.io/produccion-diaria-chepito-/produccion-chepito.html),
         Supabase vieja **`fqwxhrxjphvqjtosxizb`** (aparte del ERP `iwtbfdrchzqcrewiaiua`).
-      - **Plan por fases:** 1) Recetas/Costos (BOM) ✅ HECHA · 2) Producción diaria ⬅️ SIGUE · 3) explosión
-        de materiales + costeo + posteo contable (Debe Inv PT / Haber Inv MP) · 4) horneadas y
-        cálculo de receta · 5) cutover + crear usuarios a los dependientes + retirar la vieja.
+      - **Plan por fases:** 1) Recetas/Costos (BOM) ✅ · 2) Producción diaria → descuento de MP ✅ (Opción 1;
+        falta Opción 2 = digitar en el ERP, para el cutover) · 3) ~~posteo contable Debe Inv PT / Haber Inv MP~~
+        **NO aplica** (costeo periódico: la compra ya es el costo; producción solo mueve cantidades) ·
+        4) horneadas y cálculo de receta · 5) cutover + crear usuarios a los dependientes + retirar la vieja.
       - **HECHO y subido (Fase 4-1):** migración `20261007100001_produccion_recetas.sql`
         (tablas `insumos_manuales`, `recetas`, `recetas_lineas`; `fn_costo_receta` recursivo con
         guardia circular; vista `v_recetas`; RLS por permiso `produccion.ver`/`produccion.gestionar`);
@@ -199,7 +210,11 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   **Editor de Producción:** entrega 1 (CRUD insumos manuales) y entrega 2 (editor de recetas/productos
   con líneas, costo/margen en vivo, precio; RPC `fn_guardar_receta`) y entrega 3 (convertir insumo
   manual → artículo de inventario; RPC `fn_convertir_insumo` + fix del trigger de `recetas_lineas`)
-  hechas y subidas. **Fase 4-1 completa**; sigue Fase 4-2 (producción diaria + posteo contable).
+  hechas y subidas. **Fase 4-1 completa.**
+  **Fase 4-2 Opción 1 (2026-10-09):** `/produccion/aplicar` descuenta la MP del inventario a partir de la
+  producción de la app vieja (botón Descontar + Anular; `fn_aplicar_produccion`/`fn_anular_aplicacion`;
+  sin asiento, costeo periódico). Probado contra la base. Falta Opción 2 (digitar producción en el ERP,
+  para el cutover de las dependientas).
 - **Saldo inicial Banco Popular Cuenta 1 (`11-10-15-01-01`) registrado** (2026-10): apertura al
   30/06/2026 = **₡3.316.689,04** (asiento tipo Apertura contra Depuración `31-11`). La conciliación
   de julio quedó cuadrada. Además, los asientos de **Apertura** ahora se **excluyen** de la lista de

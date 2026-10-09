@@ -1313,6 +1313,7 @@ export interface Database {
           unidad: string;
           proveedor: string | null;
           estado: string;
+          articulo_id: string | null;
           creado_en: string;
           creado_por: string | null;
           actualizado_en: string | null;
@@ -1326,12 +1327,37 @@ export interface Database {
           unidad: string;
           proveedor?: string | null;
           estado?: string;
+          articulo_id?: string | null;
           creado_en?: string;
           creado_por?: string | null;
           actualizado_en?: string | null;
           actualizado_por?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["insumos_manuales"]["Insert"]>;
+        Relationships: [];
+      };
+      produccion_aplicaciones: {
+        Row: {
+          id: string;
+          desde: string;
+          hasta: string;
+          bodega_id: string;
+          estado: string;
+          nota: string | null;
+          creado_en: string;
+          creado_por: string | null;
+          actualizado_en: string | null;
+          actualizado_por: string | null;
+        };
+        Insert: {
+          id?: string;
+          desde: string;
+          hasta: string;
+          bodega_id: string;
+          estado?: string;
+          nota?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["produccion_aplicaciones"]["Insert"]>;
         Relationships: [];
       };
       recetas: {
@@ -1470,6 +1496,8 @@ export interface Database {
     Functions: {
       fn_guardar_receta: { Args: { p: unknown }; Returns: string };
       fn_convertir_insumo: { Args: { p_insumo: string; p_articulo: string }; Returns: number };
+      fn_aplicar_produccion: { Args: { p_desde: string; p_hasta: string; p_bodega: string; p_lineas: unknown }; Returns: string };
+      fn_anular_aplicacion: { Args: { p_id: string }; Returns: undefined };
       fn_registrar_liquidacion_datafono: {
         Args: {
           p_centro: string;

@@ -38,10 +38,18 @@ export default async function ProduccionPage() {
   return (
     <div>
       <h1 className="mt-1 text-lg font-semibold text-neutral-900">Producción — Recetas y costos</h1>
-      <p className="mb-4 text-sm text-neutral-500">
+      <p className="mb-3 text-sm text-neutral-500">
         Fichas de costo por producto, armadas con insumos y recetas (BOM). El costo sale del promedio
         ponderado del inventario, o del costo manual cuando el insumo todavía no está en el inventario.
       </p>
+      {puedeGestionar && (
+        <Link
+          href="/produccion/aplicar"
+          className="mb-4 inline-block rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+        >
+          📦 Descontar producción del inventario →
+        </Link>
+      )}
 
       {/* PRODUCTOS FINALES */}
       <div className="mt-6 mb-2 flex items-center justify-between gap-3">
