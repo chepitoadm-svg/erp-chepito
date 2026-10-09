@@ -60,6 +60,7 @@ export interface ConsumoInsumo {
   base_qty: number; // en unidad base (g / ml / u)
   proveedor: string;
   colones: number; // costo del consumo (base_qty × costo por unidad base del insumo)
+  productos: { nombre: string; base_qty: number; colones: number }[]; // en qué productos se gastó
 }
 export interface GastoProducto {
   nombre: string;
@@ -214,10 +215,12 @@ export function calcularConsumo(
     cpb[i.id] = b > 0 ? (Number(i.costo) || 0) / b : 0;
   });
 
-  // --- consumo de insumos + costo por producto ---
+  // --- consumo de insumos + costo por producto + desglose insumo→producto ---
   const acc: Record<string, number> = {};
   const sinReceta: { fila: number; nombre: string; cantidad: number }[] = [];
-  const prodAcc: Record<string, { nombre: string; unidades: number; costo_unit: number }> = {};
+  const prodAcc: Record<string, { nombre: string; unidades: number; costo_total: number }> = {};
+  // perIP[insumoId][nombreProducto] = base_qty del insumo que se fue a ese producto
+  const perIP: Record<string, Record<string, number>> = {};
   Object.keys(u).forEach((fs) => {
     const fila = Number(fs);
     const count = u[fila] || 0;
@@ -225,38 +228,48 @@ export function calcularConsumo(
     const nombre = nombreFila[fila] || "#" + fila;
     const prod = prodForFila(fila, nombre);
     if (!prod) { sinReceta.push({ fila, nombre, cantidad: count }); return; }
-    expandProducto(prod, count, acc);
-    // costo de MP por unidad del producto: expandir 1 unidad y valuar
-    const tmp: Record<string, number> = {};
-    expandProducto(prod, 1, tmp);
-    const costoUnit = Object.keys(tmp).reduce((s, id) => s + tmp[id] * (cpb[id] ?? 0), 0);
+    // expandir las `count` unidades a insumos (de una), y repartir a acc + desglose
+    const tprod: Record<string, number> = {};
+    expandProducto(prod, count, tprod);
+    let costoProd = 0;
+    Object.keys(tprod).forEach((id) => {
+      const q = tprod[id];
+      acc[id] = (acc[id] || 0) + q;
+      (perIP[id] || (perIP[id] = {}))[prod.nombre] = ((perIP[id] || {})[prod.nombre] || 0) + q;
+      costoProd += q * (cpb[id] ?? 0);
+    });
     const key = normp(prod.nombre);
-    const p = prodAcc[key] || { nombre: prod.nombre, unidades: 0, costo_unit: costoUnit };
+    const p = prodAcc[key] || { nombre: prod.nombre, unidades: 0, costo_total: 0 };
     p.unidades += count;
-    p.costo_unit = costoUnit;
+    p.costo_total += costoProd;
     prodAcc[key] = p;
   });
 
   const insumos: ConsumoInsumo[] = Object.keys(acc)
     .map((id) => {
       const ins = getInsumo(id);
+      const cp = cpb[id] ?? 0;
+      const productos = Object.entries(perIP[id] || {})
+        .map(([nombre, base]) => ({ nombre, base_qty: base, colones: Math.round(base * cp * 100) / 100 }))
+        .sort((a, b) => b.base_qty - a.base_qty);
       return {
         insumo_id: id,
         nombre: ins ? ins.nombre : "?" + id,
         unidad: ins ? ins.unidad : "g",
         base_qty: acc[id],
         proveedor: (ins?.proveedor || "").trim(),
-        colones: Math.round(acc[id] * (cpb[id] ?? 0) * 100) / 100,
+        colones: Math.round(acc[id] * cp * 100) / 100,
+        productos,
       };
     })
-    .sort((a, b) => b.base_qty - a.base_qty);
+    .sort((a, b) => b.colones - a.colones);
 
   const por_producto: GastoProducto[] = Object.values(prodAcc)
     .map((p) => ({
       nombre: p.nombre,
       unidades: p.unidades,
-      costo_unit: Math.round(p.costo_unit * 100) / 100,
-      costo_total: Math.round(p.unidades * p.costo_unit * 100) / 100,
+      costo_unit: p.unidades > 0 ? Math.round((p.costo_total / p.unidades) * 100) / 100 : 0,
+      costo_total: Math.round(p.costo_total * 100) / 100,
     }))
     .sort((a, b) => b.costo_total - a.costo_total);
 

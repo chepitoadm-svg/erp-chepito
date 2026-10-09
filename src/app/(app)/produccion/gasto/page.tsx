@@ -2,18 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
 import { consumoMateriaPrima } from "@/lib/data/produccion";
-import { familiaBase } from "@/lib/produccion/gasto";
+import GastoInsumos from "@/components/GastoInsumos";
 
 const money = (n: number) => "₡" + n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money0 = (n: number) => "₡" + n.toLocaleString("es-CR", { maximumFractionDigits: 0 });
-
-function fmtQty(base: number, unidad: string): string {
-  const fam = familiaBase(unidad);
-  const n = (x: number, d = 2) => x.toLocaleString("es-CR", { maximumFractionDigits: d });
-  if (fam === "peso") return n(base / 1000, 3) + " kg";
-  if (fam === "volumen") return n(base / 1000, 3) + " L";
-  return n(base, 0) + " u";
-}
 
 function hoyCR(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Costa_Rica" });
@@ -112,37 +104,12 @@ export default async function GastoMpPage({
             </table>
           </div>
 
-          {/* POR INSUMO */}
+          {/* POR INSUMO (expandible: tocá para ver en qué productos se gastó) */}
           <h2 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
             En qué se gastó (por insumo)
           </h2>
-          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-            <table className="w-full min-w-[520px] text-sm">
-              <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Insumo</th>
-                  <th className="px-4 py-3 font-medium">Proveedor</th>
-                  <th className="px-4 py-3 text-right font-medium">Cantidad</th>
-                  <th className="px-4 py-3 text-right font-medium">Costo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {data.insumos.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-neutral-400">No hay consumo en ese rango.</td>
-                  </tr>
-                )}
-                {data.insumos.map((i) => (
-                  <tr key={i.insumo_id}>
-                    <td className="px-4 py-3 text-neutral-900">{i.nombre}</td>
-                    <td className="px-4 py-3 text-neutral-500">{i.proveedor || "—"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-700">{fmtQty(i.base_qty, i.unidad)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-800">{money(i.colones)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="mb-2 text-xs text-neutral-400">Tocá una materia prima para ver en cuáles productos se gastó.</p>
+          <GastoInsumos insumos={data.insumos} />
 
           <p className="mt-3 text-xs text-neutral-400">
             {data.filas_leidas.toLocaleString("es-CR")} filas de producción leídas
