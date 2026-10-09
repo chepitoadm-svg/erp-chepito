@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requerirPermiso, tienePermiso } from "@/lib/auth/permisos";
+import { listarKardex, type KardexMovimiento } from "@/lib/data/inventario";
 import {
   crearArticuloSchema,
   editarArticuloSchema,
@@ -133,6 +134,13 @@ export async function editarArticulo(
   revalidatePath("/inventario/articulos");
   revalidatePath(`/inventario/articulos/${id}`);
   return { ok: "Artículo actualizado." };
+}
+
+// Trae los movimientos (kardex) de un artículo — para ver sus compras al expandir.
+export async function cargarKardexArticulo(id: string): Promise<KardexMovimiento[]> {
+  await requerirPermiso("articulos.gestionar");
+  if (!id) return [];
+  return listarKardex(id);
 }
 
 export async function alternarArticuloEstado(formData: FormData): Promise<void> {
