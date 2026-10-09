@@ -42,14 +42,22 @@ export default async function ProduccionPage() {
         Fichas de costo por producto, armadas con insumos y recetas (BOM). El costo sale del promedio
         ponderado del inventario, o del costo manual cuando el insumo todavía no está en el inventario.
       </p>
-      {puedeGestionar && (
+      <div className="mb-4 flex flex-wrap gap-2">
         <Link
-          href="/produccion/aplicar"
-          className="mb-4 inline-block rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+          href="/produccion/gasto"
+          className="inline-block rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
         >
-          📦 Descontar producción del inventario →
+          📊 Gasto de materia prima →
         </Link>
-      )}
+        {puedeGestionar && (
+          <Link
+            href="/produccion/aplicar"
+            className="inline-block rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            📦 Descontar producción del inventario →
+          </Link>
+        )}
+      </div>
 
       {/* PRODUCTOS FINALES */}
       <div className="mt-6 mb-2 flex items-center justify-between gap-3">

@@ -59,11 +59,20 @@ export interface ConsumoInsumo {
   unidad: string;
   base_qty: number; // en unidad base (g / ml / u)
   proveedor: string;
+  colones: number; // costo del consumo (base_qty × costo por unidad base del insumo)
+}
+export interface GastoProducto {
+  nombre: string;
+  unidades: number;
+  costo_unit: number; // ₡ de materia prima por unidad (receta)
+  costo_total: number; // unidades × costo_unit
 }
 export interface ResultadoConsumo {
   insumos: ConsumoInsumo[];
   sin_receta: { fila: number; nombre: string; cantidad: number }[];
   filas_leidas: number;
+  por_producto: GastoProducto[];
+  total_colones: number;
 }
 
 // --- normalizadores (idénticos a la app) ---
@@ -198,9 +207,17 @@ export function calcularConsumo(
     u[r.fila] = (u[r.fila] || 0) + q;
   });
 
-  // --- consumo de insumos ---
+  // --- costo (₡) por unidad base de cada insumo ---
+  const cpb: Record<string, number> = {};
+  state.insumos.forEach((i) => {
+    const b = toBase(i.cantCompra ?? 0, i.unidad);
+    cpb[i.id] = b > 0 ? (Number(i.costo) || 0) / b : 0;
+  });
+
+  // --- consumo de insumos + costo por producto ---
   const acc: Record<string, number> = {};
   const sinReceta: { fila: number; nombre: string; cantidad: number }[] = [];
+  const prodAcc: Record<string, { nombre: string; unidades: number; costo_unit: number }> = {};
   Object.keys(u).forEach((fs) => {
     const fila = Number(fs);
     const count = u[fila] || 0;
@@ -209,6 +226,15 @@ export function calcularConsumo(
     const prod = prodForFila(fila, nombre);
     if (!prod) { sinReceta.push({ fila, nombre, cantidad: count }); return; }
     expandProducto(prod, count, acc);
+    // costo de MP por unidad del producto: expandir 1 unidad y valuar
+    const tmp: Record<string, number> = {};
+    expandProducto(prod, 1, tmp);
+    const costoUnit = Object.keys(tmp).reduce((s, id) => s + tmp[id] * (cpb[id] ?? 0), 0);
+    const key = normp(prod.nombre);
+    const p = prodAcc[key] || { nombre: prod.nombre, unidades: 0, costo_unit: costoUnit };
+    p.unidades += count;
+    p.costo_unit = costoUnit;
+    prodAcc[key] = p;
   });
 
   const insumos: ConsumoInsumo[] = Object.keys(acc)
@@ -220,10 +246,22 @@ export function calcularConsumo(
         unidad: ins ? ins.unidad : "g",
         base_qty: acc[id],
         proveedor: (ins?.proveedor || "").trim(),
+        colones: Math.round(acc[id] * (cpb[id] ?? 0) * 100) / 100,
       };
     })
     .sort((a, b) => b.base_qty - a.base_qty);
 
+  const por_producto: GastoProducto[] = Object.values(prodAcc)
+    .map((p) => ({
+      nombre: p.nombre,
+      unidades: p.unidades,
+      costo_unit: Math.round(p.costo_unit * 100) / 100,
+      costo_total: Math.round(p.unidades * p.costo_unit * 100) / 100,
+    }))
+    .sort((a, b) => b.costo_total - a.costo_total);
+
+  const total_colones = Math.round(insumos.reduce((s, c) => s + c.colones, 0) * 100) / 100;
+
   sinReceta.sort((a, b) => b.cantidad - a.cantidad);
-  return { insumos, sin_receta: sinReceta, filas_leidas: rows.length };
+  return { insumos, sin_receta: sinReceta, filas_leidas: rows.length, por_producto, total_colones };
 }

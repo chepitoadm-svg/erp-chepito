@@ -91,10 +91,12 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
         por artículo = gramos por unidad de stock) + cargar existencias iniciales. Mientras tanto, los
         insumos quedan MANUALES (costos correctos). El puente bueno sería guardar "base por unidad de
         stock" en el artículo y que `fn_costo_receta` y `/aplicar` lo usen (pendiente de diseño).
-      - **👉 PRÓXIMO más útil y SEGURO: reporte "Gasto de materia prima" en el ERP** (lo pidió el user:
-        "veo cuánto se gastó pero no en qué"). Desglose por producto (unidades×receta) y por insumo, por
-        día/semana/mes/rango y por sucursal, igual que la app vieja. Usa recetas (correctas) + producción
-        de la app vieja (`consumoMateriaPrima`/`costoDeConsumo`); NO toca inventario ni conversiones → seguro.
+      - **✅ Reporte "Gasto de materia prima" (2026-10-09): `/produccion/gasto`.** Total del período +
+        tabla POR PRODUCTO (unidades × receta) + tabla POR INSUMO (cantidad + colones = "en qué se gastó"),
+        con selector desde/hasta. Reusa `calcularConsumo` (extendido: ahora devuelve `colones` por insumo,
+        `por_producto` y `total_colones`). NO toca inventario ni conversiones → seguro. Debe cuadrar con la
+        pantalla "Gasto materia prima" de la app vieja (misma receta + misma producción). FALTA/opcional:
+        filtro por sucursal y botones rápidos día/semana/mes (hoy es por rango de fechas).
       - **👉 RETOMAR AQUÍ:** dos frentes posibles.
         (a) **USAR la Opción 1** (se puede desde cualquier lado, solo navegador, no necesita red de node):
         en `/produccion` **Convertir** los insumos clave (harina, huevos…) a artículos del inventario, y en
