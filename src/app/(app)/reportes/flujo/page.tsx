@@ -29,18 +29,29 @@ function etiqueta(mes: string) {
   return `${MESES[m - 1]} ${y}`;
 }
 
-export default async function FlujoCajaPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string }> }) {
+export default async function FlujoCajaPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string; reparto?: string }> }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
   const sp = await searchParams;
   const mes = /^\d{4}-\d{2}$/.test(sp.mes ?? "") ? (sp.mes as string) : "2026-07";
   const vista = sp.vista === "negocios" ? "negocios" : "empresa";
+  const conReparto = sp.reparto !== "no"; // por panadería: reparte Taller/General por defecto
   const { desde, hasta } = rango(mes);
+
+  // Link del reporte preservando vista y reparto.
+  const qs = (m: string, v: "empresa" | "negocios", rep: boolean) => {
+    let s = `/reportes/flujo?mes=${m}`;
+    if (v === "negocios") {
+      s += "&vista=negocios";
+      if (!rep) s += "&reparto=no";
+    }
+    return s;
+  };
 
   const [flujo, comp, cuentas, centrosFlujo] = await Promise.all([
     flujoCaja(desde, hasta),
     compromisos(hasta),
     listarCuentasPosteables(),
-    vista === "negocios" ? flujoCajaPorCentro(desde, hasta) : Promise.resolve([]),
+    vista === "negocios" ? flujoCajaPorCentro(desde, hasta, conReparto) : Promise.resolve([]),
   ]);
   const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
   const hrefMayor = (cod: string) => {
@@ -152,14 +163,14 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
       {/* Selector de mes + vista */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Link
-          href={`/reportes/flujo?mes=${mover(mes, -1)}${vista === "negocios" ? "&vista=negocios" : ""}`}
+          href={qs(mover(mes, -1), vista, conReparto)}
           className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
         >
           ← {etiqueta(mover(mes, -1))}
         </Link>
         <span className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium capitalize text-white">{etiqueta(mes)}</span>
         <Link
-          href={`/reportes/flujo?mes=${mover(mes, 1)}${vista === "negocios" ? "&vista=negocios" : ""}`}
+          href={qs(mover(mes, 1), vista, conReparto)}
           className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
         >
           {etiqueta(mover(mes, 1))} →
@@ -168,18 +179,38 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
         {/* Toggle Empresa / Por negocio */}
         <div className="ml-2 inline-flex overflow-hidden rounded-md border border-neutral-300 text-sm">
           <Link
-            href={`/reportes/flujo?mes=${mes}`}
+            href={qs(mes, "empresa", conReparto)}
             className={`px-3 py-1.5 ${vista === "empresa" ? "bg-neutral-900 font-medium text-white" : "text-neutral-700 hover:bg-neutral-50"}`}
           >
             Toda la empresa
           </Link>
           <Link
-            href={`/reportes/flujo?mes=${mes}&vista=negocios`}
+            href={qs(mes, "negocios", conReparto)}
             className={`border-l border-neutral-300 px-3 py-1.5 ${vista === "negocios" ? "bg-neutral-900 font-medium text-white" : "text-neutral-700 hover:bg-neutral-50"}`}
           >
             Por panadería
           </Link>
         </div>
+
+        {/* Toggle Con reparto / Sin reparto (solo por panadería) */}
+        {vista === "negocios" && (
+          <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 text-sm">
+            <Link
+              href={qs(mes, "negocios", true)}
+              title="Reparte Taller y General entre las panaderías (su parte justa)"
+              className={`px-3 py-1.5 ${conReparto ? "bg-neutral-900 font-medium text-white" : "text-neutral-700 hover:bg-neutral-50"}`}
+            >
+              Con reparto
+            </Link>
+            <Link
+              href={qs(mes, "negocios", false)}
+              title="Muestra la caja cruda de cada centro, sin repartir Taller/General"
+              className={`border-l border-neutral-300 px-3 py-1.5 ${!conReparto ? "bg-neutral-900 font-medium text-white" : "text-neutral-700 hover:bg-neutral-50"}`}
+            >
+              Sin reparto
+            </Link>
+          </div>
+        )}
 
         {vista === "empresa" && (
           <ExportarExcel
@@ -198,7 +229,7 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
       </div>
 
       {vista === "negocios" ? (
-        <FlujoPorCentroPanel centros={centrosFlujo} />
+        <FlujoPorCentroPanel centros={centrosFlujo} conReparto={conReparto} />
       ) : (
       <>
       {/* === Vista EMPRESA === */}

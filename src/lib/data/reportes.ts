@@ -126,9 +126,25 @@ export interface CentroFlujo {
   neto: number;
   entradas: FlujoCategoria[];
   salidas: FlujoCategoria[];
+  avisoSinReparto?: boolean; // apoyo con caja pero sin prorrateo corrido ese mes
 }
 
-export async function flujoCajaPorCentro(desde: string, hasta: string): Promise<CentroFlujo[]> {
+// Categoría sintética donde cae la "parte de Taller/General" al repartir.
+const CAT_REPARTO = "Centros de apoyo (Taller y General)";
+function nombreParteApoyo(codigo: string, nombre: string): string {
+  if (codigo === "TAL") return "Parte de Taller (producción)";
+  if (codigo === "GEN") return "Parte de General (gastos compartidos)";
+  return `Parte de ${nombre}`;
+}
+
+// Flujo de caja por panadería. Con conProrrateo=true reparte el flujo neto de los
+// centros de apoyo (Taller, General) entre las sucursales usando el MISMO % del
+// prorrateo contable del mes, de modo que cada panadería cargue su parte justa.
+export async function flujoCajaPorCentro(
+  desde: string,
+  hasta: string,
+  conProrrateo = false,
+): Promise<CentroFlujo[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("fn_flujo_caja_centro", { p_desde: desde, p_hasta: hasta });
   if (error) throw new Error(`No se pudo cargar el flujo por negocio: ${error.message}`);
@@ -142,25 +158,73 @@ export async function flujoCajaPorCentro(desde: string, hasta: string): Promise<
   }[];
 
   const porCentro = new Map<string, CentroFlujo>();
-  for (const r of rows) {
-    let c = porCentro.get(r.centro_codigo);
-    if (!c) {
-      c = { centro_codigo: r.centro_codigo, centro_nombre: r.centro_nombre, entro: 0, salio: 0, neto: 0, entradas: [], salidas: [] };
-      porCentro.set(r.centro_codigo, c);
-    }
-    const monto = Number(r.monto);
-    const mag = Math.abs(monto);
-    const lista = monto >= 0 ? c.entradas : c.salidas;
-    const cat = lista.find((x) => x.categoria === r.categoria) ?? (() => {
-      const nueva = { categoria: r.categoria, total: 0, lineas: [] as FlujoLinea[] };
+  const nuevoCentro = (codigo: string, nombre: string): CentroFlujo => {
+    const c: CentroFlujo = { centro_codigo: codigo, centro_nombre: nombre, entro: 0, salio: 0, neto: 0, entradas: [], salidas: [] };
+    porCentro.set(codigo, c);
+    return c;
+  };
+  const agregarLinea = (c: CentroFlujo, lado: "entrada" | "salida", categoria: string, linea: FlujoLinea) => {
+    const lista = lado === "entrada" ? c.entradas : c.salidas;
+    const cat = lista.find((x) => x.categoria === categoria) ?? (() => {
+      const nueva = { categoria, total: 0, lineas: [] as FlujoLinea[] };
       lista.push(nueva);
       return nueva;
     })();
-    cat.total += mag;
-    cat.lineas.push({ cuenta_codigo: r.cuenta_codigo, cuenta_nombre: r.cuenta_nombre, monto: mag });
-    if (monto >= 0) c.entro += mag;
-    else c.salio += mag;
-    c.neto += monto;
+    cat.total += linea.monto;
+    cat.lineas.push(linea);
+    if (lado === "entrada") c.entro += linea.monto;
+    else c.salio += linea.monto;
+    c.neto += lado === "entrada" ? linea.monto : -linea.monto;
+  };
+
+  for (const r of rows) {
+    const c = porCentro.get(r.centro_codigo) ?? nuevoCentro(r.centro_codigo, r.centro_nombre);
+    const monto = Number(r.monto);
+    const mag = Math.abs(monto);
+    agregarLinea(c, monto >= 0 ? "entrada" : "salida", r.categoria, {
+      cuenta_codigo: r.cuenta_codigo,
+      cuenta_nombre: r.cuenta_nombre,
+      monto: mag,
+    });
+  }
+
+  if (conProrrateo) {
+    const [{ data: rep, error: eRep }, { data: ci }] = await Promise.all([
+      supabase.rpc("fn_prorrateo_reparto", { p_desde: desde, p_hasta: hasta }),
+      supabase.from("centros_costo").select("codigo").eq("tipo", "intermedio"),
+    ]);
+    if (eRep) throw new Error(`No se pudo cargar el reparto de prorrateo: ${eRep.message}`);
+    const intermedios = new Set((ci ?? []).map((x) => x.codigo));
+
+    // Reparto por origen: destinos con su monto y el pool (suma) del centro.
+    const reparto = new Map<string, { nombre: string; pool: number; destinos: { codigo: string; nombre: string; monto: number }[] }>();
+    for (const r of (rep ?? []) as { origen_codigo: string; origen_nombre: string; destino_codigo: string; destino_nombre: string; monto: number }[]) {
+      const e = reparto.get(r.origen_codigo) ?? { nombre: r.origen_nombre, pool: 0, destinos: [] };
+      e.destinos.push({ codigo: r.destino_codigo, nombre: r.destino_nombre, monto: Number(r.monto) });
+      e.pool += Number(r.monto);
+      reparto.set(r.origen_codigo, e);
+    }
+
+    for (const [origen, info] of reparto) {
+      const centroOrigen = porCentro.get(origen);
+      if (!centroOrigen || info.pool === 0) continue; // sin caja o sin base: nada que repartir
+      const netoOrigen = centroOrigen.neto; // normalmente negativo (consume caja)
+      for (const d of info.destinos) {
+        const dest = porCentro.get(d.codigo) ?? nuevoCentro(d.codigo, d.nombre);
+        const share = netoOrigen * (d.monto / info.pool); // con signo
+        agregarLinea(dest, share >= 0 ? "entrada" : "salida", CAT_REPARTO, {
+          cuenta_codigo: `PROR-${origen}`,
+          cuenta_nombre: nombreParteApoyo(origen, info.nombre),
+          monto: Math.abs(share),
+        });
+      }
+      porCentro.delete(origen); // el apoyo queda totalmente repartido
+    }
+
+    // Aviso: centro de apoyo con caja pero sin prorrateo corrido este mes.
+    for (const c of porCentro.values()) {
+      if (intermedios.has(c.centro_codigo) && !reparto.has(c.centro_codigo)) c.avisoSinReparto = true;
+    }
   }
 
   const arr = [...porCentro.values()];

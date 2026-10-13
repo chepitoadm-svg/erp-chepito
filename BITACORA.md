@@ -256,6 +256,18 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Flujo por panadería CON REPARTO de Taller/General (2026-10-12).** En la vista por panadería
+  se agregó toggle **"Con reparto / Sin reparto"** (con reparto por defecto). "Con reparto"
+  reparte el **flujo de caja neto** de Taller y General entre las sucursales usando el **mismo %
+  del prorrateo contable del mes** (Taller = % del centro; General = su mezcla por cuenta), así
+  cada panadería carga su parte justa y Taller/General quedan en 0. Casa (final, gasto personal) y
+  "Sin negocio" NO se reparten. Función nueva `fn_prorrateo_reparto(desde,hasta)` (migr.
+  `20260724100118`, aplicada): devuelve, desde los asientos `tipo='prorrateo'` confirmados del
+  rango, cuánto se movió de cada centro de apoyo a cada canal; la app saca el % efectivo y reparte.
+  Si un mes no tiene prorrateo corrido, el centro de apoyo sale con badge **"sin repartir"** y aviso.
+  Verificado julio: CH2 ₡2.892.818,50 / CH1 ₡1.441.694,00 / VEX ₡737.889 (total se conserva, dif 0).
+  `fn_flujo_caja_centro` no se tocó (la vista "Sin reparto" es la de antes).
+
 - **Flujo de caja POR PANADERÍA (2026-10-12).** Nueva vista en `/reportes/flujo` (toggle
   "Toda la empresa / Por panadería") que muestra, por negocio, cuánto Entró / Salió / Neto
   del mes, y al tocar cada uno su detalle. Función nueva `fn_flujo_caja_centro` (migr.

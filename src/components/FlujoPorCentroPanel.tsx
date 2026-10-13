@@ -44,8 +44,9 @@ function Lado({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[];
   );
 }
 
-export default function FlujoPorCentroPanel({ centros }: { centros: CentroFlujo[] }) {
+export default function FlujoPorCentroPanel({ centros, conReparto = false }: { centros: CentroFlujo[]; conReparto?: boolean }) {
   const [abierto, setAbierto] = useState<string | null>(null);
+  const hayAviso = centros.some((c) => c.avisoSinReparto);
 
   if (centros.length === 0) {
     return (
@@ -74,7 +75,14 @@ export default function FlujoPorCentroPanel({ centros }: { centros: CentroFlujo[
               return (
                 <Fragment key={c.centro_codigo}>
                   <tr className={abiertoAqui ? "bg-neutral-50" : ""}>
-                    <td className="px-4 py-3 font-medium text-neutral-900">{c.centro_nombre}</td>
+                    <td className="px-4 py-3 font-medium text-neutral-900">
+                      {c.centro_nombre}
+                      {c.avisoSinReparto && (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+                          sin repartir
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums text-green-700">{money(c.entro)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-red-600">{money(c.salio)}</td>
                     <td className={`px-4 py-3 text-right font-semibold tabular-nums ${c.neto >= 0 ? "text-green-700" : "text-red-600"}`}>
@@ -105,12 +113,30 @@ export default function FlujoPorCentroPanel({ centros }: { centros: CentroFlujo[
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-neutral-500">
-        El <b>Neto</b> positivo = ese negocio generó caja; negativo = consumió. Las ventas con tarjeta se
-        cuentan a la panadería que las vendió. <b>Sin negocio</b> = préstamos, IVA y traslados entre
-        cuentas (no son de una panadería). Taller y General son centros de apoyo: no venden, solo
-        consumen (los pagan las sucursales).
-      </p>
+      {conReparto ? (
+        <p className="text-xs text-neutral-500">
+          El <b>Neto</b> positivo = ese negocio generó caja; negativo = consumió. <b>Con reparto:</b> el
+          flujo de <b>Taller</b> y <b>General</b> ya está repartido entre las panaderías con el mismo % del
+          prorrateo del mes (aparece como <i>&quot;Centros de apoyo&quot;</i> en el detalle de cada una), así cada
+          una carga su parte justa. Las ventas con tarjeta se cuentan a la panadería que las vendió.
+          <b> Casa</b> (gasto personal) y <b>Sin negocio</b> (préstamos, IVA, traslados) no se reparten.
+        </p>
+      ) : (
+        <p className="text-xs text-neutral-500">
+          El <b>Neto</b> positivo = ese negocio generó caja; negativo = consumió. Las ventas con tarjeta se
+          cuentan a la panadería que las vendió. <b>Sin negocio</b> = préstamos, IVA y traslados entre
+          cuentas (no son de una panadería). Taller y General son centros de apoyo: no venden, solo
+          consumen (los pagan las sucursales). Con el botón <b>&quot;Con reparto&quot;</b> se reparten entre las
+          panaderías.
+        </p>
+      )}
+      {hayAviso && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Hay un centro de apoyo marcado <b>&quot;sin repartir&quot;</b>: este mes todavía no se corrió su
+          prorrateo, así que su caja no se pudo repartir. Corré el prorrateo del mes en Configuración →
+          Prorrateo para que quede cargado a las panaderías.
+        </p>
+      )}
     </div>
   );
 }

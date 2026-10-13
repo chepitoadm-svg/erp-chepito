@@ -2015,6 +2015,16 @@ export interface Database {
           monto: number;
         }[];
       };
+      fn_prorrateo_reparto: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: {
+          origen_codigo: string;
+          origen_nombre: string;
+          destino_codigo: string;
+          destino_nombre: string;
+          monto: number;
+        }[];
+      };
       fn_compromisos: {
         Args: { p_fecha: string };
         Returns: { categoria: string; cuenta_codigo: string; cuenta_nombre: string; saldo: number }[];
