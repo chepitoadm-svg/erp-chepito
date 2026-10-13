@@ -256,6 +256,16 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Flujo de caja POR PANADERÍA (2026-10-12).** Nueva vista en `/reportes/flujo` (toggle
+  "Toda la empresa / Por panadería") que muestra, por negocio, cuánto Entró / Salió / Neto
+  del mes, y al tocar cada uno su detalle. Función nueva `fn_flujo_caja_centro` (migr.
+  `20260724100117`): atribuye cada movimiento de caja al centro de su contrapartida; los
+  **pagos a proveedor se rastrean a la factura** (la línea de CxP no lleva centro) y el
+  **datáfono se trata como caja** para que la venta con tarjeta le cuente a la panadería que
+  la hizo; préstamos/IVA/traslados → "Sin negocio". Verificado sep-2026: Chepito 2 +₡3,43M,
+  Chepito 1 +₡2,41M (ambas generan); Taller/General/Casa consumen. Solo código + función,
+  sin migración de datos. `fn_flujo_caja` (empresa) y `fn_saldo_caja` NO se tocaron.
+
 - **Fase 4-1 aplicada a producción (2026-10-08).** La migración `20261007100001_produccion_recetas`
   se aplicó a la base real (tablas `insumos_manuales`/`recetas`/`recetas_lineas`, funciones de costeo,
   vista `v_recetas`, permisos `produccion.*`). Como el `schema_migrations` está desajustado (ver KNOWN

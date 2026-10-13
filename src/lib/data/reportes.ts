@@ -114,6 +114,75 @@ export async function flujoCaja(desde: string, hasta: string): Promise<FlujoCaja
   };
 }
 
+// Flujo de caja POR NEGOCIO (centro de costo). Cada movimiento se atribuye al
+// negocio de su contrapartida (ventas, gastos, y los pagos a proveedor rastreados
+// a la factura); lo compartido va a "Sin negocio". Sirve para ver qué panadería
+// genera caja y cuál la consume.
+export interface CentroFlujo {
+  centro_codigo: string;
+  centro_nombre: string;
+  entro: number;
+  salio: number; // magnitud positiva
+  neto: number;
+  entradas: FlujoCategoria[];
+  salidas: FlujoCategoria[];
+}
+
+export async function flujoCajaPorCentro(desde: string, hasta: string): Promise<CentroFlujo[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_flujo_caja_centro", { p_desde: desde, p_hasta: hasta });
+  if (error) throw new Error(`No se pudo cargar el flujo por negocio: ${error.message}`);
+  const rows = (data ?? []) as {
+    centro_codigo: string;
+    centro_nombre: string;
+    categoria: string;
+    cuenta_codigo: string;
+    cuenta_nombre: string;
+    monto: number;
+  }[];
+
+  const porCentro = new Map<string, CentroFlujo>();
+  for (const r of rows) {
+    let c = porCentro.get(r.centro_codigo);
+    if (!c) {
+      c = { centro_codigo: r.centro_codigo, centro_nombre: r.centro_nombre, entro: 0, salio: 0, neto: 0, entradas: [], salidas: [] };
+      porCentro.set(r.centro_codigo, c);
+    }
+    const monto = Number(r.monto);
+    const mag = Math.abs(monto);
+    const lista = monto >= 0 ? c.entradas : c.salidas;
+    const cat = lista.find((x) => x.categoria === r.categoria) ?? (() => {
+      const nueva = { categoria: r.categoria, total: 0, lineas: [] as FlujoLinea[] };
+      lista.push(nueva);
+      return nueva;
+    })();
+    cat.total += mag;
+    cat.lineas.push({ cuenta_codigo: r.cuenta_codigo, cuenta_nombre: r.cuenta_nombre, monto: mag });
+    if (monto >= 0) c.entro += mag;
+    else c.salio += mag;
+    c.neto += monto;
+  }
+
+  const arr = [...porCentro.values()];
+  for (const c of arr) {
+    c.entradas.sort((a, b) => b.total - a.total);
+    c.salidas.sort((a, b) => b.total - a.total);
+    c.entradas.forEach((k) => k.lineas.sort((a, b) => b.monto - a.monto));
+    c.salidas.forEach((k) => k.lineas.sort((a, b) => b.monto - a.monto));
+    c.entro = Math.round(c.entro * 100) / 100;
+    c.salio = Math.round(c.salio * 100) / 100;
+    c.neto = Math.round(c.neto * 100) / 100;
+  }
+  // "Sin negocio" de último; el resto por neto descendente (quién genera primero).
+  arr.sort((a, b) => {
+    const aSin = a.centro_codigo === "SINNEG" ? 1 : 0;
+    const bSin = b.centro_codigo === "SINNEG" ? 1 : 0;
+    if (aSin !== bSin) return aSin - bSin;
+    return b.neto - a.neto;
+  });
+  return arr;
+}
+
 export interface CompromisoCategoria {
   categoria: string;
   total: number;

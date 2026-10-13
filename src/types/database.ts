@@ -2003,6 +2003,18 @@ export interface Database {
           monto: number;
         }[];
       };
+      fn_flujo_caja_centro: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: {
+          centro_codigo: string;
+          centro_nombre: string;
+          categoria: string;
+          tipo: "entrada" | "salida";
+          cuenta_codigo: string;
+          cuenta_nombre: string;
+          monto: number;
+        }[];
+      };
       fn_compromisos: {
         Args: { p_fecha: string };
         Returns: { categoria: string; cuenta_codigo: string; cuenta_nombre: string; saldo: number }[];

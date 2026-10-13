@@ -2,9 +2,10 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { flujoCaja, compromisos, type FlujoCategoria } from "@/lib/data/reportes";
+import { flujoCaja, flujoCajaPorCentro, compromisos, type FlujoCategoria } from "@/lib/data/reportes";
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 import ExportarExcel, { type FilaExcel } from "@/components/ExportarExcel";
+import FlujoPorCentroPanel from "@/components/FlujoPorCentroPanel";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -28,16 +29,18 @@ function etiqueta(mes: string) {
   return `${MESES[m - 1]} ${y}`;
 }
 
-export default async function FlujoCajaPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+export default async function FlujoCajaPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string }> }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
   const sp = await searchParams;
   const mes = /^\d{4}-\d{2}$/.test(sp.mes ?? "") ? (sp.mes as string) : "2026-07";
+  const vista = sp.vista === "negocios" ? "negocios" : "empresa";
   const { desde, hasta } = rango(mes);
 
-  const [flujo, comp, cuentas] = await Promise.all([
+  const [flujo, comp, cuentas, centrosFlujo] = await Promise.all([
     flujoCaja(desde, hasta),
     compromisos(hasta),
     listarCuentasPosteables(),
+    vista === "negocios" ? flujoCajaPorCentro(desde, hasta) : Promise.resolve([]),
   ]);
   const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
   const hrefMayor = (cod: string) => {
@@ -146,34 +149,59 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
       <h1 className="mt-1 text-lg font-semibold text-neutral-900">Flujo de caja</h1>
       <p className="mb-4 text-sm text-neutral-500">De dónde entra y en qué se va la plata de caja y bancos, mes a mes.</p>
 
-      {/* Selector de mes */}
-      <div className="mb-4 flex items-center gap-2">
+      {/* Selector de mes + vista */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <Link
-          href={`/reportes/flujo?mes=${mover(mes, -1)}`}
+          href={`/reportes/flujo?mes=${mover(mes, -1)}${vista === "negocios" ? "&vista=negocios" : ""}`}
           className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
         >
           ← {etiqueta(mover(mes, -1))}
         </Link>
         <span className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium capitalize text-white">{etiqueta(mes)}</span>
         <Link
-          href={`/reportes/flujo?mes=${mover(mes, 1)}`}
+          href={`/reportes/flujo?mes=${mover(mes, 1)}${vista === "negocios" ? "&vista=negocios" : ""}`}
           className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
         >
           {etiqueta(mover(mes, 1))} →
         </Link>
-        <ExportarExcel
-          className="ml-auto rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-          nombre={`flujo-caja-${mes}.xlsx`}
-          hoja="Flujo de caja"
-          titulo="Flujo de caja"
-          subtitulo={`Panaderías Chepito · ${etiqueta(mes)} (${desde} a ${hasta})`}
-          columnas={[
-            { titulo: "Concepto", ancho: 46 },
-            { titulo: "Monto", money: true, ancho: 18 },
-          ]}
-          filas={excel}
-        />
+
+        {/* Toggle Empresa / Por negocio */}
+        <div className="ml-2 inline-flex overflow-hidden rounded-md border border-neutral-300 text-sm">
+          <Link
+            href={`/reportes/flujo?mes=${mes}`}
+            className={`px-3 py-1.5 ${vista === "empresa" ? "bg-neutral-900 font-medium text-white" : "text-neutral-700 hover:bg-neutral-50"}`}
+          >
+            Toda la empresa
+          </Link>
+          <Link
+            href={`/reportes/flujo?mes=${mes}&vista=negocios`}
+            className={`border-l border-neutral-300 px-3 py-1.5 ${vista === "negocios" ? "bg-neutral-900 font-medium text-white" : "text-neutral-700 hover:bg-neutral-50"}`}
+          >
+            Por panadería
+          </Link>
+        </div>
+
+        {vista === "empresa" && (
+          <ExportarExcel
+            className="ml-auto rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            nombre={`flujo-caja-${mes}.xlsx`}
+            hoja="Flujo de caja"
+            titulo="Flujo de caja"
+            subtitulo={`Panaderías Chepito · ${etiqueta(mes)} (${desde} a ${hasta})`}
+            columnas={[
+              { titulo: "Concepto", ancho: 46 },
+              { titulo: "Monto", money: true, ancho: 18 },
+            ]}
+            filas={excel}
+          />
+        )}
       </div>
+
+      {vista === "negocios" ? (
+        <FlujoPorCentroPanel centros={centrosFlujo} />
+      ) : (
+      <>
+      {/* === Vista EMPRESA === */}
 
       {/* Resumen */}
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -302,6 +330,8 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
         </Link>
         .
       </p>
+      </>
+      )}
     </div>
   );
 }
