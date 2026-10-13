@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { tienePermiso } from "@/lib/auth/permisos";
-import { flujoCajaPorCentro } from "@/lib/data/reportes";
+import { flujoCajaPorCentro, repartoShares } from "@/lib/data/reportes";
 import SimuladorCierrePanel from "@/components/SimuladorCierrePanel";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -30,7 +30,11 @@ export default async function SimuladorCierrePage({ searchParams }: { searchPara
   const { desde, hasta } = rango(mes);
 
   // Datos crudos por panadería (sin reparto): el simulador decide qué se va/queda.
-  const centros = await flujoCajaPorCentro(desde, hasta, false);
+  // El reparto da el % del prorrateo (default: de Taller/General se va la parte de la que cierra).
+  const [centros, reparto] = await Promise.all([
+    flujoCajaPorCentro(desde, hasta, false),
+    repartoShares(desde, hasta),
+  ]);
 
   return (
     <div>
@@ -59,7 +63,7 @@ export default async function SimuladorCierrePage({ searchParams }: { searchPara
           No hay movimientos de caja este mes.
         </div>
       ) : (
-        <SimuladorCierrePanel centros={centros} etiquetaMes={etiqueta(mes)} />
+        <SimuladorCierrePanel centros={centros} etiquetaMes={etiqueta(mes)} reparto={reparto} />
       )}
     </div>
   );

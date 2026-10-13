@@ -257,14 +257,17 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 ## Hecho reciente (sep–oct 2026)
 
 - **Simulador de cierre de panadería (2026-10-13).** `/reportes/flujo/simulador` (botón "🧮 Simular
-  cierre" en la vista por panadería). Toma el flujo CRUDO por centro del mes y deja marcar línea por
-  línea qué "se va" y qué "se queda" si cerrás una panadería (default: todo lo de la que cierra se va,
-  el resto se queda). Muestra en vivo: flujo actual, aporte directo de la que cierra, flujo proyectado
-  y **efecto de cerrar** (+ mejora / − empeora), con veredicto y reconciliación (nada queda sin
-  clasificar). NO toca libros. Clave que revela: cerrar CH1 quitando solo sus líneas EMPEORA la caja
-  (pierde su aporte directo +₡552k jul / +₡471k ago); solo conviene si se recorta suficiente de
-  Taller/General — por eso esos quedan en "se queda" por defecto y el usuario marca lo realmente
-  ahorrable. Archivos: `SimuladorCierrePanel.tsx` + page. Reusa `flujoCajaPorCentro(...,false)`.
+  cierre" en la vista por panadería). Toma el flujo CRUDO por centro del mes y da un **% "se va"** por
+  centro. Default inteligente: la panadería que cierra = 100%; **Taller/General = la PARTE de la que
+  cierra (su % del prorrateo del mes)** porque la harina/producción de esa sucursal sí desaparece, pero
+  el resto del Taller sigue para las otras; Casa/Sin negocio = 0% (editable, p.ej. IVA baja). Presets
+  rápidos en apoyo (su parte / mitad / todo / nada) + detalle línea por línea desplegable. Muestra en
+  vivo flujo actual, aporte directo, flujo proyectado y **efecto de cerrar** (+ mejora / − empeora) con
+  veredicto y reconciliación. NO toca libros. Verificado: efecto default de cerrar CH1 = **+₡745.449
+  jul / +₡681.424 ago** (coincide con −(neto con reparto de CH1), buen check). OJO: el default asume
+  que toda la parte de CH1 en apoyo es ahorrable; parte es FIJA (alquiler Taller, panadero base) y no
+  se va → el usuario baja el % para esa parte. Archivos: `SimuladorCierrePanel.tsx` + page +
+  `repartoShares()` en reportes.ts. Reusa `flujoCajaPorCentro(...,false)` y `fn_prorrateo_reparto`.
 
 - **Flujo por panadería: PAGO DE GASTOS atribuido por centro (2026-10-12).** "Pago a proveedores
   (facturas)" caía en "Sin negocio" (agosto ₡1.163.809) porque eran CxP de GASTOS (luz/CNFL, agua/AYA,

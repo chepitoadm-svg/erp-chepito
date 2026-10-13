@@ -247,6 +247,23 @@ export async function flujoCajaPorCentro(
   return arr;
 }
 
+// % del prorrateo del mes: para cada centro de apoyo (origen), qué fracción (0..1)
+// le toca a cada panadería (destino). Sirve de default en el simulador de cierre:
+// al cerrar una panadería, de Taller/General se va "su parte".
+export async function repartoShares(desde: string, hasta: string): Promise<Record<string, Record<string, number>>> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("fn_prorrateo_reparto", { p_desde: desde, p_hasta: hasta });
+  const rows = (data ?? []) as { origen_codigo: string; destino_codigo: string; monto: number }[];
+  const pool: Record<string, number> = {};
+  for (const r of rows) pool[r.origen_codigo] = (pool[r.origen_codigo] ?? 0) + Number(r.monto);
+  const out: Record<string, Record<string, number>> = {};
+  for (const r of rows) {
+    const p = pool[r.origen_codigo] || 1;
+    (out[r.origen_codigo] ??= {})[r.destino_codigo] = Number(r.monto) / p;
+  }
+  return out;
+}
+
 export interface CompromisoCategoria {
   categoria: string;
   total: number;
