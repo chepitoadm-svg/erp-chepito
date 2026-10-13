@@ -256,6 +256,13 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Flujo por panadería: PAGO DE GASTOS atribuido por centro (2026-10-12).** "Pago a proveedores
+  (facturas)" caía en "Sin negocio" (agosto ₡1.163.809) porque eran CxP de GASTOS (luz/CNFL, agua/AYA,
+  ICE, alquileres, software) con `cuentas_por_pagar.gasto_id` en vez de `factura_id`, y el rastreo solo
+  miraba la factura. `fn_flujo_caja_centro` (migr. `20260724100120`) ahora usa
+  `coalesce(factura.centro, gasto.centro)`. Queda en Sin negocio solo lo sin centro real (ej. NC de
+  Dos Pinos, −70.584,69). Total por centro se conserva.
+
 - **Flujo por panadería: PAGO DE PLANILLA atribuido por centro (2026-10-12).** El pago de
   salarios (`origen='planilla_pago'`) debita "Salarios por pagar" (21-10-11, pasivo SIN centro)
   y acredita caja/banco, así que toda la salida caía en "Sin negocio" (se veía ₡3.633.128 ahí en
