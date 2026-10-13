@@ -2026,6 +2026,17 @@ export interface Database {
           monto: number;
         }[];
       };
+      fn_compromisos_centro: {
+        Args: { p_fecha: string };
+        Returns: {
+          centro_codigo: string;
+          centro_nombre: string;
+          categoria: string;
+          cuenta_codigo: string;
+          cuenta_nombre: string;
+          saldo: number;
+        }[];
+      };
       fn_prorrateo_reparto: {
         Args: { p_desde: string; p_hasta: string };
         Returns: {

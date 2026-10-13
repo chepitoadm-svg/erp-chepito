@@ -256,6 +256,15 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Simulador: "¿Me alcanza para pagar lo pendiente?" (2026-10-13).** El flujo es base caja, así que lo
+  devengado y NO pagado (ej. alquiler) no sale. Nueva función `fn_compromisos_centro(fecha)` (migr.
+  `20261013100002`, APLICADA a la base): CxP con saldo>0 por centro (factura o gasto), categorizado
+  (Alquileres/Proveedores/Servicios…). `compromisosPorCentro()` + tipo en database.ts. En el simulador,
+  sección nueva: Tengo (caja+banco) vs Debo y no he pagado (por panadería, desplegable) = **Me queda si
+  pago todo**. Al 31/08: disponible ₡2,73M vs pendiente operativo ₡13,25M (CH1 3,96M incl. alquiler
+  560k; CH2 5,03M incl. 710k; TAL 4,26M) → faltan ₡10,5M. Los préstamos (largo plazo) NO se cuentan
+  acá a propósito. Muestra también en cuántos meses se cubre el faltante con el efecto de cerrar.
+
 - **Detalle por línea del flujo por panadería — migración APLICADA (2026-10-13, en casa).** La función
   `fn_flujo_caja_centro_detalle` (migr. `20261013100001`, hecha en el trabajo) daba "Sin detalle para
   esta línea" porque **la migración nunca se aplicó a Supabase** (en el trabajo node no tiene red). Se

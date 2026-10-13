@@ -298,6 +298,49 @@ export async function flujoCentroDetalle(
   }));
 }
 
+// Pendiente de pagar (CxP con saldo) por panadería, a una fecha. Para el simulador
+// de cierre: muestra lo devengado y NO pagado (alquiler, proveedores) que el flujo
+// de caja —base caja— no enseña, y así ver "si pago todo, cuánto me queda".
+export interface CentroPendienteCat {
+  categoria: string;
+  saldo: number;
+  lineas: { cuenta_nombre: string; saldo: number }[];
+}
+export interface CentroPendiente {
+  centro_codigo: string;
+  centro_nombre: string;
+  pendiente: number;
+  categorias: CentroPendienteCat[];
+}
+export async function compromisosPorCentro(fecha: string): Promise<CentroPendiente[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_compromisos_centro", { p_fecha: fecha });
+  if (error) throw new Error(`No se pudo cargar lo pendiente por panadería: ${error.message}`);
+  const rows = (data ?? []) as {
+    centro_codigo: string; centro_nombre: string; categoria: string; cuenta_nombre: string; saldo: number;
+  }[];
+  const m = new Map<string, CentroPendiente>();
+  for (const r of rows) {
+    let c = m.get(r.centro_codigo);
+    if (!c) { c = { centro_codigo: r.centro_codigo, centro_nombre: r.centro_nombre, pendiente: 0, categorias: [] }; m.set(r.centro_codigo, c); }
+    let cat = c.categorias.find((x) => x.categoria === r.categoria);
+    if (!cat) { cat = { categoria: r.categoria, saldo: 0, lineas: [] }; c.categorias.push(cat); }
+    const s = Number(r.saldo);
+    cat.saldo += s; cat.lineas.push({ cuenta_nombre: r.cuenta_nombre, saldo: s }); c.pendiente += s;
+  }
+  const arr = [...m.values()];
+  for (const c of arr) {
+    c.categorias.sort((a, b) => b.saldo - a.saldo);
+    c.pendiente = Math.round(c.pendiente * 100) / 100;
+  }
+  arr.sort((a, b) => {
+    const aSin = a.centro_codigo === "SINNEG" ? 1 : 0, bSin = b.centro_codigo === "SINNEG" ? 1 : 0;
+    if (aSin !== bSin) return aSin - bSin;
+    return b.pendiente - a.pendiente;
+  });
+  return arr;
+}
+
 export interface CompromisoCategoria {
   categoria: string;
   total: number;

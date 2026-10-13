@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { CentroFlujo } from "@/lib/data/reportes";
+import type { CentroFlujo, CentroPendiente } from "@/lib/data/reportes";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,10 +27,16 @@ export default function SimuladorCierrePanel({
   centros,
   etiquetaMes,
   reparto,
+  pendientes,
+  disponible,
+  fechaCorte,
 }: {
   centros: CentroFlujo[];
   etiquetaMes: string;
   reparto: Reparto;
+  pendientes: CentroPendiente[];
+  disponible: number;
+  fechaCorte: string;
 }) {
   const finales = centros.filter((c) => rolCentro(c.centro_codigo) === "final");
   const [cierra, setCierra] = useState<string>(
@@ -80,6 +86,17 @@ export default function SimuladorCierrePanel({
   });
 
   const nombreCierra = centros.find((c) => c.centro_codigo === cierra)?.centro_nombre ?? cierra;
+
+  // Pendiente de pagar (devengado y no pagado): ¿me alcanza?
+  const [pendAbierto, setPendAbierto] = useState<Record<string, boolean>>({});
+  const totalPendiente = useMemo(() => pendientes.reduce((s, p) => s + p.pendiente, 0), [pendientes]);
+  const meQueda = disponible - totalPendiente;
+  const pendCierra = pendientes.find((p) => p.centro_codigo === cierra)?.pendiente ?? 0;
+  const mesesRecuperar = r.efecto > 0 && meQueda < 0 ? Math.ceil(-meQueda / r.efecto) : null;
+  const fCorte = (() => {
+    const p = (fechaCorte || "").split("-");
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : fechaCorte;
+  })();
 
   const Signo = ({ n }: { n: number }) => (
     <span className={`tabular-nums ${n >= 0 ? "text-green-700" : "text-red-600"}`}>
@@ -230,6 +247,80 @@ export default function SimuladorCierrePanel({
         <span className={r.efecto >= 0 ? "text-green-700" : "text-red-600"}>{r.efecto >= 0 ? "+" : "−"}{money(Math.abs(r.efecto))}</span>{" "}
         = flujo proyectado <Signo n={r.flujoProyectado} />. Cada centro muestra cuánto se va; lo demás se queda. Abrí
         cada uno (▸) para ver el detalle línea por línea.
+      </div>
+
+      {/* ¿Me alcanza para pagar lo pendiente? (devengado y no pagado) */}
+      <div className="mt-6 overflow-hidden rounded-lg border border-neutral-300 bg-white">
+        <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-800">
+          💸 ¿Me alcanza para pagar lo pendiente? <span className="font-normal text-neutral-500">— al {fCorte}</span>
+        </div>
+        <div className="grid gap-3 p-4 sm:grid-cols-3">
+          <div>
+            <div className="text-xs text-neutral-500">Tengo (caja + bancos)</div>
+            <div className="text-lg font-semibold tabular-nums text-neutral-900">{money(disponible)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-neutral-500">Debo y no he pagado (proveedores + alquiler…)</div>
+            <div className="text-lg font-semibold tabular-nums text-red-700">{money(totalPendiente)}</div>
+          </div>
+          <div className={`rounded-md p-2 ${meQueda < 0 ? "bg-red-50" : "bg-green-50"}`}>
+            <div className="text-xs text-neutral-500">Me queda si pago todo</div>
+            <div className={`text-lg font-semibold tabular-nums ${meQueda < 0 ? "text-red-700" : "text-green-800"}`}>
+              {meQueda < 0 ? `(${money(-meQueda)})` : money(meQueda)}
+            </div>
+          </div>
+        </div>
+
+        {/* Pendiente por panadería */}
+        <table className="w-full border-t border-neutral-100 text-sm">
+          <tbody className="divide-y divide-neutral-100">
+            {pendientes.map((p) => {
+              const op = !!pendAbierto[p.centro_codigo];
+              const esCierra = p.centro_codigo === cierra;
+              return (
+                <Fragment key={p.centro_codigo}>
+                  <tr className={esCierra ? "bg-neutral-50" : ""}>
+                    <td className="px-4 py-1.5">
+                      <button onClick={() => setPendAbierto((s) => ({ ...s, [p.centro_codigo]: !s[p.centro_codigo] }))} className="text-left font-medium text-neutral-800">
+                        <span className="mr-1 text-xs text-neutral-400">{op ? "▾" : "▸"}</span>
+                        {p.centro_nombre}
+                        {esCierra && <span className="ml-2 rounded bg-neutral-900 px-1.5 py-0.5 text-[11px] text-white">cierra</span>}
+                      </button>
+                    </td>
+                    <td className="px-4 py-1.5 text-right font-medium tabular-nums text-red-700">{money(p.pendiente)}</td>
+                  </tr>
+                  {op &&
+                    p.categorias.map((cat) => (
+                      <tr key={p.centro_codigo + cat.categoria} className="bg-neutral-50/60">
+                        <td className="py-1 pl-8 pr-4 text-neutral-600">{cat.categoria}</td>
+                        <td className="px-4 py-1 text-right tabular-nums text-neutral-500">{money(cat.saldo)}</td>
+                      </tr>
+                    ))}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="space-y-1 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-600">
+          <p>
+            Esto es lo <b>devengado y aún no pagado</b> (lo que el flujo de caja no muestra porque es base caja). El
+            <b> alquiler</b> está acá porque se debe pero no se ha pagado.
+            {meQueda < 0 && <b className="text-red-700"> Hoy no alcanza para ponerse al día: faltan ₡{money(-meQueda)}.</b>}
+          </p>
+          {mesesRecuperar !== null && (
+            <p>
+              Si cerrás <b>{nombreCierra}</b>, la caja mejora <b>₡{money(r.efecto)}/mes</b> (escenario de arriba), así
+              que cubrir ese faltante tomaría <b>~{mesesRecuperar} mes{mesesRecuperar === 1 ? "" : "es"}</b>. De lo
+              pendiente, <b>₡{money(pendCierra)}</b> es de {nombreCierra} (lo ya recibido se sigue debiendo; lo que se
+              deja de acumular es a futuro).
+            </p>
+          )}
+          <p className="text-neutral-400">
+            Nota: los <b>préstamos</b> bancarios (largo plazo, en cuotas) no se cuentan acá — son otra cosa. Esto es la
+            deuda operativa de corto plazo.
+          </p>
+        </div>
       </div>
     </div>
   );
