@@ -282,7 +282,12 @@ export async function flujoCentroDetalle(
   cuentaCodigo: string,
 ): Promise<FlujoCentroDetalleFila[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("fn_flujo_caja_centro_detalle", {
+  // La función es nueva: todavía no está en los tipos generados (database.ts),
+  // así que el .rpc se llama con un cast suelto. Al regenerar los tipos calza.
+  const rpc = (supabase as unknown as {
+    rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+  }).rpc;
+  const { data, error } = await rpc("fn_flujo_caja_centro_detalle", {
     p_desde: desde,
     p_hasta: hasta,
     p_centro_codigo: centroCodigo,
