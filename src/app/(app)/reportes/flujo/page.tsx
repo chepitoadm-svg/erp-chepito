@@ -212,6 +212,15 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
           </div>
         )}
 
+        {vista === "negocios" && (
+          <Link
+            href={`/reportes/flujo/simulador?mes=${mes}`}
+            className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+          >
+            🧮 Simular cierre
+          </Link>
+        )}
+
         {vista === "empresa" && (
           <ExportarExcel
             className="ml-auto rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"

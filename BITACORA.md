@@ -256,6 +256,16 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Simulador de cierre de panadería (2026-10-13).** `/reportes/flujo/simulador` (botón "🧮 Simular
+  cierre" en la vista por panadería). Toma el flujo CRUDO por centro del mes y deja marcar línea por
+  línea qué "se va" y qué "se queda" si cerrás una panadería (default: todo lo de la que cierra se va,
+  el resto se queda). Muestra en vivo: flujo actual, aporte directo de la que cierra, flujo proyectado
+  y **efecto de cerrar** (+ mejora / − empeora), con veredicto y reconciliación (nada queda sin
+  clasificar). NO toca libros. Clave que revela: cerrar CH1 quitando solo sus líneas EMPEORA la caja
+  (pierde su aporte directo +₡552k jul / +₡471k ago); solo conviene si se recorta suficiente de
+  Taller/General — por eso esos quedan en "se queda" por defecto y el usuario marca lo realmente
+  ahorrable. Archivos: `SimuladorCierrePanel.tsx` + page. Reusa `flujoCajaPorCentro(...,false)`.
+
 - **Flujo por panadería: PAGO DE GASTOS atribuido por centro (2026-10-12).** "Pago a proveedores
   (facturas)" caía en "Sin negocio" (agosto ₡1.163.809) porque eran CxP de GASTOS (luz/CNFL, agua/AYA,
   ICE, alquileres, software) con `cuentas_por_pagar.gasto_id` en vez de `factura_id`, y el rastreo solo
