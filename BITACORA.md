@@ -256,6 +256,16 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Detalle por línea del flujo por panadería — migración APLICADA (2026-10-13, en casa).** La función
+  `fn_flujo_caja_centro_detalle` (migr. `20261013100001`, hecha en el trabajo) daba "Sin detalle para
+  esta línea" porque **la migración nunca se aplicó a Supabase** (en el trabajo node no tiene red). Se
+  aplicó desde casa. Verificado: el drill-down de cada línea trae sus movimientos y suma igual que la
+  línea (CH1 ventas 60 mov ₡3.998.265,96; proveedores/gastos 18 mov ₡1.876.246,36; planilla 16 mov
+  ₡1.492.425,05; SINNEG préstamos 5 mov). Las líneas "Parte de Taller/General" (reparto) no abren a
+  propósito (son sintéticas). De paso se agregó el tipo de la función a `database.ts` y se quitó el
+  cast suelto de `flujoCentroDetalle`. **Recordatorio: toda migración hecha en el trabajo hay que
+  aplicarla a la base desde casa (node con red).**
+
 - **Simulador de cierre de panadería (2026-10-13).** `/reportes/flujo/simulador` (botón "🧮 Simular
   cierre" en la vista por panadería). Toma el flujo CRUDO por centro del mes y da un **% "se va"** por
   centro. Default inteligente: la panadería que cierra = 100%; **Taller/General = la PARTE de la que

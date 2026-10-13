@@ -2015,6 +2015,17 @@ export interface Database {
           monto: number;
         }[];
       };
+      fn_flujo_caja_centro_detalle: {
+        Args: { p_desde: string; p_hasta: string; p_centro_codigo: string; p_cuenta_codigo: string };
+        Returns: {
+          fecha: string;
+          numero: string | null;
+          origen_tipo: string | null;
+          origen_id: string | null;
+          concepto: string;
+          monto: number;
+        }[];
+      };
       fn_prorrateo_reparto: {
         Args: { p_desde: string; p_hasta: string };
         Returns: {
