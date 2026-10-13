@@ -256,6 +256,18 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Flujo por panadería: PAGO DE PLANILLA atribuido por centro (2026-10-12).** El pago de
+  salarios (`origen='planilla_pago'`) debita "Salarios por pagar" (21-10-11, pasivo SIN centro)
+  y acredita caja/banco, así que toda la salida caía en "Sin negocio" (se veía ₡3.633.128 ahí en
+  julio). Arreglo (igual que el rastreo de proveedores): `fn_flujo_caja_centro` (migr.
+  `20260724100119`) rastrea cada pago hasta la PROVISIÓN de esa planilla (`origen='planilla'`, que
+  reparte Salarios 61-10-01-08 + No deducibles 64-01-03 por centro, con DIV ya resuelto a CH1/CH2)
+  y reparte la salida con esa proporción; lo no rastreable queda en Sin negocio. Verificado julio:
+  reparte CH1 −1.492.425 / CH2 −1.492.425 / Taller −426.571 / Casa −221.707 (suma exacta −3.633.128);
+  total por centro se conserva. **Impacto grande:** con salarios + reparto, Chepito 1 julio pasa de
+  parecer +1,44M a **−174.437** (consume caja). Ojo para la decisión de cerrar/no. Pendiente similar:
+  cargas sociales CCSS (se pagan por convenio, siguen en Sin negocio).
+
 - **Flujo por panadería CON REPARTO de Taller/General (2026-10-12).** En la vista por panadería
   se agregó toggle **"Con reparto / Sin reparto"** (con reparto por defecto). "Con reparto"
   reparte el **flujo de caja neto** de Taller y General entre las sucursales usando el **mismo %
