@@ -303,12 +303,15 @@ export async function flujoCentroDetalle(
 // de caja —base caja— no enseña, y así ver "si pago todo, cuánto me queda".
 export interface CentroPendienteCat {
   categoria: string;
-  saldo: number;
-  lineas: { cuenta_nombre: string; saldo: number }[];
+  vencido: number; // saldo cuya fecha de vencimiento ya pasó (o sin fecha)
+  porVencer: number; // saldo que aún no vence al corte
+  saldo: number; // vencido + porVencer
 }
 export interface CentroPendiente {
   centro_codigo: string;
   centro_nombre: string;
+  vencido: number;
+  porVencer: number;
   pendiente: number;
   categorias: CentroPendienteCat[];
 }
@@ -317,21 +320,24 @@ export async function compromisosPorCentro(fecha: string): Promise<CentroPendien
   const { data, error } = await supabase.rpc("fn_compromisos_centro", { p_fecha: fecha });
   if (error) throw new Error(`No se pudo cargar lo pendiente por panadería: ${error.message}`);
   const rows = (data ?? []) as {
-    centro_codigo: string; centro_nombre: string; categoria: string; cuenta_nombre: string; saldo: number;
+    centro_codigo: string; centro_nombre: string; categoria: string; vencido: boolean; saldo: number;
   }[];
   const m = new Map<string, CentroPendiente>();
   for (const r of rows) {
     let c = m.get(r.centro_codigo);
-    if (!c) { c = { centro_codigo: r.centro_codigo, centro_nombre: r.centro_nombre, pendiente: 0, categorias: [] }; m.set(r.centro_codigo, c); }
+    if (!c) { c = { centro_codigo: r.centro_codigo, centro_nombre: r.centro_nombre, vencido: 0, porVencer: 0, pendiente: 0, categorias: [] }; m.set(r.centro_codigo, c); }
     let cat = c.categorias.find((x) => x.categoria === r.categoria);
-    if (!cat) { cat = { categoria: r.categoria, saldo: 0, lineas: [] }; c.categorias.push(cat); }
+    if (!cat) { cat = { categoria: r.categoria, vencido: 0, porVencer: 0, saldo: 0 }; c.categorias.push(cat); }
     const s = Number(r.saldo);
-    cat.saldo += s; cat.lineas.push({ cuenta_nombre: r.cuenta_nombre, saldo: s }); c.pendiente += s;
+    if (r.vencido) { cat.vencido += s; c.vencido += s; } else { cat.porVencer += s; c.porVencer += s; }
+    cat.saldo += s; c.pendiente += s;
   }
+  const round = (n: number) => Math.round(n * 100) / 100;
   const arr = [...m.values()];
   for (const c of arr) {
     c.categorias.sort((a, b) => b.saldo - a.saldo);
-    c.pendiente = Math.round(c.pendiente * 100) / 100;
+    c.categorias.forEach((cat) => { cat.vencido = round(cat.vencido); cat.porVencer = round(cat.porVencer); cat.saldo = round(cat.saldo); });
+    c.vencido = round(c.vencido); c.porVencer = round(c.porVencer); c.pendiente = round(c.pendiente);
   }
   arr.sort((a, b) => {
     const aSin = a.centro_codigo === "SINNEG" ? 1 : 0, bSin = b.centro_codigo === "SINNEG" ? 1 : 0;

@@ -87,11 +87,34 @@ export default function SimuladorCierrePanel({
 
   const nombreCierra = centros.find((c) => c.centro_codigo === cierra)?.centro_nombre ?? cierra;
 
-  // Pendiente de pagar (devengado y no pagado): ¿me alcanza?
-  const [pendAbierto, setPendAbierto] = useState<Record<string, boolean>>({});
+  // Pendiente de pagar: elegir qué meter en el flujo (default: solo lo vencido).
+  const pendItems = useMemo(() => {
+    const out: { id: string; centro: string; categoria: string; bucket: "venc" | "porv"; saldo: number }[] = [];
+    for (const p of pendientes)
+      for (const cat of p.categorias) {
+        if (cat.vencido > 0) out.push({ id: `${p.centro_codigo}|${cat.categoria}|venc`, centro: p.centro_codigo, categoria: cat.categoria, bucket: "venc", saldo: cat.vencido });
+        if (cat.porVencer > 0) out.push({ id: `${p.centro_codigo}|${cat.categoria}|porv`, centro: p.centro_codigo, categoria: cat.categoria, bucket: "porv", saldo: cat.porVencer });
+      }
+    return out;
+  }, [pendientes]);
+  const [incluido, setIncluido] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    const d: Record<string, boolean> = {};
+    for (const it of pendItems) d[it.id] = it.bucket === "venc"; // default: solo lo vencido
+    setIncluido(d);
+  }, [pendItems]);
+  const toggleItem = (id: string) => setIncluido((s) => ({ ...s, [id]: !s[id] }));
+  const setPreset = (modo: "venc" | "todo" | "nada") =>
+    setIncluido(() => {
+      const d: Record<string, boolean> = {};
+      for (const it of pendItems) d[it.id] = modo === "todo" ? true : modo === "nada" ? false : it.bucket === "venc";
+      return d;
+    });
+
   const totalPendiente = useMemo(() => pendientes.reduce((s, p) => s + p.pendiente, 0), [pendientes]);
-  const meQueda = disponible - totalPendiente;
-  const pendCierra = pendientes.find((p) => p.centro_codigo === cierra)?.pendiente ?? 0;
+  const totalVencido = useMemo(() => pendientes.reduce((s, p) => s + p.vencido, 0), [pendientes]);
+  const seleccionado = useMemo(() => pendItems.reduce((s, it) => s + (incluido[it.id] ? it.saldo : 0), 0), [pendItems, incluido]);
+  const meQueda = disponible - seleccionado;
   const mesesRecuperar = r.efecto > 0 && meQueda < 0 ? Math.ceil(-meQueda / r.efecto) : null;
   const fCorte = (() => {
     const p = (fechaCorte || "").split("-");
@@ -249,7 +272,7 @@ export default function SimuladorCierrePanel({
         cada uno (▸) para ver el detalle línea por línea.
       </div>
 
-      {/* ¿Me alcanza para pagar lo pendiente? (devengado y no pagado) */}
+      {/* ¿Me alcanza para pagar lo pendiente? (elegir qué meter) */}
       <div className="mt-6 overflow-hidden rounded-lg border border-neutral-300 bg-white">
         <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-800">
           💸 ¿Me alcanza para pagar lo pendiente? <span className="font-normal text-neutral-500">— al {fCorte}</span>
@@ -260,42 +283,68 @@ export default function SimuladorCierrePanel({
             <div className="text-lg font-semibold tabular-nums text-neutral-900">{money(disponible)}</div>
           </div>
           <div>
-            <div className="text-xs text-neutral-500">Debo y no he pagado (proveedores + alquiler…)</div>
-            <div className="text-lg font-semibold tabular-nums text-red-700">{money(totalPendiente)}</div>
+            <div className="text-xs text-neutral-500">Pago lo marcado</div>
+            <div className="text-lg font-semibold tabular-nums text-red-700">{money(seleccionado)}</div>
           </div>
           <div className={`rounded-md p-2 ${meQueda < 0 ? "bg-red-50" : "bg-green-50"}`}>
-            <div className="text-xs text-neutral-500">Me queda si pago todo</div>
+            <div className="text-xs text-neutral-500">Me queda</div>
             <div className={`text-lg font-semibold tabular-nums ${meQueda < 0 ? "text-red-700" : "text-green-800"}`}>
               {meQueda < 0 ? `(${money(-meQueda)})` : money(meQueda)}
             </div>
           </div>
         </div>
 
-        {/* Pendiente por panadería */}
+        {/* Presets de selección */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 bg-neutral-50/50 px-4 py-2 text-xs">
+          <span className="text-neutral-500">Meter en el flujo:</span>
+          <button onClick={() => setPreset("venc")} className="rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100">Solo lo vencido</button>
+          <button onClick={() => setPreset("todo")} className="rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100">Todo</button>
+          <button onClick={() => setPreset("nada")} className="rounded border border-neutral-300 px-2 py-0.5 hover:bg-neutral-100">Nada</button>
+          <span className="ml-auto text-neutral-500">
+            Marcado <b className="tabular-nums text-neutral-700">{money(seleccionado)}</b> de {money(totalPendiente)}
+            {" "}· vencido total {money(totalVencido)}
+          </span>
+        </div>
+
+        {/* Pendiente por panadería, con checkbox por categoría (vencido / por vencer) */}
         <table className="w-full border-t border-neutral-100 text-sm">
           <tbody className="divide-y divide-neutral-100">
             {pendientes.map((p) => {
-              const op = !!pendAbierto[p.centro_codigo];
               const esCierra = p.centro_codigo === cierra;
               return (
                 <Fragment key={p.centro_codigo}>
-                  <tr className={esCierra ? "bg-neutral-50" : ""}>
-                    <td className="px-4 py-1.5">
-                      <button onClick={() => setPendAbierto((s) => ({ ...s, [p.centro_codigo]: !s[p.centro_codigo] }))} className="text-left font-medium text-neutral-800">
-                        <span className="mr-1 text-xs text-neutral-400">{op ? "▾" : "▸"}</span>
-                        {p.centro_nombre}
-                        {esCierra && <span className="ml-2 rounded bg-neutral-900 px-1.5 py-0.5 text-[11px] text-white">cierra</span>}
-                      </button>
+                  <tr className="bg-neutral-50/70">
+                    <td className="px-4 py-1.5 font-medium text-neutral-800" colSpan={2}>
+                      {p.centro_nombre}
+                      {esCierra && <span className="ml-2 rounded bg-neutral-900 px-1.5 py-0.5 text-[11px] text-white">cierra</span>}
+                      <span className="ml-2 text-xs font-normal text-neutral-500">
+                        debe {money(p.pendiente)} · vencido {money(p.vencido)}
+                        {p.porVencer > 0 && <> · por vencer {money(p.porVencer)}</>}
+                      </span>
                     </td>
-                    <td className="px-4 py-1.5 text-right font-medium tabular-nums text-red-700">{money(p.pendiente)}</td>
                   </tr>
-                  {op &&
-                    p.categorias.map((cat) => (
-                      <tr key={p.centro_codigo + cat.categoria} className="bg-neutral-50/60">
-                        <td className="py-1 pl-8 pr-4 text-neutral-600">{cat.categoria}</td>
-                        <td className="px-4 py-1 text-right tabular-nums text-neutral-500">{money(cat.saldo)}</td>
-                      </tr>
-                    ))}
+                  {p.categorias.flatMap((cat) => {
+                    const filas: { id: string; etiqueta: string; venc: boolean; monto: number }[] = [];
+                    if (cat.vencido > 0) filas.push({ id: `${p.centro_codigo}|${cat.categoria}|venc`, etiqueta: cat.categoria, venc: true, monto: cat.vencido });
+                    if (cat.porVencer > 0) filas.push({ id: `${p.centro_codigo}|${cat.categoria}|porv`, etiqueta: cat.categoria, venc: false, monto: cat.porVencer });
+                    return filas.map((f) => {
+                      const on = !!incluido[f.id];
+                      return (
+                        <tr key={f.id} className={on ? "" : "opacity-50"}>
+                          <td className="py-1 pl-8 pr-3">
+                            <label className="flex cursor-pointer items-center gap-2">
+                              <input type="checkbox" checked={on} onChange={() => toggleItem(f.id)} className="h-4 w-4 accent-neutral-900" />
+                              <span className="text-neutral-700">{f.etiqueta}</span>
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${f.venc ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                {f.venc ? "vencido" : "por vencer"}
+                              </span>
+                            </label>
+                          </td>
+                          <td className="px-4 py-1 text-right tabular-nums text-neutral-600">{money(f.monto)}</td>
+                        </tr>
+                      );
+                    });
+                  })}
                 </Fragment>
               );
             })}
@@ -304,21 +353,21 @@ export default function SimuladorCierrePanel({
 
         <div className="space-y-1 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-600">
           <p>
-            Esto es lo <b>devengado y aún no pagado</b> (lo que el flujo de caja no muestra porque es base caja). El
-            <b> alquiler</b> está acá porque se debe pero no se ha pagado.
-            {meQueda < 0 && <b className="text-red-700"> Hoy no alcanza para ponerse al día: faltan ₡{money(-meQueda)}.</b>}
+            Es lo <b>devengado y aún no pagado</b> (lo que el flujo —base caja— no muestra). Marcá lo que querés pagar:
+            por defecto solo lo <b className="text-red-700">vencido</b> (ya tocaba); lo <b className="text-amber-700">por
+            vencer</b> aún no tenés que pagarlo este mes, por eso viene desmarcado.
+            {meQueda < 0 && <b className="text-red-700"> Con lo marcado no alcanza: faltan ₡{money(-meQueda)}.</b>}
           </p>
           {mesesRecuperar !== null && (
             <p>
-              Si cerrás <b>{nombreCierra}</b>, la caja mejora <b>₡{money(r.efecto)}/mes</b> (escenario de arriba), así
-              que cubrir ese faltante tomaría <b>~{mesesRecuperar} mes{mesesRecuperar === 1 ? "" : "es"}</b>. De lo
-              pendiente, <b>₡{money(pendCierra)}</b> es de {nombreCierra} (lo ya recibido se sigue debiendo; lo que se
-              deja de acumular es a futuro).
+              Si cerrás <b>{nombreCierra}</b>, la caja mejora <b>₡{money(r.efecto)}/mes</b>, así que cubrir ese
+              faltante tomaría <b>~{mesesRecuperar} mes{mesesRecuperar === 1 ? "" : "es"}</b>. Lo ya recibido se sigue
+              debiendo; lo que se deja de acumular es a futuro.
             </p>
           )}
           <p className="text-neutral-400">
-            Nota: los <b>préstamos</b> bancarios (largo plazo, en cuotas) no se cuentan acá — son otra cosa. Esto es la
-            deuda operativa de corto plazo.
+            Nota: los <b>préstamos</b> bancarios (largo plazo, en cuotas) no se cuentan acá. Esto es la deuda operativa
+            de corto plazo.
           </p>
         </div>
       </div>

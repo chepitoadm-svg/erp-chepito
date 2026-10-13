@@ -2034,6 +2034,7 @@ export interface Database {
           categoria: string;
           cuenta_codigo: string;
           cuenta_nombre: string;
+          vencido: boolean;
           saldo: number;
         }[];
       };

@@ -264,6 +264,11 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   pago todo**. Al 31/08: disponible ₡2,73M vs pendiente operativo ₡13,25M (CH1 3,96M incl. alquiler
   560k; CH2 5,03M incl. 710k; TAL 4,26M) → faltan ₡10,5M. Los préstamos (largo plazo) NO se cuentan
   acá a propósito. Muestra también en cuántos meses se cubre el faltante con el efecto de cerrar.
+  **v2 (mismo día):** `fn_compromisos_centro` separa **vencido vs por vencer** (por `fecha_vencimiento`
+  vs corte; null = vencido). En el simulador cada pendiente tiene **checkbox** (default: solo lo
+  vencido marcado; lo por vencer no, porque no toca pagarlo ese mes) + presets Solo vencido/Todo/Nada,
+  y "Me queda" = disponible − lo marcado. Al 31/08: vencido ₡12,56M vs por vencer ₡685k (alquiler del
+  mes). Migr. `20261013100002` (v1) y `20261013100003` (v2), ambas aplicadas.
 
 - **Detalle por línea del flujo por panadería — migración APLICADA (2026-10-13, en casa).** La función
   `fn_flujo_caja_centro_detalle` (migr. `20261013100001`, hecha en el trabajo) daba "Sin detalle para
