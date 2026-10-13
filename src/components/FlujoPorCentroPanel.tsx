@@ -1,12 +1,125 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import type { CentroFlujo, FlujoCategoria } from "@/lib/data/reportes";
+import { Fragment, useState, useTransition } from "react";
+import type { CentroFlujo, FlujoCategoria, FlujoLinea, FlujoCentroDetalleFila } from "@/lib/data/reportes";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function Lado({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[]; signo: "+" | "-" }) {
+const fechaCorta = (f: string) => {
+  const p = (f || "").split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}` : f;
+};
+
+type Detalle = (
+  desde: string,
+  hasta: string,
+  centroCodigo: string,
+  cuentaCodigo: string,
+) => Promise<FlujoCentroDetalleFila[]>;
+
+// Una línea (cuenta) dentro de un lado: se puede tocar para abrir el detalle.
+function LineaRow({
+  linea,
+  centroCodigo,
+  desde,
+  hasta,
+  onDetalle,
+}: {
+  linea: FlujoLinea;
+  centroCodigo: string;
+  desde: string;
+  hasta: string;
+  onDetalle: Detalle;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [filas, setFilas] = useState<FlujoCentroDetalleFila[] | null>(null);
+  const [cargando, startTransition] = useTransition();
+  // Las líneas de reparto (Taller/General) no tienen movimientos propios que abrir.
+  const esReparto = linea.cuenta_codigo.startsWith("PROR-");
+
+  const toggle = () => {
+    if (esReparto) return;
+    if (!abierto && filas === null) {
+      startTransition(async () => {
+        try {
+          const d = await onDetalle(desde, hasta, centroCodigo, linea.cuenta_codigo);
+          setFilas(d);
+        } catch {
+          setFilas([]);
+        }
+      });
+    }
+    setAbierto((v) => !v);
+  };
+
+  return (
+    <>
+      <tr
+        onClick={toggle}
+        className={esReparto ? "" : "cursor-pointer hover:bg-neutral-100/70"}
+        title={esReparto ? undefined : "Tocar para ver el detalle"}
+      >
+        <td className="py-0.5 pl-6 pr-3 text-neutral-600">
+          {!esReparto && <span className="mr-1 inline-block w-3 text-neutral-400">{abierto ? "▾" : "▸"}</span>}
+          {linea.cuenta_nombre}
+        </td>
+        <td className="px-3 py-0.5 text-right tabular-nums text-neutral-500">{money(linea.monto)}</td>
+      </tr>
+      {abierto && (
+        <tr>
+          <td colSpan={2} className="bg-neutral-50 px-2 pb-2 pt-0.5">
+            {cargando && filas === null ? (
+              <p className="px-4 py-2 text-xs text-neutral-400">Cargando…</p>
+            ) : filas && filas.length > 0 ? (
+              <table className="w-full text-xs">
+                <tbody>
+                  {filas.map((f, i) => (
+                    <tr key={i} className="border-b border-neutral-100 last:border-0">
+                      <td className="whitespace-nowrap py-0.5 pl-8 pr-2 tabular-nums text-neutral-400">
+                        {fechaCorta(f.fecha)}
+                      </td>
+                      <td className="py-0.5 pr-2 text-neutral-600">{f.concepto}</td>
+                      <td className="py-0.5 pr-3 text-right tabular-nums text-neutral-500">{money(f.monto)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-neutral-200">
+                    <td className="py-0.5 pl-8 pr-2 text-[11px] font-medium text-neutral-500" colSpan={2}>
+                      {filas.length} movimiento{filas.length === 1 ? "" : "s"}
+                    </td>
+                    <td className="py-0.5 pr-3 text-right text-[11px] font-semibold tabular-nums text-neutral-600">
+                      {money(filas.reduce((s, x) => s + x.monto, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              <p className="px-4 py-2 text-xs text-neutral-400">Sin detalle para esta línea.</p>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function Lado({
+  titulo,
+  cats,
+  signo,
+  centroCodigo,
+  desde,
+  hasta,
+  onDetalle,
+}: {
+  titulo: string;
+  cats: FlujoCategoria[];
+  signo: "+" | "-";
+  centroCodigo: string;
+  desde: string;
+  hasta: string;
+  onDetalle: Detalle;
+}) {
   const total = cats.reduce((s, c) => s + c.total, 0);
   return (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -16,7 +129,9 @@ function Lado({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[];
         }`}
       >
         <span>{titulo}</span>
-        <span className="tabular-nums">{signo} {money(total)}</span>
+        <span className="tabular-nums">
+          {signo} {money(total)}
+        </span>
       </div>
       {cats.length === 0 ? (
         <p className="px-3 py-3 text-center text-xs text-neutral-400">Sin movimientos.</p>
@@ -30,10 +145,14 @@ function Lado({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[];
                   <td className="px-3 py-1 text-right font-medium tabular-nums text-neutral-800">{money(c.total)}</td>
                 </tr>
                 {c.lineas.map((l) => (
-                  <tr key={c.categoria + l.cuenta_codigo}>
-                    <td className="py-0.5 pl-6 pr-3 text-neutral-600">{l.cuenta_nombre}</td>
-                    <td className="px-3 py-0.5 text-right tabular-nums text-neutral-500">{money(l.monto)}</td>
-                  </tr>
+                  <LineaRow
+                    key={c.categoria + l.cuenta_codigo}
+                    linea={l}
+                    centroCodigo={centroCodigo}
+                    desde={desde}
+                    hasta={hasta}
+                    onDetalle={onDetalle}
+                  />
                 ))}
               </Fragment>
             ))}
@@ -44,7 +163,19 @@ function Lado({ titulo, cats, signo }: { titulo: string; cats: FlujoCategoria[];
   );
 }
 
-export default function FlujoPorCentroPanel({ centros, conReparto = false }: { centros: CentroFlujo[]; conReparto?: boolean }) {
+export default function FlujoPorCentroPanel({
+  centros,
+  conReparto = false,
+  desde,
+  hasta,
+  onDetalle,
+}: {
+  centros: CentroFlujo[];
+  conReparto?: boolean;
+  desde: string;
+  hasta: string;
+  onDetalle: Detalle;
+}) {
   const [abierto, setAbierto] = useState<string | null>(null);
   const hayAviso = centros.some((c) => c.avisoSinReparto);
 
@@ -100,9 +231,10 @@ export default function FlujoPorCentroPanel({ centros, conReparto = false }: { c
                   {abiertoAqui && (
                     <tr>
                       <td colSpan={5} className="bg-neutral-50 px-4 py-3">
+                        <p className="mb-2 text-xs text-neutral-500">Tocá una línea para ver sus movimientos.</p>
                         <div className="grid gap-3 lg:grid-cols-2">
-                          <Lado titulo={`Entró a ${c.centro_nombre}`} cats={c.entradas} signo="+" />
-                          <Lado titulo={`Salió de ${c.centro_nombre}`} cats={c.salidas} signo="-" />
+                          <Lado titulo={`Entró a ${c.centro_nombre}`} cats={c.entradas} signo="+" centroCodigo={c.centro_codigo} desde={desde} hasta={hasta} onDetalle={onDetalle} />
+                          <Lado titulo={`Salió de ${c.centro_nombre}`} cats={c.salidas} signo="-" centroCodigo={c.centro_codigo} desde={desde} hasta={hasta} onDetalle={onDetalle} />
                         </div>
                       </td>
                     </tr>

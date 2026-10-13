@@ -264,6 +264,40 @@ export async function repartoShares(desde: string, hasta: string): Promise<Recor
   return out;
 }
 
+// Detalle de UNA línea del flujo por centro (drill-down): los movimientos
+// individuales que componen esa (panadería, cuenta) en el mes, con la misma
+// atribución que fn_flujo_caja_centro.
+export interface FlujoCentroDetalleFila {
+  fecha: string;
+  numero: string | null;
+  origen_tipo: string | null;
+  concepto: string;
+  monto: number;
+}
+
+export async function flujoCentroDetalle(
+  desde: string,
+  hasta: string,
+  centroCodigo: string,
+  cuentaCodigo: string,
+): Promise<FlujoCentroDetalleFila[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("fn_flujo_caja_centro_detalle", {
+    p_desde: desde,
+    p_hasta: hasta,
+    p_centro_codigo: centroCodigo,
+    p_cuenta_codigo: cuentaCodigo,
+  });
+  if (error) throw new Error(`No se pudo cargar el detalle: ${error.message}`);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    fecha: r.fecha as string,
+    numero: (r.numero as string | null) ?? null,
+    origen_tipo: (r.origen_tipo as string | null) ?? null,
+    concepto: (r.concepto as string) ?? "Movimiento",
+    monto: Number(r.monto ?? 0),
+  }));
+}
+
 export interface CompromisoCategoria {
   categoria: string;
   total: number;

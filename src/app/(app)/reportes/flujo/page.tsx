@@ -6,6 +6,7 @@ import { flujoCaja, flujoCajaPorCentro, compromisos, type FlujoCategoria } from 
 import { listarCuentasPosteables } from "@/lib/data/asientos";
 import ExportarExcel, { type FilaExcel } from "@/components/ExportarExcel";
 import FlujoPorCentroPanel from "@/components/FlujoPorCentroPanel";
+import { obtenerDetalleFlujoCentro } from "./detalle-actions";
 
 const money = (n: number) =>
   Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -238,7 +239,13 @@ export default async function FlujoCajaPage({ searchParams }: { searchParams: Pr
       </div>
 
       {vista === "negocios" ? (
-        <FlujoPorCentroPanel centros={centrosFlujo} conReparto={conReparto} />
+        <FlujoPorCentroPanel
+          centros={centrosFlujo}
+          conReparto={conReparto}
+          desde={desde}
+          hasta={hasta}
+          onDetalle={obtenerDetalleFlujoCentro}
+        />
       ) : (
       <>
       {/* === Vista EMPRESA === */}
