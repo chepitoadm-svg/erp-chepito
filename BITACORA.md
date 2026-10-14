@@ -256,6 +256,17 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Flujo por panadería: IVA de ventas atribuido a la sucursal (2026-10-13).** El "Impuesto de ventas
+  cobrado" (21-10-15-04) caía en "Sin negocio" porque la cuenta no lleva centro, pero es plata que
+  entró a la panadería (cliente pagó neto+IVA en datáfono/caja). `fn_flujo_caja_centro` y
+  `_detalle` (migr. `20261013100004` y `100005`, aplicadas) ahora atribuyen el IVA de cada `venta_dia`
+  al centro de sus Ventas (41) del mismo asiento (cada venta_dia tiene un solo centro). El pago del IVA
+  a Hacienda (no es venta_dia) y ajustes manuales siguen en Sin negocio. **Ojo bug que se cazó:** la
+  exclusión `origen_tipo = 'venta_dia'` con NULL daba NULL y botaba una línea de ajuste (−535.86) →
+  arreglado con `coalesce(origen_tipo,'')` en las 3 exclusiones. Verificado: total por centro = verdad
+  (neto caja) en jul/ago/sep, dif 0.00. Efecto: cada panadería sube su "Entró" por su IVA cobrado
+  (jul CH2 242.934/CH1 204.554, etc.); el neto por sucursal cambia (incluye IVA que luego se remesa).
+
 - **Simulador: "¿Me alcanza para pagar lo pendiente?" (2026-10-13).** El flujo es base caja, así que lo
   devengado y NO pagado (ej. alquiler) no sale. Nueva función `fn_compromisos_centro(fecha)` (migr.
   `20261013100002`, APLICADA a la base): CxP con saldo>0 por centro (factura o gasto), categorizado
