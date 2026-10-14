@@ -181,6 +181,27 @@ export default function SimuladorCierrePanel({
         )}
       </div>
 
+      {/* Resultado combinado: flujo del escenario − lo pendiente que marcás pagar abajo */}
+      <div className="rounded-lg border-2 border-neutral-800 bg-neutral-50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-neutral-600">Flujo del mes (cerrando {nombreCierra})</span>
+          <span className="font-medium"><Signo n={r.flujoProyectado} /></span>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-neutral-600">− Pendiente que pagás (lo marcado abajo ⬇)</span>
+          <span className="font-medium tabular-nums text-red-600">− {money(seleccionado)}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-300 pt-2 text-base font-bold">
+          <span className="text-neutral-800">= Te queda este mes</span>
+          <span className={`tabular-nums ${r.flujoProyectado - seleccionado >= 0 ? "text-green-700" : "text-red-700"}`}>
+            {r.flujoProyectado - seleccionado < 0 ? `(${money(seleccionado - r.flujoProyectado)})` : money(r.flujoProyectado - seleccionado)}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-neutral-500">
+          Marcá o desmarcá pendientes abajo y este resultado se mueve al instante (como si los pagaras este mes).
+        </p>
+      </div>
+
       {/* Explicación del default */}
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
         De <b>Taller</b> y <b>General</b> se va, por defecto, la <b>parte de {nombreCierra}</b> (su % del prorrateo del
@@ -287,7 +308,7 @@ export default function SimuladorCierrePanel({
             <div className="text-lg font-semibold tabular-nums text-red-700">{money(seleccionado)}</div>
           </div>
           <div className={`rounded-md p-2 ${meQueda < 0 ? "bg-red-50" : "bg-green-50"}`}>
-            <div className="text-xs text-neutral-500">Me queda</div>
+            <div className="text-xs text-neutral-500">Me queda en el banco</div>
             <div className={`text-lg font-semibold tabular-nums ${meQueda < 0 ? "text-red-700" : "text-green-800"}`}>
               {meQueda < 0 ? `(${money(-meQueda)})` : money(meQueda)}
             </div>
