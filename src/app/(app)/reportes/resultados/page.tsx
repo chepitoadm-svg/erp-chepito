@@ -52,7 +52,7 @@ const SECCIONES: { seccion: string; titulo: string; neg?: boolean }[] = [
 export default async function ResultadosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ modo?: string; desde?: string; hasta?: string; prorrateo?: string; centro?: string | string[]; mesDesde?: string; mesHasta?: string }>;
+  searchParams: Promise<{ modo?: string; desde?: string; hasta?: string; prorrateo?: string; centro?: string | string[]; mesDesde?: string; mesHasta?: string; sumar?: string }>;
 }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
   const sp = await searchParams;
@@ -67,6 +67,7 @@ export default async function ResultadosPage({
   // Centros seleccionados (checkboxes, varios). Vacío = todos (consolidado).
   const centrosSel = (Array.isArray(sp.centro) ? sp.centro : sp.centro ? [sp.centro] : []).filter((x) => x && x !== "TODOS");
   const meses = modo === "meses" ? listaMeses(mesDesde, mesHasta) : [];
+  const sumar = sp.sumar === "si"; // comparar meses: sumar los centros marcados en vez de separarlos
 
   const cuentas = await listarCuentasPosteables();
   const codToId = new Map(cuentas.map((c: { id: string; codigo: string }) => [c.codigo, c.id]));
@@ -87,9 +88,27 @@ export default async function ResultadosPage({
   const centrosMostrar = centrosSel.length ? centrosOrden.filter((c) => centrosSel.includes(c)) : centrosOrden;
   const centrosLabel = centrosSel.length ? centrosSel.join(", ") : "todos (consolidado)";
 
-  // Columnas (keys) y etiquetas según modo
-  const cols: string[] = modo === "meses" ? [...meses, ...(meses.length > 1 ? ["VAR"] : [])] : [...centrosMostrar, "TOTAL"];
-  const colLabel = (k: string) => (k === "TOTAL" ? "TOTAL" : k === "VAR" ? "Variación" : modo === "meses" ? etiquetaMes(k) : k);
+  // Columnas (keys) según modo. En "comparar meses" separado: una columna por
+  // centro × mes (key "CENTRO|mes") + "CENTRO|VAR"; sumado: columnas = meses.
+  let cols: string[];
+  if (modo !== "meses") {
+    cols = [...centrosMostrar, "TOTAL"];
+  } else if (sumar) {
+    cols = [...meses, ...(meses.length > 1 ? ["VAR"] : [])];
+  } else {
+    cols = [];
+    for (const ce of centrosMostrar) {
+      for (const m of meses) cols.push(`${ce}|${m}`);
+      if (meses.length > 1) cols.push(`${ce}|VAR`);
+    }
+  }
+  const esVar = (k: string) => k === "VAR" || k.endsWith("|VAR");
+  const colLabel = (k: string) => {
+    if (k === "TOTAL") return "TOTAL";
+    if (k === "VAR") return "Variación";
+    if (k.includes("|")) { const [ce, mm] = k.split("|"); return mm === "VAR" ? `${ce} · Var` : `${ce} · ${etiquetaMes(mm)}`; }
+    return modo === "meses" ? etiquetaMes(k) : k;
+  };
 
   // Construcción de filas por sección (celdas keyed por col)
   const buildSeccion = (seccion: string): Row[] => {
@@ -103,11 +122,22 @@ export default async function ResultadosPage({
       meses.forEach((m, i) => {
         for (const f of datosPorMes[i]) {
           if (f.seccion !== seccion) continue;
-          if (centrosSel.length && !centrosSel.includes(f.centro_codigo)) continue;
-          upd(f.cuenta_codigo, f.cuenta_nombre, m, Number(f.monto));
+          if (sumar) {
+            if (centrosSel.length && !centrosSel.includes(f.centro_codigo)) continue;
+            upd(f.cuenta_codigo, f.cuenta_nombre, m, Number(f.monto));
+          } else {
+            if (!centrosMostrar.includes(f.centro_codigo)) continue;
+            upd(f.cuenta_codigo, f.cuenta_nombre, `${f.centro_codigo}|${m}`, Number(f.monto));
+          }
         }
       });
-      if (meses.length > 1) for (const e of porCuenta.values()) e.celdas.VAR = (e.celdas[meses[meses.length - 1]] ?? 0) - (e.celdas[meses[0]] ?? 0);
+      if (meses.length > 1) {
+        const lastM = meses[meses.length - 1], firstM = meses[0];
+        for (const e of porCuenta.values()) {
+          if (sumar) e.celdas.VAR = (e.celdas[lastM] ?? 0) - (e.celdas[firstM] ?? 0);
+          else for (const ce of centrosMostrar) e.celdas[`${ce}|VAR`] = (e.celdas[`${ce}|${lastM}`] ?? 0) - (e.celdas[`${ce}|${firstM}`] ?? 0);
+        }
+      }
     } else {
       for (const f of filas) {
         if (f.seccion !== seccion) continue;
@@ -139,12 +169,18 @@ export default async function ResultadosPage({
   // Drill-down al detalle de la cuenta
   const hrefMayor = (cod: string, colKey: string) => {
     const id = codToId.get(cod);
-    if (!id || colKey === "VAR") return null;
+    if (!id || esVar(colKey)) return null;
     const p = new URLSearchParams({ cuenta: id });
     if (modo === "meses") {
-      const rg = rango(colKey);
-      p.set("desde", rg.desde); p.set("hasta", rg.hasta);
-      if (centrosSel.length === 1) p.set("centro", centrosSel[0]);
+      if (colKey.includes("|")) {
+        const [ce, mm] = colKey.split("|");
+        const rg = rango(mm);
+        p.set("desde", rg.desde); p.set("hasta", rg.hasta); p.set("centro", ce);
+      } else {
+        const rg = rango(colKey);
+        p.set("desde", rg.desde); p.set("hasta", rg.hasta);
+        if (centrosSel.length === 1) p.set("centro", centrosSel[0]);
+      }
     } else {
       p.set("desde", desde); p.set("hasta", hasta);
       if (colKey !== "TOTAL") p.set("centro", colKey);
@@ -184,15 +220,15 @@ export default async function ResultadosPage({
             <td className="px-3 py-1.5 text-neutral-700"><span className="text-neutral-400">{r.cod}</span> {r.nombre}</td>
             {cols.map((c) => {
               const v = r.celdas[c] ?? 0;
-              const esVar = c === "VAR";
-              const txt = v ? (neg && !esVar && v > 0 ? `(${money(v)})` : money(v)) : "";
-              const href = v && !esVar ? hrefMayor(r.cod, c) : null;
+              const colVar = esVar(c);
+              const txt = v ? (neg && !colVar && v > 0 ? `(${money(v)})` : money(v)) : "";
+              const href = v && !colVar ? hrefMayor(r.cod, c) : null;
               return (
-                <td key={c} className={`px-3 py-1.5 text-right tabular-nums ${esVar ? (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "") : ""}`}>
+                <td key={c} className={`px-3 py-1.5 text-right tabular-nums ${colVar ? (v > 0 ? "text-green-700" : v < 0 ? "text-red-600" : "") : ""}`}>
                   {href ? (
                     <Link href={href} className="text-neutral-600 underline decoration-dotted underline-offset-2 hover:text-neutral-900" title="Ver el detalle de esta cuenta">{txt}</Link>
                   ) : (
-                    <span className={esVar ? "" : "text-neutral-600"}>{esVar && v ? (v > 0 ? `+${money(v)}` : `(${money(-v)})`) : txt}</span>
+                    <span className={colVar ? "" : "text-neutral-600"}>{colVar && v ? (v > 0 ? `+${money(v)}` : `(${money(-v)})`) : txt}</span>
                   )}
                 </td>
               );
@@ -202,7 +238,7 @@ export default async function ResultadosPage({
         <tr className="border-t border-neutral-200 text-sm font-medium text-neutral-700">
           <td className="px-3 py-1.5">Total {titulo.toLowerCase()}</td>
           {cols.map((c) => (
-            <td key={c} className="px-3 py-1.5 text-right tabular-nums">{neg && c !== "VAR" ? `(${money(total[c] ?? 0)})` : money(total[c] ?? 0)}</td>
+            <td key={c} className="px-3 py-1.5 text-right tabular-nums">{neg && !esVar(c) ? `(${money(total[c] ?? 0)})` : money(total[c] ?? 0)}</td>
           ))}
         </tr>
       </>
@@ -223,7 +259,7 @@ export default async function ResultadosPage({
     const p = new URLSearchParams();
     p.set("modo", m);
     if (!conProrrateo) p.set("prorrateo", "no");
-    if (m === "meses") { p.set("mesDesde", mesDesde); p.set("mesHasta", mesHasta); }
+    if (m === "meses") { p.set("mesDesde", mesDesde); p.set("mesHasta", mesHasta); if (sumar) p.set("sumar", "si"); }
     else { p.set("desde", desde); p.set("hasta", hasta); }
     for (const cc of centrosSel) p.append("centro", cc);
     return `/reportes/resultados?${p.toString()}`;
@@ -272,6 +308,12 @@ export default async function ResultadosPage({
           <input type="checkbox" name="prorrateo" value="no" defaultChecked={!conProrrateo} className="h-4 w-4" />
           <span className="text-neutral-600">Sin prorrateo (ver qué costó el Taller)</span>
         </label>
+        {modo === "meses" && (
+          <label className="flex items-center gap-2 pb-1.5">
+            <input type="checkbox" name="sumar" value="si" defaultChecked={sumar} className="h-4 w-4" />
+            <span className="text-neutral-600">Sumar los centros (consolidar)</span>
+          </label>
+        )}
         <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-800">Aplicar</button>
         <ExportarExcel
           nombre={`estado-resultados-${modo === "meses" ? `${mesDesde}_${mesHasta}` : `${desde}_${hasta}`}${centrosSel.length ? "_" + centrosSel.join("-") : ""}.xlsx`}
@@ -311,7 +353,9 @@ export default async function ResultadosPage({
       {hayDatos && (
         <p className="mt-3 text-xs text-neutral-500">
           {modo === "meses"
-            ? <>Comparando <b>{centrosLabel}</b> mes a mes. La columna <b>Variación</b> = último mes − primero.</>
+            ? (sumar
+                ? <>Consolidando <b>{centrosLabel}</b> mes a mes (sumados). La columna <b>Variación</b> = último mes − primero.</>
+                : <>Cada centro (<b>{centrosLabel}</b>) es su <b>propia columna</b> por mes — no se suman. <b>Variación</b> = último mes − primero de cada centro.</>)
             : <>Columnas = centros de costo (<b>{centrosLabel}</b>). {conProrrateo ? "El Taller aparece repartido a los canales (prorrateo)." : "El Taller aparece como columna sin repartir."}</>}{" "}
           Costos y gastos en positivo; los subtotales ya los restan. Tocá una celda para ver el detalle.
         </p>

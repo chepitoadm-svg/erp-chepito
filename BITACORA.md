@@ -266,6 +266,9 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   **(2026-10-16) Checkboxes de centros:** el selector de centro pasó de dropdown único a **checkboxes
   (varios)** en ambos modos (param `centro` repetido). Sin marcar = todos. En "comparar meses" consolida
   los marcados; en "por centro" filtra qué columnas se muestran (TOTAL sobre los marcados).
+  **(2026-10-16 bis):** en "comparar meses" ahora los centros marcados van **SEPARADOS** por defecto
+  (columna por centro×mes, key "CENTRO|mes" + "CENTRO|VAR"); checkbox "Sumar los centros (consolidar)"
+  (`sumar=si`) para el consolidado viejo. Antes sumaba por defecto y el usuario los quería por separado.
 
 - **Flujo por panadería: IVA de ventas atribuido a la sucursal (2026-10-13).** El "Impuesto de ventas
   cobrado" (21-10-15-04) caía en "Sin negocio" porque la cuenta no lleva centro, pero es plata que
