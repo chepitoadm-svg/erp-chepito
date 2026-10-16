@@ -308,11 +308,15 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   General (su %)" — el % del reparto se aplica a cada categoría, así solo se ve la parte de esa
   panadería. Default: todo marcado (= base con reparto); el usuario DESmarca lo que de verdad se queda
   (ej. un panadero que no despide, gasto fijo). "No cambian" (CH2/Casa/Sin negocio) aparte. El pendiente
-  marcado baja el "Te queda este mes". Se quitó el input de %. El análisis dueño jul/ago quedó: el
+  marcado baja el "Te queda este mes". El análisis dueño jul/ago quedó: el
   negocio genera ~₡1M/mes operativo, lo hunden deuda (~₡867k/mes sobre ₡39.4M) + retiros personales
   (Casa ~₡744k/mes); cerrar CH1 mejora ~₡400–710k/mes (Taller es ~85% harina, variable), pero CH1 pierde
   solo por productividad (salario 43% ventas vs 31% CH2) → ajustar personal puede rendir igual sin perder
   ventas; OJO liquidación CR (golpe único). Caja al 31/08 ₡2.7M vs vencido ₡12.6M.
+  **v3 (2026-10-16):** cada línea de Taller/General tiene **% editable** (arranca en el % del reparto,
+  ajustable por línea) y se agregó un bloque **Casa (gasto personal)** editable con % (default
+  desmarcado) bajo "Otros recortes", para simular recorte de retiros personales. El "Efecto" ahora dice
+  "de los cambios" (cierre + recortes). Casa salió de "No cambian".
 
 - **Flujo por panadería: PAGO DE GASTOS atribuido por centro (2026-10-12).** "Pago a proveedores
   (facturas)" caía en "Sin negocio" (agosto ₡1.163.809) porque eran CxP de GASTOS (luz/CNFL, agua/AYA,

@@ -14,8 +14,16 @@ function rolCentro(cod: string): "final" | "apoyo" | "casa" | "sinneg" {
 }
 
 type Reparto = Record<string, Record<string, number>>; // apoyo -> final -> fracción 0..1
-type Grupo = "propio" | "taller" | "general";
-type Item = { id: string; grupo: Grupo; lado: "entrada" | "salida"; nombre: string; signed: number };
+type Bloque = "propio" | "taller" | "general" | "casa";
+type Item = {
+  id: string;
+  bloque: Bloque;
+  lado: "entrada" | "salida";
+  nombre: string;
+  base: number; // monto al 100% (con signo): propio = su línea; taller/general/casa = total del centro
+  editablePct: boolean; // taller/general/casa dejan ajustar el %
+  defaultPct: number;
+};
 
 export default function SimuladorCierrePanel({
   centros,
@@ -40,51 +48,54 @@ export default function SimuladorCierrePanel({
   const nombreCierra = centros.find((c) => c.centro_codigo === cierra)?.centro_nombre ?? cierra;
   const shareTAL = reparto["TAL"]?.[cierra] ?? 0;
   const shareGEN = reparto["GEN"]?.[cierra] ?? 0;
+  const pct1 = (x: number) => Math.round(x * 1000) / 10;
 
-  // Líneas marcables: lo propio de la que cierra (100%) + su PARTE de Taller y General.
+  // Líneas marcables, por bloque.
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
-    const add = (centro: CentroFlujo | undefined, grupo: Grupo, factor: number) => {
-      if (!centro || factor === 0) return;
+    const add = (centro: CentroFlujo | undefined, bloque: Bloque, editablePct: boolean, defaultPct: number) => {
+      if (!centro) return;
       for (const cat of centro.entradas)
-        if (cat.total * factor !== 0) out.push({ id: `${grupo}#e#${cat.categoria}`, grupo, lado: "entrada", nombre: cat.categoria, signed: cat.total * factor });
+        if (cat.total !== 0) out.push({ id: `${bloque}#e#${cat.categoria}`, bloque, lado: "entrada", nombre: cat.categoria, base: cat.total, editablePct, defaultPct });
       for (const cat of centro.salidas)
-        if (cat.total * factor !== 0) out.push({ id: `${grupo}#s#${cat.categoria}`, grupo, lado: "salida", nombre: cat.categoria, signed: -cat.total * factor });
+        if (cat.total !== 0) out.push({ id: `${bloque}#s#${cat.categoria}`, bloque, lado: "salida", nombre: cat.categoria, base: -cat.total, editablePct, defaultPct });
     };
-    add(centros.find((c) => c.centro_codigo === cierra), "propio", 1);
-    add(centros.find((c) => c.centro_codigo === "TAL"), "taller", shareTAL);
-    add(centros.find((c) => c.centro_codigo === "GEN"), "general", shareGEN);
+    add(centros.find((c) => c.centro_codigo === cierra), "propio", false, 100);
+    if (shareTAL > 0) add(centros.find((c) => c.centro_codigo === "TAL"), "taller", true, pct1(shareTAL));
+    if (shareGEN > 0) add(centros.find((c) => c.centro_codigo === "GEN"), "general", true, pct1(shareGEN));
+    add(centros.find((c) => c.centro_codigo === "CAS"), "casa", true, 100);
     return out;
   }, [centros, cierra, shareTAL, shareGEN]);
 
-  // Por defecto TODO se va (la panadería y su parte de apoyo). Vos desmarcás lo que
-  // de verdad se queda (ej. un panadero que no despedís, el alquiler del Taller…).
+  // Default: lo del cierre (propio/taller/general) viene marcado; Casa NO (la recortás a gusto).
   const [seVa, setSeVa] = useState<Record<string, boolean>>({});
+  const [pctL, setPctL] = useState<Record<string, number>>({});
   useEffect(() => {
-    const d: Record<string, boolean> = {};
-    for (const it of items) d[it.id] = true;
-    setSeVa(d);
+    const sv: Record<string, boolean> = {};
+    const pl: Record<string, number> = {};
+    for (const it of items) { sv[it.id] = it.bloque !== "casa"; pl[it.id] = it.defaultPct; }
+    setSeVa(sv); setPctL(pl);
   }, [items]);
+
   const toggle = (id: string) => setSeVa((s) => ({ ...s, [id]: !s[id] }));
-  const setGrupo = (grupo: Grupo, val: boolean) =>
-    setSeVa((s) => {
-      const n = { ...s };
-      for (const it of items) if (it.grupo === grupo) n[it.id] = val;
-      return n;
-    });
+  const setGrupo = (bloque: Bloque, val: boolean) =>
+    setSeVa((s) => { const n = { ...s }; for (const it of items) if (it.bloque === bloque) n[it.id] = val; return n; });
+  const setPct = (id: string, v: number) => setPctL((s) => ({ ...s, [id]: Math.max(0, Math.min(100, v)) }));
+  const efectivo = (it: Item) => (it.editablePct ? it.base * ((pctL[it.id] ?? it.defaultPct) / 100) : it.base);
 
   const flujoActual = useMemo(() => centros.reduce((s, c) => s + c.neto, 0), [centros]);
   const r = useMemo(() => {
     let ing = 0, cost = 0;
-    for (const it of items) if (seVa[it.id]) { if (it.signed >= 0) ing += it.signed; else cost += -it.signed; }
-    const efecto = cost - ing; // + mejora (ahorro > ingreso perdido), - empeora
+    for (const it of items) if (seVa[it.id]) { const e = efectivo(it); if (e >= 0) ing += e; else cost += -e; }
+    const efecto = cost - ing;
     return { ing, cost, efecto, flujoProyectado: flujoActual + efecto };
-  }, [items, seVa, flujoActual]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, seVa, pctL, flujoActual]);
 
-  // Centros que NO cambian al cerrar (otras panaderías, Casa, Sin negocio).
-  const noCambian = centros.filter((c) => c.centro_codigo !== cierra && rolCentro(c.centro_codigo) !== "apoyo");
+  // Centros que NO cambian al cerrar (otras panaderías + Sin negocio; Casa ya es su propio bloque).
+  const noCambian = centros.filter((c) => c.centro_codigo !== cierra && rolCentro(c.centro_codigo) !== "apoyo" && rolCentro(c.centro_codigo) !== "casa");
 
-  // ---- Pendiente de pagar: elegir qué meter (default: solo lo vencido) ----
+  // ---- Pendiente de pagar ----
   const pendItems = useMemo(() => {
     const out: { id: string; centro: string; categoria: string; bucket: "venc" | "porv"; saldo: number }[] = [];
     for (const p of pendientes)
@@ -102,20 +113,13 @@ export default function SimuladorCierrePanel({
   }, [pendItems]);
   const toggleItem = (id: string) => setIncluido((s) => ({ ...s, [id]: !s[id] }));
   const setPreset = (modo: "venc" | "todo" | "nada") =>
-    setIncluido(() => {
-      const d: Record<string, boolean> = {};
-      for (const it of pendItems) d[it.id] = modo === "todo" ? true : modo === "nada" ? false : it.bucket === "venc";
-      return d;
-    });
+    setIncluido(() => { const d: Record<string, boolean> = {}; for (const it of pendItems) d[it.id] = modo === "todo" ? true : modo === "nada" ? false : it.bucket === "venc"; return d; });
   const totalPendiente = useMemo(() => pendientes.reduce((s, p) => s + p.pendiente, 0), [pendientes]);
   const totalVencido = useMemo(() => pendientes.reduce((s, p) => s + p.vencido, 0), [pendientes]);
   const seleccionado = useMemo(() => pendItems.reduce((s, it) => s + (incluido[it.id] ? it.saldo : 0), 0), [pendItems, incluido]);
   const meQueda = disponible - seleccionado;
   const mesesRecuperar = r.efecto > 0 && meQueda < 0 ? Math.ceil(-meQueda / r.efecto) : null;
-  const fCorte = (() => {
-    const p = (fechaCorte || "").split("-");
-    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : fechaCorte;
-  })();
+  const fCorte = (() => { const p = (fechaCorte || "").split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : fechaCorte; })();
 
   const Signo = ({ n }: { n: number }) => (
     <span className={`tabular-nums ${n >= 0 ? "text-green-700" : "text-red-600"}`}>
@@ -123,12 +127,11 @@ export default function SimuladorCierrePanel({
     </span>
   );
 
-  // Tarjeta editable de un grupo (propio / taller / general)
-  const GrupoCard = ({ grupo, titulo, subtitulo }: { grupo: Grupo; titulo: string; subtitulo?: string }) => {
-    const its = items.filter((x) => x.grupo === grupo);
+  const GrupoCard = ({ bloque, titulo, subtitulo }: { bloque: Bloque; titulo: string; subtitulo?: string }) => {
+    const its = items.filter((x) => x.bloque === bloque);
     if (its.length === 0) return null;
     const nSeVa = its.filter((x) => seVa[x.id]).length;
-    const efectoGrupo = -its.reduce((s, x) => s + (seVa[x.id] ? x.signed : 0), 0); // + ahorra / - pierde
+    const efectoGrupo = -its.reduce((s, x) => s + (seVa[x.id] ? efectivo(x) : 0), 0);
     const fila = (it: Item) => {
       const on = !!seVa[it.id];
       return (
@@ -139,10 +142,18 @@ export default function SimuladorCierrePanel({
               <span className="text-neutral-700">{it.nombre}</span>
             </label>
           </td>
-          <td className="px-4 py-1.5 text-right"><Signo n={it.signed} /></td>
-          <td className="w-20 pr-3 text-right text-[11px] font-medium">
-            <span className={on ? "text-neutral-500" : "text-neutral-400"}>{on ? "se va" : "se queda"}</span>
+          <td className="w-20 px-1 py-1 text-right">
+            {it.editablePct && (
+              <span className="inline-flex items-center gap-0.5" title={`de ${money(Math.abs(it.base))}`}>
+                <input type="number" min={0} max={100} value={pctL[it.id] ?? it.defaultPct}
+                  onChange={(e) => setPct(it.id, Number(e.target.value))}
+                  className="w-12 rounded border border-neutral-300 px-1 py-0.5 text-right text-xs tabular-nums" />
+                <span className="text-[11px] text-neutral-400">%</span>
+              </span>
+            )}
           </td>
+          <td className="w-32 px-4 py-1.5 text-right"><Signo n={efectivo(it)} /></td>
+          <td className="w-16 pr-3 text-right text-[11px] font-medium text-neutral-400">{on ? "se va" : "se queda"}</td>
         </tr>
       );
     };
@@ -156,25 +167,25 @@ export default function SimuladorCierrePanel({
             {subtitulo && <span className="ml-2 text-xs text-neutral-500">{subtitulo}</span>}
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-neutral-500">{nSeVa}/{its.length} se va · ahorro neto</span>
+            <span className="text-neutral-500">{nSeVa}/{its.length} · ahorro neto</span>
             <span className={`font-semibold tabular-nums ${efectoGrupo >= 0 ? "text-green-700" : "text-red-600"}`}>
               {efectoGrupo >= 0 ? "+" : "−"}{money(Math.abs(efectoGrupo))}
             </span>
-            <button onClick={() => setGrupo(grupo, true)} className="rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-50">Todo se va</button>
-            <button onClick={() => setGrupo(grupo, false)} className="rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-50">Todo se queda</button>
+            <button onClick={() => setGrupo(bloque, true)} className="rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-50">Todo</button>
+            <button onClick={() => setGrupo(bloque, false)} className="rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-50">Nada</button>
           </div>
         </div>
         <table className="w-full text-sm">
           <tbody>
             {entradas.length > 0 && (
               <>
-                <tr><td colSpan={3} className="bg-green-50/50 px-4 py-0.5 text-[11px] font-medium uppercase tracking-wide text-green-700">Entra</td></tr>
+                <tr><td colSpan={4} className="bg-green-50/50 px-4 py-0.5 text-[11px] font-medium uppercase tracking-wide text-green-700">Entra</td></tr>
                 {entradas.map(fila)}
               </>
             )}
             {salidas.length > 0 && (
               <>
-                <tr><td colSpan={3} className="bg-red-50/50 px-4 py-0.5 text-[11px] font-medium uppercase tracking-wide text-red-700">Sale</td></tr>
+                <tr><td colSpan={4} className="bg-red-50/50 px-4 py-0.5 text-[11px] font-medium uppercase tracking-wide text-red-700">Sale</td></tr>
                 {salidas.map(fila)}
               </>
             )}
@@ -190,15 +201,8 @@ export default function SimuladorCierrePanel({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-neutral-700">Si cierro:</span>
         {finales.map((c) => (
-          <button
-            key={c.centro_codigo}
-            onClick={() => setCierra(c.centro_codigo)}
-            className={`rounded-md border px-3 py-1.5 text-sm ${
-              cierra === c.centro_codigo
-                ? "border-neutral-900 bg-neutral-900 font-medium text-white"
-                : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"
-            }`}
-          >
+          <button key={c.centro_codigo} onClick={() => setCierra(c.centro_codigo)}
+            className={`rounded-md border px-3 py-1.5 text-sm ${cierra === c.centro_codigo ? "border-neutral-900 bg-neutral-900 font-medium text-white" : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"}`}>
             {c.centro_nombre}
           </button>
         ))}
@@ -212,7 +216,7 @@ export default function SimuladorCierrePanel({
           <div className="text-base font-semibold"><Signo n={flujoActual} /></div>
         </div>
         <div className={`rounded-lg border p-3 ${r.efecto >= 0 ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}>
-          <div className="text-xs text-neutral-600">Efecto de cerrar</div>
+          <div className="text-xs text-neutral-600">Efecto de los cambios</div>
           <div className={`text-base font-semibold tabular-nums ${r.efecto >= 0 ? "text-green-800" : "text-red-700"}`}>
             {r.efecto >= 0 ? "+" : "−"} {money(Math.abs(r.efecto))}
           </div>
@@ -226,26 +230,24 @@ export default function SimuladorCierrePanel({
       {/* Veredicto */}
       <div className={`rounded-lg border px-4 py-3 text-sm ${r.efecto >= 0 ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`}>
         {r.efecto >= 0 ? (
-          <>Cerrar <b>{nombreCierra}</b> (con lo que marcaste) <b>mejoraría</b> tu caja en <b>₡{money(r.efecto)}</b> al mes
-          — te ahorrás ₡{money(r.cost)} y perdés ₡{money(r.ing)} de ingresos.</>
+          <>Con lo que marcaste, tu caja <b>mejoraría</b> en <b>₡{money(r.efecto)}</b> al mes — te ahorrás ₡{money(r.cost)} y perdés ₡{money(r.ing)} de ingresos.</>
         ) : (
-          <>Cerrar <b>{nombreCierra}</b> (con lo que marcaste) <b>empeoraría</b> tu caja en <b>₡{money(-r.efecto)}</b> al mes
-          — perdés ₡{money(r.ing)} de ingresos y solo te ahorrás ₡{money(r.cost)}.</>
+          <>Con lo que marcaste, tu caja <b>empeoraría</b> en <b>₡{money(-r.efecto)}</b> al mes — perdés ₡{money(r.ing)} de ingresos y solo te ahorrás ₡{money(r.cost)}.</>
         )}
       </div>
 
       {/* Instrucción */}
       <p className="text-xs text-neutral-500">
-        Marcá <b>lo que se va</b> si cerrás {nombreCierra}. Por defecto viene todo marcado; <b>desmarcá lo que en
-        realidad se queda</b> (ej. un empleado del Taller que no vas a despedir, o un gasto fijo que sigue). De Taller
-        y General solo aparece <b>la parte de {nombreCierra}</b> (su % del prorrateo).
+        Marcá <b>lo que se va</b> si cerrás {nombreCierra}. De Taller y General solo aparece <b>la parte de {nombreCierra}</b> y
+        podés ajustar el <b>%</b> por línea (quizá de la harina consume más y de la producción menos). Desmarcá lo que en
+        realidad se queda (ej. un empleado que no despedís). <b>Casa</b> es tu gasto personal: marcá y ponele % a lo que recortarías.
       </p>
 
-      {/* Bloques editables */}
+      {/* Bloques del cierre */}
       <div className="space-y-3">
-        <GrupoCard grupo="propio" titulo={`Lo propio de ${nombreCierra}`} subtitulo="sus ventas, IVA, salarios y gastos directos" />
-        <GrupoCard grupo="taller" titulo={`Parte de ${nombreCierra} en Taller`} subtitulo={`su ${(shareTAL * 100).toFixed(0)}% — harina, insumos, producción`} />
-        <GrupoCard grupo="general" titulo={`Parte de ${nombreCierra} en General`} subtitulo={`su ${(shareGEN * 100).toFixed(0)}% — administración, combustible…`} />
+        <GrupoCard bloque="propio" titulo={`Lo propio de ${nombreCierra}`} subtitulo="sus ventas, IVA, salarios y gastos directos" />
+        <GrupoCard bloque="taller" titulo={`Parte de ${nombreCierra} en Taller`} subtitulo={`su ${pct1(shareTAL)}% — harina, insumos, producción (ajustable)`} />
+        <GrupoCard bloque="general" titulo={`Parte de ${nombreCierra} en General`} subtitulo={`su ${pct1(shareGEN)}% — administración, combustible… (ajustable)`} />
         {shareTAL === 0 && shareGEN === 0 && (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Este mes no hay prorrateo corrido, así que no puedo mostrar la parte de Taller/General. Corré el prorrateo del mes para verla.
@@ -253,10 +255,18 @@ export default function SimuladorCierrePanel({
         )}
       </div>
 
+      {/* Otros recortes (no son del cierre) */}
+      {items.some((x) => x.bloque === "casa") && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Otros recortes (opcional, no son del cierre)</p>
+          <GrupoCard bloque="casa" titulo="Casa — gasto personal / no deducible" subtitulo="marcá y ponele % a lo que recortarías del gasto personal" />
+        </div>
+      )}
+
       {/* No cambian */}
       {noCambian.length > 0 && (
         <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-500">
-          <b>No cambian</b> al cerrar {nombreCierra} (siguen igual): {noCambian.map((c) => (
+          <b>No cambian</b> (siguen igual): {noCambian.map((c) => (
             <span key={c.centro_codigo} className="mr-3 whitespace-nowrap">{c.centro_nombre} <Signo n={c.neto} /></span>
           ))}. El resto de Taller y General (lo de las otras panaderías) también se queda.
         </div>
@@ -265,7 +275,7 @@ export default function SimuladorCierrePanel({
       {/* Resultado combinado con lo pendiente */}
       <div className="rounded-lg border-2 border-neutral-800 bg-neutral-50 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <span className="text-neutral-600">Flujo del mes (cerrando {nombreCierra})</span>
+          <span className="text-neutral-600">Flujo del mes (con lo que marcaste)</span>
           <span className="font-medium"><Signo n={r.flujoProyectado} /></span>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -323,8 +333,7 @@ export default function SimuladorCierrePanel({
                       {p.centro_nombre}
                       {esCierra && <span className="ml-2 rounded bg-neutral-900 px-1.5 py-0.5 text-[11px] text-white">cierra</span>}
                       <span className="ml-2 text-xs font-normal text-neutral-500">
-                        debe {money(p.pendiente)} · vencido {money(p.vencido)}
-                        {p.porVencer > 0 && <> · por vencer {money(p.porVencer)}</>}
+                        debe {money(p.pendiente)} · vencido {money(p.vencido)}{p.porVencer > 0 && <> · por vencer {money(p.porVencer)}</>}
                       </span>
                     </td>
                   </tr>
@@ -363,14 +372,9 @@ export default function SimuladorCierrePanel({
             {meQueda < 0 && <b className="text-red-700"> Con lo marcado no alcanza: faltan ₡{money(-meQueda)}.</b>}
           </p>
           {mesesRecuperar !== null && (
-            <p>
-              Si cerrás <b>{nombreCierra}</b>, la caja mejora <b>₡{money(r.efecto)}/mes</b>, así que cubrir ese faltante
-              tomaría <b>~{mesesRecuperar} mes{mesesRecuperar === 1 ? "" : "es"}</b>.
-            </p>
+            <p>Si aplicás los cambios de arriba, la caja mejora <b>₡{money(r.efecto)}/mes</b>, así que cubrir ese faltante tomaría <b>~{mesesRecuperar} mes{mesesRecuperar === 1 ? "" : "es"}</b>.</p>
           )}
-          <p className="text-neutral-400">
-            Nota: los <b>préstamos</b> bancarios (largo plazo, en cuotas) no se cuentan acá — es deuda operativa de corto plazo.
-          </p>
+          <p className="text-neutral-400">Nota: los <b>préstamos</b> bancarios (largo plazo, en cuotas) no se cuentan acá — es deuda operativa de corto plazo.</p>
         </div>
       </div>
     </div>
