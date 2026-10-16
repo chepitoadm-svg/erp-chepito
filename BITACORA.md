@@ -256,6 +256,14 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
 
 ## Hecho reciente (sep–oct 2026)
 
+- **Estado de Resultados comparativo por mes (2026-10-16).** `/reportes/resultados` ahora tiene toggle
+  **"Por centro de costo" / "Comparar meses"**. Modo meses: selector de centro (o Todos/consolidado) +
+  mes desde/hasta → columnas = cada mes (cap 12) + columna **Variación** (último − primero). Reusa
+  `fn_estado_resultados(desde,hasta,prorrateo)` (un fetch por mes). Drill-down por celda al detalle de
+  cuenta (al mes+centro). Excel para ambos modos. El modo "por centro" (columnas = centros) es el de
+  antes. Nota devengado: CH1 util. operación positiva (jul 317k / ago 569k) pero antes de imp. negativa
+  (otros gastos grandes) — coherente con el análisis de caja.
+
 - **Flujo por panadería: IVA de ventas atribuido a la sucursal (2026-10-13).** El "Impuesto de ventas
   cobrado" (21-10-15-04) caía en "Sin negocio" porque la cuenta no lleva centro, pero es plata que
   entró a la panadería (cliente pagó neto+IVA en datáfono/caja). `fn_flujo_caja_centro` y
