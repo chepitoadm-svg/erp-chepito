@@ -52,7 +52,7 @@ const SECCIONES: { seccion: string; titulo: string; neg?: boolean }[] = [
 export default async function ResultadosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ modo?: string; desde?: string; hasta?: string; prorrateo?: string; centro?: string; mesDesde?: string; mesHasta?: string }>;
+  searchParams: Promise<{ modo?: string; desde?: string; hasta?: string; prorrateo?: string; centro?: string | string[]; mesDesde?: string; mesHasta?: string }>;
 }) {
   if (!(await tienePermiso("reportes.financieros.ver"))) redirect("/reportes");
   const sp = await searchParams;
@@ -64,7 +64,8 @@ export default async function ResultadosPage({
   const hasta = sp.hasta || "2026-07-31";
   const mesDesde = /^\d{4}-\d{2}$/.test(sp.mesDesde ?? "") ? (sp.mesDesde as string) : "2026-07";
   const mesHasta = /^\d{4}-\d{2}$/.test(sp.mesHasta ?? "") ? (sp.mesHasta as string) : "2026-08";
-  const centroSel = sp.centro || "TODOS";
+  // Centros seleccionados (checkboxes, varios). Vacío = todos (consolidado).
+  const centrosSel = (Array.isArray(sp.centro) ? sp.centro : sp.centro ? [sp.centro] : []).filter((x) => x && x !== "TODOS");
   const meses = modo === "meses" ? listaMeses(mesDesde, mesHasta) : [];
 
   const cuentas = await listarCuentasPosteables();
@@ -83,9 +84,11 @@ export default async function ResultadosPage({
   const centrosMap = new Map<string, string>();
   for (const f of modo === "meses" ? datosPorMes.flat() : filas) centrosMap.set(f.centro_codigo, f.centro_nombre);
   const centrosOrden = [...centrosMap.keys()].sort();
+  const centrosMostrar = centrosSel.length ? centrosOrden.filter((c) => centrosSel.includes(c)) : centrosOrden;
+  const centrosLabel = centrosSel.length ? centrosSel.join(", ") : "todos (consolidado)";
 
   // Columnas (keys) y etiquetas según modo
-  const cols: string[] = modo === "meses" ? [...meses, ...(meses.length > 1 ? ["VAR"] : [])] : [...centrosOrden, "TOTAL"];
+  const cols: string[] = modo === "meses" ? [...meses, ...(meses.length > 1 ? ["VAR"] : [])] : [...centrosMostrar, "TOTAL"];
   const colLabel = (k: string) => (k === "TOTAL" ? "TOTAL" : k === "VAR" ? "Variación" : modo === "meses" ? etiquetaMes(k) : k);
 
   // Construcción de filas por sección (celdas keyed por col)
@@ -100,7 +103,7 @@ export default async function ResultadosPage({
       meses.forEach((m, i) => {
         for (const f of datosPorMes[i]) {
           if (f.seccion !== seccion) continue;
-          if (centroSel !== "TODOS" && f.centro_codigo !== centroSel) continue;
+          if (centrosSel.length && !centrosSel.includes(f.centro_codigo)) continue;
           upd(f.cuenta_codigo, f.cuenta_nombre, m, Number(f.monto));
         }
       });
@@ -108,9 +111,10 @@ export default async function ResultadosPage({
     } else {
       for (const f of filas) {
         if (f.seccion !== seccion) continue;
+        if (centrosSel.length && !centrosSel.includes(f.centro_codigo)) continue;
         upd(f.cuenta_codigo, f.cuenta_nombre, f.centro_codigo, Number(f.monto));
       }
-      for (const e of porCuenta.values()) e.celdas.TOTAL = centrosOrden.reduce((s, c) => s + (e.celdas[c] ?? 0), 0);
+      for (const e of porCuenta.values()) e.celdas.TOTAL = centrosMostrar.reduce((s, c) => s + (e.celdas[c] ?? 0), 0);
     }
     return [...porCuenta.values()].sort((a, b) => a.cod.localeCompare(b.cod));
   };
@@ -140,7 +144,7 @@ export default async function ResultadosPage({
     if (modo === "meses") {
       const rg = rango(colKey);
       p.set("desde", rg.desde); p.set("hasta", rg.hasta);
-      if (centroSel !== "TODOS") p.set("centro", centroSel);
+      if (centrosSel.length === 1) p.set("centro", centrosSel[0]);
     } else {
       p.set("desde", desde); p.set("hasta", hasta);
       if (colKey !== "TOTAL") p.set("centro", colKey);
@@ -219,8 +223,9 @@ export default async function ResultadosPage({
     const p = new URLSearchParams();
     p.set("modo", m);
     if (!conProrrateo) p.set("prorrateo", "no");
-    if (m === "meses") { p.set("mesDesde", mesDesde); p.set("mesHasta", mesHasta); if (centroSel !== "TODOS") p.set("centro", centroSel); }
+    if (m === "meses") { p.set("mesDesde", mesDesde); p.set("mesHasta", mesHasta); }
     else { p.set("desde", desde); p.set("hasta", hasta); }
+    for (const cc of centrosSel) p.append("centro", cc);
     return `/reportes/resultados?${p.toString()}`;
   };
 
@@ -245,27 +250,34 @@ export default async function ResultadosPage({
           </>
         ) : (
           <>
-            <div>
-              <label className="block text-xs text-neutral-500">Centro de costo</label>
-              <select name="centro" defaultValue={centroSel} className="rounded-md border border-neutral-300 px-2 py-1.5">
-                <option value="TODOS">Todos (consolidado)</option>
-                {centrosOrden.map((c) => <option key={c} value={c}>{c} · {centrosMap.get(c)}</option>)}
-              </select>
-            </div>
             <div><label className="block text-xs text-neutral-500">Mes desde</label><input type="month" name="mesDesde" defaultValue={mesDesde} className="rounded-md border border-neutral-300 px-2 py-1.5" /></div>
             <div><label className="block text-xs text-neutral-500">Mes hasta</label><input type="month" name="mesHasta" defaultValue={mesHasta} className="rounded-md border border-neutral-300 px-2 py-1.5" /></div>
           </>
         )}
+        {/* Centros de costo (varios). Sin marcar ninguno = todos (consolidado). */}
+        <div>
+          <label className="block text-xs text-neutral-500">
+            Centros de costo {modo === "meses" ? "(consolida los marcados)" : "(columnas)"} · sin marcar = todos
+          </label>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-neutral-300 px-2 py-2">
+            {centrosOrden.map((c) => (
+              <label key={c} className="flex items-center gap-1 whitespace-nowrap text-xs text-neutral-700" title={centrosMap.get(c)}>
+                <input type="checkbox" name="centro" value={c} defaultChecked={centrosSel.includes(c)} className="h-3.5 w-3.5 accent-neutral-900" />
+                {c} <span className="text-neutral-400">{centrosMap.get(c)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
         <label className="flex items-center gap-2 pb-1.5">
           <input type="checkbox" name="prorrateo" value="no" defaultChecked={!conProrrateo} className="h-4 w-4" />
           <span className="text-neutral-600">Sin prorrateo (ver qué costó el Taller)</span>
         </label>
         <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 font-medium text-white hover:bg-neutral-800">Aplicar</button>
         <ExportarExcel
-          nombre={`estado-resultados-${modo === "meses" ? `${mesDesde}_${mesHasta}_${centroSel}` : `${desde}_${hasta}`}.xlsx`}
+          nombre={`estado-resultados-${modo === "meses" ? `${mesDesde}_${mesHasta}` : `${desde}_${hasta}`}${centrosSel.length ? "_" + centrosSel.join("-") : ""}.xlsx`}
           hoja="Resultados"
           titulo="Estado de Resultados"
-          subtitulo={`Panaderías Chepito · ${modo === "meses" ? `comparar ${etiquetaMes(mesDesde)}–${etiquetaMes(mesHasta)} · ${centroSel === "TODOS" ? "consolidado" : centroSel}` : `${desde} a ${hasta}`}${conProrrateo ? " · con prorrateo" : " · sin prorrateo"}`}
+          subtitulo={`Panaderías Chepito · ${modo === "meses" ? `comparar ${etiquetaMes(mesDesde)}–${etiquetaMes(mesHasta)}` : `${desde} a ${hasta}`} · ${centrosLabel}${conProrrateo ? " · con prorrateo" : " · sin prorrateo"}`}
           columnas={excelCols}
           filas={excel}
         />
@@ -299,8 +311,8 @@ export default async function ResultadosPage({
       {hayDatos && (
         <p className="mt-3 text-xs text-neutral-500">
           {modo === "meses"
-            ? <>Comparando <b>{centroSel === "TODOS" ? "todos los centros (consolidado)" : centroSel}</b> mes a mes. La columna <b>Variación</b> = último mes − primero.</>
-            : <>Columnas = centros de costo. {conProrrateo ? "El Taller aparece repartido a los canales (prorrateo)." : "El Taller aparece como columna sin repartir."}</>}{" "}
+            ? <>Comparando <b>{centrosLabel}</b> mes a mes. La columna <b>Variación</b> = último mes − primero.</>
+            : <>Columnas = centros de costo (<b>{centrosLabel}</b>). {conProrrateo ? "El Taller aparece repartido a los canales (prorrateo)." : "El Taller aparece como columna sin repartir."}</>}{" "}
           Costos y gastos en positivo; los subtotales ya los restan. Tocá una celda para ver el detalle.
         </p>
       )}

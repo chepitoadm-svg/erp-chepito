@@ -263,6 +263,9 @@ cambió algo, te deja listo. (Esto es SOLO para correr local; en Vercel/Netlify 
   cuenta (al mes+centro). Excel para ambos modos. El modo "por centro" (columnas = centros) es el de
   antes. Nota devengado: CH1 util. operación positiva (jul 317k / ago 569k) pero antes de imp. negativa
   (otros gastos grandes) — coherente con el análisis de caja.
+  **(2026-10-16) Checkboxes de centros:** el selector de centro pasó de dropdown único a **checkboxes
+  (varios)** en ambos modos (param `centro` repetido). Sin marcar = todos. En "comparar meses" consolida
+  los marcados; en "por centro" filtra qué columnas se muestran (TOTAL sobre los marcados).
 
 - **Flujo por panadería: IVA de ventas atribuido a la sucursal (2026-10-13).** El "Impuesto de ventas
   cobrado" (21-10-15-04) caía en "Sin negocio" porque la cuenta no lleva centro, pero es plata que
